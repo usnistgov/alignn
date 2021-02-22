@@ -13,11 +13,10 @@ from torch import optim
 from dgl.nn import GraphConv
 from dgl.nn import AvgPooling
 import numpy as np
-import networkx as nx
 import torch.utils.data
 import torch
 from sklearn.model_selection import train_test_split
-
+import networkx as nx
 
 config = {
     "chem_type": "basic",
@@ -46,20 +45,25 @@ config = {
 }
 
 
-def dgl_crystal(atoms, primitive=False, cutoff=8, enforce_c_size=5):
+def dgl_crystal(
+    atoms: Atoms, primitive: bool = False, cutoff: float = 8, enforce_c_size: float = 5
+):
     """Get DGLGraph from atoms."""
-    g = dgl.DGLGraph()
+
     if primitive:
         atoms = atoms.get_primitive_atoms
+
     dim = get_supercell_dims(atoms=atoms, enforce_c_size=enforce_c_size)
     atoms = atoms.make_supercell(dim)
     dist = atoms.raw_distance_matrix
     dist[dist > cutoff] = 0
-    D = nx.Graph(dist)
-    g.from_networkx(D, edge_attrs=["weight"])
+
+    D = nx.DiGraph(dist)
+
+    g = dgl.from_networkx(D, edge_attrs=["weight"])
     g.edata["bondlength"] = g.edata["weight"]
     # del g.edata['weight']
-    g.ndata["atomic_number"] = np.array(atoms.atomic_numbers, dtype=np.int8)
+    g.ndata["atomic_number"] = torch.tensor(atoms.atomic_numbers, dtype=torch.int8)
     return g
 
 
@@ -121,7 +125,11 @@ class StructureDataset(torch.utils.data.Dataset):
 
 
 def train_epoch(
-    train_loader, model, criterion, optimizer, epoch=0,
+    train_loader,
+    model,
+    criterion,
+    optimizer,
+    epoch=0,
 ):
     """Train model."""
     train_loss = []
@@ -138,7 +146,11 @@ def train_epoch(
 
 
 def evaluate(
-    test_loader, model, criterion, optimizer, epoch=0,
+    test_loader,
+    model,
+    criterion,
+    optimizer,
+    epoch=0,
 ):
     """Evaluate model."""
     test_loss = []
@@ -197,11 +209,13 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
     # v_loss = []
     for epoch_idx in range(config["n_epochs"]):
         train_loss = train_epoch(
-            train_loader, model, criterion, optimizer, epoch=epoch_idx,
+            train_loader,
+            model,
+            criterion,
+            optimizer,
+            epoch=epoch_idx,
         )
-        val_loss = evaluate(
-            val_loader, model, criterion, optimizer, epoch=epoch_idx
-        )
+        val_loss = evaluate(val_loader, model, criterion, optimizer, epoch=epoch_idx)
         # print (train_loss, type(train_loss),val_loss,type(val_loss))
         t_loss.append(np.mean(np.array([j.data for j in train_loss])))
         val_loss = [j.data for j in val_loss]
