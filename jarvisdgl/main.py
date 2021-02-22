@@ -1,21 +1,18 @@
 """Module to train DGL graph for Atoms."""
 
 # !pip install dgl==0.4.3 jarvis-tools==2021.2.3
-from torch.utils.data import DataLoader
-from jarvis.db.figshare import data as jdata
+import dgl
+import numpy as np
+import torch
+import torch.nn.functional as F
+import torch.utils.data
+from dgl.nn import AvgPooling, GraphConv
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
-import dgl
-import torch
-from torch import nn
-import torch.nn.functional as F
-from torch import optim
-from dgl.nn import GraphConv
-from dgl.nn import AvgPooling
-import numpy as np
-import torch.utils.data
-import torch
+from jarvis.db.figshare import data as jdata
 from sklearn.model_selection import train_test_split
+from torch import nn, optim
+from torch.utils.data import DataLoader
 
 config = {
     "chem_type": "basic",
@@ -101,7 +98,7 @@ class StructureDataset(torch.utils.data.Dataset):
                 # g1=dgl.from_networkx(graph)
                 # atom_features = "atomic_number"
 
-                g2 = dgl_crystal_graph(a)
+                g2 = dgl_crystal(a)
 
                 self.graphs.append(g2)
                 self.labels.append(j)
