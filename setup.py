@@ -1,0 +1,38 @@
+import glob
+import os
+
+from setuptools import setup, find_packages
+
+JARVIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+base_dir = os.path.dirname(__file__)
+with open(os.path.join(base_dir, "README.md")) as f:
+    long_d = f.read()
+
+setup(
+    name="jarvisdgl",
+    version="2021.2.22",
+    long_description=long_d,
+    install_requires=[
+        "jarvis-tools==2021.2.3",
+        "dgl==0.4.3",
+        "torch==1.5.1",
+    ],
+    author="Kamal Choudhary, Brain DeCost",
+    author_email="kamal.choudhary@nist.gov",
+    description=(
+        "jarvisdgl: Deep graph library for materials science. https://jarvis.nist.gov/"
+    ),
+    license="NIST",
+    url="https://github.com/JARVIS-Materials-Design/jarvisdgl",
+    packages=find_packages(),
+    classifiers=[
+        "Programming Language :: Python :: 3.6",
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Topic :: Scientific/Engineering",
+    ],
+    # scripts=glob.glob(os.path.join(JARVIS_DIR,  "*"))
+)

@@ -1,6 +1,6 @@
 """Module to train DGL graph for Atoms."""
 
-# !pip install dgl==0.4.3 jarvis-tools==2021.2.3 
+# !pip install dgl==0.4.3 jarvis-tools==2021.2.3
 from torch.utils.data import DataLoader
 from jarvis.db.figshare import data as jdata
 from jarvis.core.atoms import Atoms
@@ -154,54 +154,59 @@ def evaluate(
     return test_loss
 
 
-dataset = jdata("dft_3d")
-prop = "optb88vdw_bandgap"
-structures = []
-targets = []
-for i in dataset:
-    if i[prop] != "na":
-        structures.append(i["atoms"])
-        targets.append(i[prop])
+def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
+    """Train property model."""
+    dataset = jdata(dataset_name)
+    structures = []
+    targets = []
+    for i in dataset:
+        if i[prop] != "na":
+            structures.append(i["atoms"])
+            targets.append(i[prop])
 
-X_train, X_test, y_train, y_test = train_test_split(
-    structures, targets, test_size=0.33, random_state=int(37)
-)
-
-train_data = StructureDataset(X_train, y_train)
-val_data = StructureDataset(X_test, y_test)
-
-# use a regular pytorch dataloader
-train_loader = DataLoader(
-    train_data,
-    batch_size=1,
-    shuffle=True,
-    collate_fn=train_data.collate,
-    drop_last=True,
-)
-
-val_loader = DataLoader(
-    val_data,
-    batch_size=1,
-    shuffle=True,
-    collate_fn=val_data.collate,
-    drop_last=True,
-)
-
-model = SimpleGCN()
-criterion = torch.nn.L1Loss()
-optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0)
-
-hist = {"val_loss": [], "train_loss": []}
-t_loss = []
-v_loss = []
-for epoch_idx in range(config["n_epochs"]):
-    train_loss = train_epoch(
-        train_loader, model, criterion, optimizer, epoch=epoch_idx,
+    X_train, X_test, y_train, y_test = train_test_split(
+        structures, targets, test_size=0.33, random_state=int(37)
     )
-    val_loss = evaluate(
-        val_loader, model, criterion, optimizer, epoch=epoch_idx
+
+    train_data = StructureDataset(X_train, y_train)
+    val_data = StructureDataset(X_test, y_test)
+
+    # use a regular pytorch dataloader
+    train_loader = DataLoader(
+        train_data,
+        batch_size=1,
+        shuffle=True,
+        collate_fn=train_data.collate,
+        drop_last=True,
     )
-    # print (train_loss, type(train_loss),val_loss,type(val_loss))
-    t_loss.append(np.mean(np.array([j.data for j in train_loss])))
-    val_loss = [j.data for j in val_loss]
-    print("t_loss,v_loss", epoch_idx, (train_loss[-1]), val_loss[-1])
+
+    val_loader = DataLoader(
+        val_data,
+        batch_size=1,
+        shuffle=True,
+        collate_fn=val_data.collate,
+        drop_last=True,
+    )
+
+    model = SimpleGCN()
+    criterion = torch.nn.L1Loss()
+    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0)
+
+    # hist = {"val_loss": [], "train_loss": []}
+    t_loss = []
+    # v_loss = []
+    for epoch_idx in range(config["n_epochs"]):
+        train_loss = train_epoch(
+            train_loader, model, criterion, optimizer, epoch=epoch_idx,
+        )
+        val_loss = evaluate(
+            val_loader, model, criterion, optimizer, epoch=epoch_idx
+        )
+        # print (train_loss, type(train_loss),val_loss,type(val_loss))
+        t_loss.append(np.mean(np.array([j.data for j in train_loss])))
+        val_loss = [j.data for j in val_loss]
+        print("t_loss,v_loss", epoch_idx, (train_loss[-1]), val_loss[-1])
+
+
+if __name__ == "__main__":
+    train_property_model()
