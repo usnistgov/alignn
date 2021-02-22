@@ -34,3 +34,9 @@ jobs:
         run: |
           echo Add other actions to build,
           echo test, and deploy your project.
+          python setup.py develop
+          pip install codecov pytest pytest-cov coverage
+          coverage run -m pytest
+          coverage report -m
+          codecov
+
