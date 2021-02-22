@@ -1,4 +1,5 @@
 #!pip install jarvis-tools dgl
+# https://docs.dgl.ai/en/0.4.x/tutorials/basics/4_batch.html
 from dgl.data import MiniGCDataset
 import matplotlib.pyplot as plt
 %matplotlib inline
