@@ -20,19 +20,13 @@ def dgl_crystal_pmg(structure,primitive = False,cutoff = 8,supercell_size= 1) :
     return g
     
 def dgl_crystal_jarvis(atoms,primitive = False,cutoff = 8,supercell_size= [1,1,1]) :
-    # TODO: check lattice parameters and tile only if some cutoff radius is exceeded
     g = dgl.DGLGraph()
-
     if primitive:
       atoms = atoms.get_primitive_atoms
-
-    if supercell_size > 1:
-      atoms.make_supercell(supercell_size)
-
+    atoms=atoms.make_supercell(supercell_size)
     dist = atoms.raw_distance_matrix
     dist[dist > cutoff] = 0
     D = nx.Graph(dist)
-
     g.from_networkx(D, edge_attrs=['weight'])
     g.edata['bondlength'] = g.edata['weight']
     del g.edata['weight']
