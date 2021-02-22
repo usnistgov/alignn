@@ -4,7 +4,7 @@
 from torch.utils.data import DataLoader
 from jarvis.db.figshare import data as jdata
 from jarvis.core.atoms import Atoms
-from jarvis.core.atoms import get_supercell_dims
+from jarvis.core.graphs import Graph
 import dgl
 import torch
 from torch import nn
@@ -16,7 +16,6 @@ import numpy as np
 import torch.utils.data
 import torch
 from sklearn.model_selection import train_test_split
-import networkx as nx
 
 config = {
     "chem_type": "basic",
@@ -48,22 +47,23 @@ config = {
 def dgl_crystal(
     atoms: Atoms, primitive: bool = False, cutoff: float = 8, enforce_c_size: float = 5
 ):
-    """Get DGLGraph from atoms."""
+    """Get DGLGraph from atoms. go through jarvis.core.graph """
 
-    if primitive:
-        atoms = atoms.get_primitive_atoms
+    jgraph = Graph.from_atoms(
+        atoms,
+        features="basic",
+        get_prim=primitive,
+        max_cut=cutoff,
+        enforce_c_size=enforce_c_size,
+    )
 
-    dim = get_supercell_dims(atoms=atoms, enforce_c_size=enforce_c_size)
-    atoms = atoms.make_supercell(dim)
-    dist = atoms.raw_distance_matrix
-    dist[dist > cutoff] = 0
+    # weight is currently `adj = variance * np.exp(-bond_distance / lengthscale)`
+    g = dgl.from_networkx(jgraph.to_networkx(), edge_attrs=["weight"])
+    # g.edata["bondlength"] = g.edata["weight"]
 
-    D = nx.DiGraph(dist)
-
-    g = dgl.from_networkx(D, edge_attrs=["weight"])
-    g.edata["bondlength"] = g.edata["weight"]
-    # del g.edata['weight']
-    g.ndata["atomic_number"] = torch.tensor(atoms.atomic_numbers, dtype=torch.int8)
+    g.ndata["atomic_number"] = torch.tensor(
+        jgraph.node_attributes[:, 0], dtype=torch.int8
+    )
     return g
 
 
@@ -71,7 +71,7 @@ class SimpleGCN(nn.Module):
     """Module for simple GCN."""
 
     def __init__(self, in_features=1, conv_layers=2, width=32):
-        """Initialize class with number og input features, conv layers."""
+        """Initialize class with number of input features, conv layers."""
         super().__init__()
         self.layer1 = GraphConv(in_features, width)
         self.layer2 = GraphConv(width, 1)
@@ -101,7 +101,7 @@ class StructureDataset(torch.utils.data.Dataset):
                 # g1=dgl.from_networkx(graph)
                 # atom_features = "atomic_number"
 
-                g2 = dgl_crystal(a)
+                g2 = dgl_crystal_graph(a)
 
                 self.graphs.append(g2)
                 self.labels.append(j)
