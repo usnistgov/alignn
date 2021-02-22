@@ -19,7 +19,7 @@ def dgl_crystal_pmg(structure,primitive = False,cutoff = 8,supercell_size= 1) :
     g.ndata['atomic_number'] = np.array(structure.atomic_numbers, dtype=np.int8)
     return g
     
-def dgl_crystal_jarvis(atoms,primitive = False,cutoff = 8,supercell_size= 1) :
+def dgl_crystal_jarvis(atoms,primitive = False,cutoff = 8,supercell_size= [1,1,1]) :
     # TODO: check lattice parameters and tile only if some cutoff radius is exceeded
     g = dgl.DGLGraph()
 
