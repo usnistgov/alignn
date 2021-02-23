@@ -1,6 +1,6 @@
 name: jarvisdgl-action
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -32,6 +32,8 @@ jobs:
       run: |
         export DGLBACKEND=pytorch
         pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage torch==1.7.1 jarvis-tools dgl==0.5.3
+        echo 'pip freeze'
+        pip freeze
         coverage run -m pytest
         coverage report -m
         # codecov
