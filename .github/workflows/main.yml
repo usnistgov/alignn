@@ -34,4 +34,4 @@ jobs:
         pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage torch==1.7.1 jarvis-tools dgl==0.5.3
         coverage run -m pytest
         coverage report -m
-        codecov
+        # codecov
