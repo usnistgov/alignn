@@ -26,7 +26,8 @@ class RBFExpansion(nn.Module):
         )
 
         if lengthscale is None:
-            # SchNet-style: set lengthscales relative to granularity of RBF expansion
+            # SchNet-style
+            # set lengthscales relative to granularity of RBF expansion
             self.lengthscale = np.diff(self.centers).mean()
             self.gamma = 1 / self.lengthscale
 
@@ -41,7 +42,9 @@ class RBFExpansion(nn.Module):
 
 
 class CGCNNConv(nn.Module):
-    """ Xie and Grossman graph convolution function from 10.1103/PhysRevLett.120.145301 """
+    """Xie and Grossman graph convolution function
+    10.1103/PhysRevLett.120.145301
+    """
 
     def __init__(self, node_features: int = 64, edge_features: int = 32):
         super().__init__()
@@ -79,7 +82,7 @@ class CGCNNConv(nn.Module):
         # form augmented edge features z_ij = [v_i, v_j, u_ij]
         z = torch.cat((edges.src["h"], edges.dst["h"], edges.data["h"]), dim=1)
 
-        # multiply output of atomic interaction network and edge attention network
+        # multiply output of atom interaction net and edge attention net
         # i.e. compute the term inside the summation in eq 5
         # σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
         return {"z": self.edge_interaction(z) * self.edge_update(z)}
@@ -90,14 +93,16 @@ class CGCNNConv(nn.Module):
         node_feats: torch.Tensor,
         edge_feats: torch.Tensor,
     ) -> torch.Tensor:
-        """ CGCNN convolution defined in Eq 5 of 10.1103/PhysRevLett.120.145301 """
+        """CGCNN convolution defined in Eq 5
+        10.1103/PhysRevLett.120.14530
+        """
 
         g = g.local_var()
 
         g.ndata["h"] = node_feats
         g.edata["h"] = edge_feats
 
-        # apply the convolution term in eq. 5 (excluding the residual connection)
+        # apply the convolution term in eq. 5 (without residual connection)
         # storing the results in edge features `h`
         g.update_all(
             message_func=self.combine_edge_features,
