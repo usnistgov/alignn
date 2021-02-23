@@ -21,7 +21,9 @@ class RBFExpansion(nn.Module):
         self.vmin = vmin
         self.vmax = vmax
         self.bins = bins
-        self.register_buffer("centers", torch.linspace(self.vmin, self.vmax, self.bins))
+        self.register_buffer(
+            "centers", torch.linspace(self.vmin, self.vmax, self.bins)
+        )
 
         if lengthscale is None:
             # SchNet-style: set lengthscales relative to granularity of RBF expansion
@@ -33,7 +35,9 @@ class RBFExpansion(nn.Module):
             self.gamma = 1 / (lengthscale ** 2)
 
     def forward(self, distance: torch.Tensor) -> torch.Tensor:
-        return torch.exp(-self.gamma * (distance.unsqueeze(1) - self.centers) ** 2)
+        return torch.exp(
+            -self.gamma * (distance.unsqueeze(1) - self.centers) ** 2
+        )
 
 
 class CGCNNConv(nn.Module):
@@ -81,7 +85,10 @@ class CGCNNConv(nn.Module):
         return {"z": self.edge_interaction(z) * self.edge_update(z)}
 
     def forward(
-        self, g: dgl.DGLGraph, node_feats: torch.Tensor, edge_feats: torch.Tensor
+        self,
+        g: dgl.DGLGraph,
+        node_feats: torch.Tensor,
+        edge_feats: torch.Tensor,
     ) -> torch.Tensor:
         """ CGCNN convolution defined in Eq 5 of 10.1103/PhysRevLett.120.145301 """
 
@@ -93,7 +100,8 @@ class CGCNNConv(nn.Module):
         # apply the convolution term in eq. 5 (excluding the residual connection)
         # storing the results in edge features `h`
         g.update_all(
-            message_func=self.combine_edge_features, reduce_func=fn.sum("z", "h")
+            message_func=self.combine_edge_features,
+            reduce_func=fn.sum("z", "h"),
         )
 
         # final batchnorm
@@ -120,12 +128,17 @@ class CGCNN(nn.Module):
         self.atom_embedding = nn.Linear(atom_input_features, node_features)
 
         self.conv_layers = nn.ModuleList(
-            [CGCNNConv(node_features, edge_features) for _ in range(conv_layers)]
+            [
+                CGCNNConv(node_features, edge_features)
+                for _ in range(conv_layers)
+            ]
         )
 
         self.readout = AvgPooling()
 
-        self.fc = nn.Sequential(nn.Linear(node_features, fc_features), nn.Softplus())
+        self.fc = nn.Sequential(
+            nn.Linear(node_features, fc_features), nn.Softplus()
+        )
 
         self.fc_out = nn.Linear(fc_features, output_features)
         self.logscale = logscale
