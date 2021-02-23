@@ -42,10 +42,12 @@ config = {
 
 
 def dgl_crystal(
-    atoms: Atoms, primitive: bool = False, cutoff: float = 8, enforce_c_size: float = 5
+    atoms: Atoms,
+    primitive: bool = False,
+    cutoff: float = 8,
+    enforce_c_size: float = 5,
 ):
-    """Get DGLGraph from atoms. go through jarvis.core.graph """
-
+    """Get DGLGraph from atoms, go through jarvis.core.graph."""
     jgraph = Graph.from_atoms(
         atoms,
         features="basic",
@@ -54,7 +56,8 @@ def dgl_crystal(
         enforce_c_size=enforce_c_size,
     )
 
-    # weight is currently `adj = variance * np.exp(-bond_distance / lengthscale)`
+    # weight is currently
+    #  `adj = variance * np.exp(-bond_distance / lengthscale)`
     g = dgl.from_networkx(jgraph.to_networkx(), edge_attrs=["weight"])
     # g.edata["bondlength"] = g.edata["weight"]
 
@@ -122,11 +125,7 @@ class StructureDataset(torch.utils.data.Dataset):
 
 
 def train_epoch(
-    train_loader,
-    model,
-    criterion,
-    optimizer,
-    epoch=0,
+    train_loader, model, criterion, optimizer, epoch=0,
 ):
     """Train model."""
     train_loss = []
@@ -143,11 +142,7 @@ def train_epoch(
 
 
 def evaluate(
-    test_loader,
-    model,
-    criterion,
-    optimizer,
-    epoch=0,
+    test_loader, model, criterion, optimizer, epoch=0,
 ):
     """Evaluate model."""
     test_loss = []
@@ -206,13 +201,11 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
     # v_loss = []
     for epoch_idx in range(config["n_epochs"]):
         train_loss = train_epoch(
-            train_loader,
-            model,
-            criterion,
-            optimizer,
-            epoch=epoch_idx,
+            train_loader, model, criterion, optimizer, epoch=epoch_idx,
         )
-        val_loss = evaluate(val_loader, model, criterion, optimizer, epoch=epoch_idx)
+        val_loss = evaluate(
+            val_loader, model, criterion, optimizer, epoch=epoch_idx
+        )
         # print (train_loss, type(train_loss),val_loss,type(val_loss))
         t_loss.append(np.mean(np.array([j.data for j in train_loss])))
         val_loss = [j.data for j in val_loss]
