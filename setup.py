@@ -14,7 +14,7 @@ setup(
     version="2021.2.22",
     long_description=long_d,
     install_requires=[
-        "jarvis-tools==2021.2.3",
+        "jarvis-tools==2021.2.21",
         "dgl==0.4.3",
         "torch==1.5.1",
     ],
