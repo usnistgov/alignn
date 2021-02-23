@@ -1,4 +1,4 @@
-name: Python package
+name: jarvisdgl-action
 
 on: [push]
 
@@ -19,15 +19,16 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest
+        pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage
         python setup.py install
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
+     
+    - name: Lint 
       run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        pycodestyle --ignore E203,W503 --exclude=tests jarvisdgl
+        pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count jarvisdgl
+        flake8 --ignore E203,W503 --exclude=tests --statistics --count --exit-zero jarvisdgl
     - name: Test with pytest
       run: |
-        pytest
+        coverage run -m pytest
+        coverage report -m
+        codecov
