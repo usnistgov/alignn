@@ -15,8 +15,8 @@ setup(
     long_description=long_d,
     install_requires=[
         "jarvis-tools==2021.2.21",
-        "dgl==0.4.3",
-        "torch==1.5.1",
+        "dgl==0.5.3",
+        "torch==1.7.1",
     ],
     author="Kamal Choudhary, Brain DeCost",
     author_email="kamal.choudhary@nist.gov",
