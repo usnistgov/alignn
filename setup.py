@@ -14,7 +14,9 @@ setup(
     version="2021.2.22",
     long_description=long_d,
     install_requires=[
-        "numpy
+        "numpy>=1.18.5",
+        "scipy>=1.4.1",
+        "matplotlib>=3.0.0",
         "jarvis-tools==2021.2.21",
         "dgl==0.5.3",
         "torch==1.7.1",
