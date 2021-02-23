@@ -14,6 +14,10 @@ from sklearn.model_selection import train_test_split
 from torch import nn, optim
 from torch.utils.data import DataLoader
 
+from jarvisdgl.models import CGCNN
+
+torch.set_default_dtype(torch.float32)
+
 config = {
     "chem_type": "basic",
     "verbose": True,
@@ -50,7 +54,7 @@ def dgl_crystal(
     """Get DGLGraph from atoms, go through jarvis.core.graph."""
     jgraph = Graph.from_atoms(
         atoms,
-        features="basic",
+        features="atomic_number",
         get_prim=primitive,
         max_cut=cutoff,
         enforce_c_size=enforce_c_size,
@@ -59,11 +63,13 @@ def dgl_crystal(
     # weight is currently
     #  `adj = variance * np.exp(-bond_distance / lengthscale)`
     g = dgl.from_networkx(jgraph.to_networkx(), edge_attrs=["weight"])
-    # g.edata["bondlength"] = g.edata["weight"]
+    g.edata["bondlength"] = g.edata["weight"].type(torch.FloatTensor)
+    del g.edata["weight"]
 
     g.ndata["atomic_number"] = torch.tensor(
-        jgraph.node_attributes[:, 0], dtype=torch.int8
-    )
+        jgraph.node_attributes, dtype=torch.int8
+    ).squeeze()
+
     return g
 
 
@@ -90,21 +96,23 @@ class SimpleGCN(nn.Module):
 class StructureDataset(torch.utils.data.Dataset):
     """Module for generating DGL dataset."""
 
-    def __init__(self, structures, targets):
+    def __init__(self, structures, targets, maxrows=np.inf):
         """Initialize the class."""
         self.graphs = []
         self.labels = []
-        for i, j in zip(structures, targets):
-            if len(self.labels) < 65:
-                a = Atoms.from_dict(i)
-                # graph=Graph.from_atoms(a).to_networkx()
-                # g1=dgl.from_networkx(graph)
-                # atom_features = "atomic_number"
+        for idx, (i, j) in enumerate(zip(structures, targets)):
+            if idx >= maxrows:
+                break
 
-                g2 = dgl_crystal(a)
+            a = Atoms.from_dict(i)
+            # graph=Graph.from_atoms(a).to_networkx()
+            # g1=dgl.from_networkx(graph)
+            # atom_features = "atomic_number"
 
-                self.graphs.append(g2)
-                self.labels.append(j)
+            g2 = dgl_crystal(a)
+
+            self.graphs.append(g2)
+            self.labels.append(j)
 
         self.labels = torch.tensor(self.labels)
 
@@ -125,7 +133,12 @@ class StructureDataset(torch.utils.data.Dataset):
 
 
 def train_epoch(
-    train_loader, model, criterion, optimizer, epoch=0,
+    train_loader,
+    model,
+    criterion,
+    optimizer,
+    scheduler,
+    epoch=0,
 ):
     """Train model."""
     train_loss = []
@@ -133,28 +146,30 @@ def train_epoch(
     for g, target in train_loader:
         output = model(g)
         loss = criterion(output, target)
-        # print (loss)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        train_loss.append(loss)
+        scheduler.step()
+        train_loss.append(loss.item())
     return train_loss
 
 
 def evaluate(
-    test_loader, model, criterion, optimizer, epoch=0,
+    test_loader,
+    model,
+    criterion,
+    epoch=0,
 ):
     """Evaluate model."""
-    test_loss = []
     model.eval()
+
+    test_loss = []
     for g, target in test_loader:
-        output = model(g)
-        loss = criterion(output, target)
-        # print (loss)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        test_loss.append(loss)
+        with torch.no_grad():
+            output = model(g)
+            loss = criterion(output, target)
+            test_loss.append(loss)
+
     return test_loss
 
 
@@ -172,13 +187,17 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
         structures, targets, test_size=0.33, random_state=int(37)
     )
 
-    train_data = StructureDataset(X_train, y_train)
-    val_data = StructureDataset(X_test, y_test)
+    maxrows = 1024
+    train_data = StructureDataset(X_train, y_train, maxrows=maxrows)
+    val_data = StructureDataset(X_test, y_test, maxrows=maxrows)
+
+    print(len(train_data))
+    print(len(val_data))
 
     # use a regular pytorch dataloader
     train_loader = DataLoader(
         train_data,
-        batch_size=1,
+        batch_size=32,
         shuffle=True,
         collate_fn=train_data.collate,
         drop_last=True,
@@ -186,28 +205,38 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
 
     val_loader = DataLoader(
         val_data,
-        batch_size=1,
+        batch_size=32,
         shuffle=True,
         collate_fn=val_data.collate,
         drop_last=True,
     )
 
-    model = SimpleGCN()
+    # model = SimpleGCN()
+    model = CGCNN(logscale=True)
     criterion = torch.nn.L1Loss()
-    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
+    scheduler = optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr=1e-2,
+        epochs=config["n_epochs"],
+        steps_per_epoch=len(train_loader),
+    )
 
     # hist = {"val_loss": [], "train_loss": []}
     t_loss = []
     # v_loss = []
     for epoch_idx in range(config["n_epochs"]):
         train_loss = train_epoch(
-            train_loader, model, criterion, optimizer, epoch=epoch_idx,
+            train_loader,
+            model,
+            criterion,
+            optimizer,
+            scheduler,
+            epoch=epoch_idx,
         )
-        val_loss = evaluate(
-            val_loader, model, criterion, optimizer, epoch=epoch_idx
-        )
+        val_loss = evaluate(val_loader, model, criterion, epoch=epoch_idx)
         # print (train_loss, type(train_loss),val_loss,type(val_loss))
-        t_loss.append(np.mean(np.array([j.data for j in train_loss])))
+        t_loss.append(np.mean(train_loss))
         val_loss = [j.data for j in val_loss]
         print("t_loss,v_loss", epoch_idx, (train_loss[-1]), val_loss[-1])
 
