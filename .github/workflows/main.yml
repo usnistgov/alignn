@@ -19,16 +19,18 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage
+       
         python setup.py install
      
     - name: Lint 
       run: |
+        pip install flake8 pytest pycodestyle pydocstyle dgl torch==1.7.1 jarvis-tools
         pycodestyle --ignore E203,W503 --exclude=tests jarvisdgl
         pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count jarvisdgl
         flake8 --ignore E203,W503 --exclude=tests --statistics --count --exit-zero jarvisdgl
     - name: Test with pytest
       run: |
+        pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage torch==1.7.1 jarvis-tools dgl
         coverage run -m pytest
         coverage report -m
         codecov
