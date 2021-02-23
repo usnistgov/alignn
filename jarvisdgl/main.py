@@ -173,7 +173,13 @@ def evaluate(
     return test_loss
 
 
-def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
+def train_property_model(
+    prop="optb88vdw_bandgap",
+    dataset_name="dft_3d",
+    epochs=config.get("n_epochs", 10),
+    maxrows=1024,
+    batch_size=config.get("batch_size", 32),
+):
     """Train property model."""
     dataset = jdata(dataset_name)
     structures = []
@@ -187,7 +193,6 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
         structures, targets, test_size=0.33, random_state=int(37)
     )
 
-    maxrows = 1024
     train_data = StructureDataset(X_train, y_train, maxrows=maxrows)
     val_data = StructureDataset(X_test, y_test, maxrows=maxrows)
 
@@ -197,7 +202,7 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
     # use a regular pytorch dataloader
     train_loader = DataLoader(
         train_data,
-        batch_size=32,
+        batch_size=batch_size,
         shuffle=True,
         collate_fn=train_data.collate,
         drop_last=True,
@@ -205,7 +210,7 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
 
     val_loader = DataLoader(
         val_data,
-        batch_size=32,
+        batch_size=batch_size,
         shuffle=True,
         collate_fn=val_data.collate,
         drop_last=True,
@@ -218,14 +223,14 @@ def train_property_model(prop="optb88vdw_bandgap", dataset_name="dft_3d"):
     scheduler = optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=1e-2,
-        epochs=config["n_epochs"],
+        epochs=epochs,
         steps_per_epoch=len(train_loader),
     )
 
     # hist = {"val_loss": [], "train_loss": []}
     t_loss = []
     # v_loss = []
-    for epoch_idx in range(config["n_epochs"]):
+    for epoch_idx in range(epochs):
         train_loss = train_epoch(
             train_loader,
             model,
