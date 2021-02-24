@@ -42,7 +42,7 @@ if torch.cuda.is_available():
 
 
 # load tiny prototyping datasets
-n = 64
+n = 128
 bs = 64
 train_loader, val_loader = data.get_train_val_loaders(
     n_train=n, n_val=n, batch_size=bs, atom_features="basic", normalize=True
@@ -66,6 +66,8 @@ optimizer = torch.optim.AdamW(net.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer,
     max_lr=1e-2,
+    max_momentum=0.92,
+    base_momentum=0.88,
     epochs=n_epochs,
     steps_per_epoch=len(train_loader),
 )
@@ -93,6 +95,7 @@ trainer.add_event_handler(
 )
 
 trainer.add_event_handler(Events.EPOCH_COMPLETED, TerminateOnNan())
+
 
 # collect evaluation performance
 @trainer.on(Events.EPOCH_COMPLETED)
