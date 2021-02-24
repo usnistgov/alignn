@@ -51,6 +51,19 @@ def dgl_crystal(
     return g
 
 
+class Normalize(torch.nn.Module):
+    def __init__(self, mean, std):
+        super().__init__()
+        self.mean = mean
+        self.std = std
+
+    def forward(self, g: dgl.DGLGraph):
+        g = g.local_var()
+        h = g.ndata.pop("atom_features")
+        g.ndata["atom_features"] = (h - self.mean) / self.std
+        return g
+
+
 class StructureDataset(torch.utils.data.Dataset):
     """Module for generating DGL dataset."""
 
@@ -60,6 +73,7 @@ class StructureDataset(torch.utils.data.Dataset):
         targets,
         maxrows=np.inf,
         atom_features="atomic_number",
+        transform=None,
     ):
         """Initialize the class."""
         self.graphs = []
@@ -75,6 +89,7 @@ class StructureDataset(torch.utils.data.Dataset):
             self.labels.append(target)
 
         self.labels = torch.tensor(self.labels)
+        self.transform = transform
 
     def __len__(self):
         """Get length."""
@@ -82,7 +97,24 @@ class StructureDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         """Get item."""
-        return self.graphs[idx], self.labels[idx]
+
+        g = self.graphs[idx]
+        label = self.labels[idx]
+
+        if self.transform:
+            g = self.transform(g)
+
+        return g, label
+
+    def setup_normalizer(self):
+        """ compute atom-wise feature means and set Normilization transform """
+        x = torch.cat([g.ndata["atom_features"] for g in self.graphs])
+        self.atom_feature_mean = x.mean(0)
+        self.atom_feature_std = x.std(0)
+
+        self.transform = Normalize(
+            self.atom_feature_mean, self.atom_feature_std
+        )
 
     @staticmethod
     def collate(samples):
@@ -99,9 +131,9 @@ def get_train_val_loaders(
     n_train: int = 32,
     n_val: int = 32,
     batch_size: int = 8,
+    normalize: bool = False,
 ):
     d = jdata(dataset)
-    d
 
     structures, targets = [], []
     for row in d:
@@ -116,8 +148,15 @@ def get_train_val_loaders(
     train_data = StructureDataset(
         X_train, y_train, atom_features=atom_features, maxrows=n_train
     )
+    if normalize:
+        train_data.setup_normalizer()
+
     val_data = StructureDataset(
-        X_test, y_test, atom_features=atom_features, maxrows=n_val
+        X_test,
+        y_test,
+        atom_features=atom_features,
+        maxrows=n_val,
+        transform=train_data.transform,
     )
 
     # use a regular pytorch dataloader
