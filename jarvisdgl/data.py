@@ -154,7 +154,7 @@ def get_train_val_loaders(
         X_train, y_train, atom_features=atom_features, maxrows=n_train
     )
     if normalize:
-        train_data.setup_normalizer()
+        train_data.setup_standardizer()
 
     val_data = StructureDataset(
         X_test,
