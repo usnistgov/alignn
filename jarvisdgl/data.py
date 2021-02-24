@@ -1,3 +1,6 @@
+"""Jarvis-dgl data loaders and DGLGraph utilities."""
+from typing import List, Tuple
+
 import dgl
 import numpy as np
 import torch
@@ -9,8 +12,7 @@ from torch.utils.data import DataLoader
 
 
 def prepare_dgl_batch(batch, device=None, non_blocking=False):
-    """ send batched dgl graph to device """
-
+    """Send batched dgl graph to device."""
     g, t = batch
     batch = (g.to(device), t.to(device))
 
@@ -24,8 +26,7 @@ def dgl_crystal(
     enforce_c_size: float = 5,
     atom_features="atomic_number",
 ):
-    """Get DGLGraph from atoms, go through jarvis.core.graph. """
-
+    """Get DGLGraph from atoms, go through jarvis.core.graph."""
     feature_sets = ("atomic_number", "basic", "cfid")
     if atom_features not in feature_sets:
         raise NotImplementedError(
@@ -51,13 +52,17 @@ def dgl_crystal(
     return g
 
 
-class Normalize(torch.nn.Module):
-    def __init__(self, mean, std):
+class Standardize(torch.nn.Module):
+    """Standardize atom_features: subtract mean and divide by std."""
+
+    def __init__(self, mean: torch.Tensor, std: torch.Tensor):
+        """Register featurewise mean and standard deviation."""
         super().__init__()
         self.mean = mean
         self.std = std
 
     def forward(self, g: dgl.DGLGraph):
+        """Apply standardization to atom_features."""
         g = g.local_var()
         h = g.ndata.pop("atom_features")
         g.ndata["atom_features"] = (h - self.mean) / self.std
@@ -65,7 +70,7 @@ class Normalize(torch.nn.Module):
 
 
 class StructureDataset(torch.utils.data.Dataset):
-    """Module for generating DGL dataset."""
+    """Dataset of crystal DGLGraphs."""
 
     def __init__(
         self,
@@ -96,8 +101,7 @@ class StructureDataset(torch.utils.data.Dataset):
         return self.labels.shape[0]
 
     def __getitem__(self, idx):
-        """Get item."""
-
+        """Get StructureDataset sample."""
         g = self.graphs[idx]
         label = self.labels[idx]
 
@@ -106,19 +110,19 @@ class StructureDataset(torch.utils.data.Dataset):
 
         return g, label
 
-    def setup_normalizer(self):
-        """ compute atom-wise feature means and set Normilization transform """
+    def setup_standardizer(self):
+        """Atom-wise feature standardization transform."""
         x = torch.cat([g.ndata["atom_features"] for g in self.graphs])
         self.atom_feature_mean = x.mean(0)
         self.atom_feature_std = x.std(0)
 
-        self.transform = Normalize(
+        self.transform = Standardize(
             self.atom_feature_mean, self.atom_feature_std
         )
 
     @staticmethod
-    def collate(samples):
-        """Provide input `samples` is a pair of lists (graphs, labels)."""
+    def collate(samples: List[Tuple[dgl.DGLGraph, torch.Tensor]]):
+        """Dataloader helper to batch graphs cross `samples`."""
         graphs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         return batched_graph, torch.tensor(labels)
@@ -133,6 +137,7 @@ def get_train_val_loaders(
     batch_size: int = 8,
     normalize: bool = False,
 ):
+    """Help function to set up Jarvis train and val dataloaders."""
     d = jdata(dataset)
 
     structures, targets = [], []

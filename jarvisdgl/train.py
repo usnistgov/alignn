@@ -1,4 +1,4 @@
-""" train.py
+"""Ignite training script.
 
 from the repository root, run
 `PYTHONPATH=$PYTHONPATH:. python jarvisdgl/train.py`
@@ -100,6 +100,7 @@ trainer.add_event_handler(Events.EPOCH_COMPLETED, TerminateOnNan())
 # collect evaluation performance
 @trainer.on(Events.EPOCH_COMPLETED)
 def log_results(engine):
+    """Print training and validation metrics to console."""
     train_evaluator.run(train_loader)
     evaluator.run(val_loader)
 

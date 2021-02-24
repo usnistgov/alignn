@@ -1,3 +1,8 @@
+"""Jarvisdgl: Deep graph library for materials science.
+
+https://jarvis.nist.gov.
+"""
+
 import glob
 import os
 
