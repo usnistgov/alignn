@@ -54,7 +54,7 @@ def dgl_crystal(
     """Get DGLGraph from atoms, go through jarvis.core.graph."""
     jgraph = Graph.from_atoms(
         atoms,
-        features="atomic_number",
+        features="basic",
         get_prim=primitive,
         max_cut=cutoff,
         enforce_c_size=enforce_c_size,
@@ -66,9 +66,9 @@ def dgl_crystal(
     g.edata["bondlength"] = g.edata["weight"].type(torch.FloatTensor)
     del g.edata["weight"]
 
-    g.ndata["atomic_number"] = torch.tensor(
-        jgraph.node_attributes, dtype=torch.int8
-    ).squeeze()
+    g.ndata["atom_features"] = torch.tensor(
+        jgraph.node_attributes, dtype=torch.float32
+    )
 
     return g
 
@@ -217,7 +217,7 @@ def train_property_model(
     )
 
     # model = SimpleGCN()
-    model = CGCNN(logscale=True)
+    model = CGCNN(atom_input_features=11, logscale=False)
     criterion = torch.nn.L1Loss()
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
     scheduler = optim.lr_scheduler.OneCycleLR(
@@ -247,4 +247,4 @@ def train_property_model(
 
 
 if __name__ == "__main__":
-    train_property_model()
+    train_property_model(prop="formation_energy_peratom")
