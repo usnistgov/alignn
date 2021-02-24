@@ -22,10 +22,10 @@ setup(
         "torch==1.7.1",
         "scikit-learn==0.24.1",
     ],
-    author="Kamal Choudhary, Brain DeCost",
+    author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description=(
-        "jarvisdgl: Deep graph library for materials science. https://jarvis.nist.gov/"
+        "jarvisdgl: Deep graph library for materials science. https://jarvis.nist.gov/"  # noqa:501
     ),
     license="NIST",
     url="https://github.com/JARVIS-Materials-Design/jarvisdgl",
