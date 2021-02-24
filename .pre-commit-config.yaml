@@ -15,6 +15,10 @@ repos:
     hooks:
     - id: black
       language_version: python3.8
+-   repo: https://github.com/pycqa/pydocstyle
+    rev: 5.1.1  # pick a git hash / tag to point to
+    hooks:
+    -   id: pydocstyle
 -   repo: https://gitlab.com/pycqa/flake8
     rev: 3.7.9
     hooks:
