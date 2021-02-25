@@ -1,3 +1,5 @@
+"""CGCNN: dgl implementation."""
+
 from typing import Optional
 
 import dgl
@@ -10,6 +12,8 @@ from torch import nn
 
 
 class RBFExpansion(nn.Module):
+    """Expand interatomic distances with radial basis functions."""
+
     def __init__(
         self,
         vmin: float = 1,
@@ -17,6 +21,7 @@ class RBFExpansion(nn.Module):
         bins: int = 10,
         lengthscale: Optional[float] = None,
     ):
+        """Register torch parameters for RBF expansion."""
         super().__init__()
         self.vmin = vmin
         self.vmax = vmax
@@ -36,17 +41,20 @@ class RBFExpansion(nn.Module):
             self.gamma = 1 / (lengthscale ** 2)
 
     def forward(self, distance: torch.Tensor) -> torch.Tensor:
+        """Apply RBF expansion to interatomic distance tensor."""
         return torch.exp(
             -self.gamma * (distance.unsqueeze(1) - self.centers) ** 2
         )
 
 
 class CGCNNConv(nn.Module):
-    """Xie and Grossman graph convolution function
+    """Xie and Grossman graph convolution function.
+
     10.1103/PhysRevLett.120.145301
     """
 
     def __init__(self, node_features: int = 64, edge_features: int = 32):
+        """Initialize torch modules for CGCNNConv layer."""
         super().__init__()
         self.node_features = node_features
         self.edge_features = edge_features
@@ -73,12 +81,11 @@ class CGCNNConv(nn.Module):
         self.bn = nn.BatchNorm1d(self.node_features)
 
     def combine_edge_features(self, edges):
-        """CGCNNConv edge update function
+        """Edge update for CGCNNConv.
 
         concatenate source and destination node features with edge features
         then apply the edge update modulated by the edge interaction model
         """
-
         # form augmented edge features z_ij = [v_i, v_j, u_ij]
         z = torch.cat((edges.src["h"], edges.dst["h"], edges.data["h"]), dim=1)
 
@@ -93,10 +100,10 @@ class CGCNNConv(nn.Module):
         node_feats: torch.Tensor,
         edge_feats: torch.Tensor,
     ) -> torch.Tensor:
-        """CGCNN convolution defined in Eq 5
+        """CGCNN convolution defined in Eq 5.
+
         10.1103/PhysRevLett.120.14530
         """
-
         g = g.local_var()
 
         g.ndata["h"] = node_feats
@@ -117,6 +124,8 @@ class CGCNNConv(nn.Module):
 
 
 class CGCNN(nn.Module):
+    """CGCNN dgl implementation."""
+
     def __init__(
         self,
         atom_input_features: int = 1,
@@ -127,6 +136,7 @@ class CGCNN(nn.Module):
         output_features: int = 1,
         logscale=False,
     ):
+        """Set up CGCNN modules."""
         super().__init__()
 
         self.rbf = RBFExpansion(vmin=1, vmax=5, bins=edge_features)
@@ -149,15 +159,15 @@ class CGCNN(nn.Module):
         self.logscale = logscale
 
     def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
+        """CGCNN function mapping graph to outputs."""
         g = g.local_var()
 
         # fixed edge features: RBF-expanded bondlengths
         edge_features = self.rbf(g.edata.pop("bondlength"))
 
         # initial node features: atom feature network...
-        v = g.ndata.pop("atomic_number").type(torch.FloatTensor)
-
-        node_features = self.atom_embedding(v.unsqueeze(-1))
+        v = g.ndata.pop("atom_features")
+        node_features = self.atom_embedding(v)
 
         # CGCNN-Conv block: update node features
         for conv_layer in self.conv_layers:
@@ -167,6 +177,7 @@ class CGCNN(nn.Module):
         features = self.readout(g, node_features)
         features = F.softplus(features)
         features = self.fc(features)
+        features = F.softplus(features)
 
         out = self.fc_out(features)
 

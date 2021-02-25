@@ -25,7 +25,7 @@ repos:
     - id: flake8
       args: # arguments to configure flake8
         # making isort line length compatible with black
-        - "--max-line-length=88"
+        - "--max-line-length=79"
         - "--max-complexity=18"
         - "--select=B,C,E,F,W,T4,B9"
 

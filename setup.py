@@ -1,3 +1,8 @@
+"""Jarvisdgl: Deep graph library for materials science.
+
+https://jarvis.nist.gov.
+"""
+
 import glob
 import os
 
@@ -21,6 +26,9 @@ setup(
         "dgl==0.5.3",
         "torch==1.7.1",
         "scikit-learn==0.24.1",
+        "pytorch-ignite",
+        "pydantic",
+        "tqdm",
     ],
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
