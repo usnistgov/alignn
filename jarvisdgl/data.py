@@ -47,7 +47,9 @@ def dgl_crystal(
     g.edata["bondlength"] = g.edata["weight"].type(torch.FloatTensor)
     del g.edata["weight"]
 
-    g.ndata["atom_features"] = torch.tensor(jgraph.node_attributes)
+    g.ndata["atom_features"] = torch.tensor(jgraph.node_attributes).type(
+        torch.FloatTensor
+    )
 
     return g
 

@@ -166,8 +166,7 @@ class CGCNN(nn.Module):
         edge_features = self.rbf(g.edata.pop("bondlength"))
 
         # initial node features: atom feature network...
-        v = g.ndata.pop("atom_features").type(torch.FloatTensor)
-
+        v = g.ndata.pop("atom_features")
         node_features = self.atom_embedding(v)
 
         # CGCNN-Conv block: update node features
@@ -178,6 +177,7 @@ class CGCNN(nn.Module):
         features = self.readout(g, node_features)
         features = F.softplus(features)
         features = self.fc(features)
+        features = F.softplus(features)
 
         out = self.fc_out(features)
 
