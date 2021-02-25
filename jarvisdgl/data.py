@@ -137,7 +137,7 @@ def get_train_val_loaders(
     n_train: int = 32,
     n_val: int = 32,
     batch_size: int = 8,
-    normalize: bool = False,
+    standardize: bool = False,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     d = jdata(dataset)
@@ -155,7 +155,7 @@ def get_train_val_loaders(
     train_data = StructureDataset(
         X_train, y_train, atom_features=atom_features, maxrows=n_train
     )
-    if normalize:
+    if standardize:
         train_data.setup_standardizer()
 
     val_data = StructureDataset(
