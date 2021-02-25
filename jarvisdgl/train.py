@@ -9,12 +9,14 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any, Dict, Union
 
+import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.tensorboard_logger import (
     OutputHandler,
     global_step_from_engine,
 )
+from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import (
     Events,
     create_supervised_evaluator,
@@ -119,6 +121,14 @@ def train_dgl(
         Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
     )
 
+    pbar = ProgressBar()
+    pbar.attach(trainer, output_transform=lambda x: {"loss": x})
+
+    history = {
+        "train": {m: [] for m in metrics.keys()},
+        "validation": {m: [] for m in metrics.keys()},
+    }
+
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_results(engine):
@@ -126,14 +136,12 @@ def train_dgl(
         train_evaluator.run(train_loader)
         evaluator.run(val_loader)
 
-        epoch = trainer.state.epoch
         tmetrics = train_evaluator.state.metrics
         vmetrics = evaluator.state.metrics
-        tloss, vloss = tmetrics["loss"], vmetrics["loss"]
-        tmae, vmae = tmetrics["mae"], vmetrics["mae"]
 
-        print(f"Epoch: {epoch} loss: {tloss:.2f} ({vloss:.2f})")
-        print(f"Epoch: {epoch} MAE: {tmae:.2f} ({vmae:.2f})")
+        for metric in metrics.keys():
+            history["train"][metric].append(tmetrics[metric])
+            history["validation"][metric].append(vmetrics[metric])
 
     # optionally log results to tensorboard
     if log_tensorboard:
@@ -159,11 +167,10 @@ def train_dgl(
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
 
-    return test_loss
+    return history
 
 
 if __name__ == "__main__":
     config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
     print(config)
-    result = train_dgl(config)
-    print(result)
+    history = train_dgl(config)
