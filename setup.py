@@ -26,6 +26,8 @@ setup(
         "dgl==0.5.3",
         "torch==1.7.1",
         "scikit-learn==0.24.1",
+        "ignite",
+        "pydantic",
     ],
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
