@@ -28,6 +28,7 @@ setup(
         "scikit-learn==0.24.1",
         "pytorch-ignite",
         "pydantic",
+        "tqdm",
     ],
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
