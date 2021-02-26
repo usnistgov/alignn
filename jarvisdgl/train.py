@@ -4,8 +4,9 @@ from the repository root, run
 `PYTHONPATH=$PYTHONPATH:. python jarvisdgl/train.py`
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
-from dataclasses import dataclass
+
 from functools import partial
+from pathlib import Path
 from typing import Any, Dict, Union
 
 import ignite
@@ -78,7 +79,6 @@ def train_dgl(
 
     # define network, optimizer, scheduler
     if model is None:
-
         net = models.CGCNN(
             atom_input_features=config.atom_input_features,
             conv_layers=config.conv_layers,
@@ -198,5 +198,4 @@ def train_dgl(
 
 if __name__ == "__main__":
     config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
-    print(config)
     history = train_dgl(config, progress=True)
