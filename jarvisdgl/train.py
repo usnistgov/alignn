@@ -5,7 +5,6 @@ from the repository root, run
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 from dataclasses import dataclass
-
 from functools import partial
 from typing import Any, Dict, Union
 
@@ -28,6 +27,22 @@ from torch import nn
 
 from jarvisdgl import data, models
 from jarvisdgl.config import TrainingConfig
+
+
+def group_decay(model):
+    """Omit weight decay from bias and batchnorm params."""
+    decay, no_decay = [], []
+
+    for name, p in model.named_parameters():
+        if "bias" in name or "bn" in name:
+            no_decay.append(p)
+        else:
+            decay.append(p)
+
+    return [
+        {"params": decay},
+        {"params": no_decay, "weight_decay": 0},
+    ]
 
 
 def train_dgl(
@@ -69,15 +84,18 @@ def train_dgl(
     )
     net.to(device)
 
+    # group parameters to skip weight decay for bias and batchnorm
+    params = group_decay(net)
+
     if config.optimizer.value == "adamw":
         optimizer = torch.optim.AdamW(
-            net.parameters(),
+            params,
             lr=config.learning_rate,
             weight_decay=config.weight_decay,
         )
     elif config.optimizer.value == "sgd":
         optimizer = torch.optim.SGD(
-            net.parameters(),
+            params,
             lr=config.lr,
             momentum=0.9,
             weight_decay=config.weight_decay,
