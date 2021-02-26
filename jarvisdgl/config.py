@@ -2,7 +2,7 @@
 
 from enum import Enum, auto
 
-from pydantic import BaseModel, ValidationError, validator
+from pydantic import BaseModel
 
 
 class AutoName(Enum):

@@ -23,7 +23,7 @@ from ignite.engine import (
     create_supervised_trainer,
 )
 from ignite.handlers import TerminateOnNan
-from ignite.metrics import Loss, MeanAbsoluteError, RunningAverage
+from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
 
 from jarvisdgl import data, models

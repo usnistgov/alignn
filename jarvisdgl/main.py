@@ -1,6 +1,5 @@
 """Module to train DGL graph for Atoms."""
 
-# !pip install dgl==0.4.3 jarvis-tools==2021.2.3
 import dgl
 import numpy as np
 import torch
