@@ -47,6 +47,7 @@ def group_decay(model):
 
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
+    model: nn.Module = None,
     progress: bool = False,
     log_tensorboard: bool = False,
 ):
@@ -76,13 +77,18 @@ def train_dgl(
     )
 
     # define network, optimizer, scheduler
-    net = models.CGCNN(
-        atom_input_features=config.atom_input_features,
-        conv_layers=config.conv_layers,
-        edge_features=config.edge_features,
-        node_features=config.node_features,
-        logscale=config.logscale,
-    )
+    if model is None:
+
+        net = models.CGCNN(
+            atom_input_features=config.atom_input_features,
+            conv_layers=config.conv_layers,
+            edge_features=config.edge_features,
+            node_features=config.node_features,
+            logscale=config.logscale,
+        )
+    else:
+        net = model
+
     net.to(device)
 
     # group parameters to skip weight decay for bias and batchnorm
