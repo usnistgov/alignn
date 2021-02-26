@@ -5,7 +5,6 @@ from the repository root, run
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 from dataclasses import dataclass
-
 from functools import partial
 from typing import Any, Dict, Union
 
@@ -30,8 +29,26 @@ from jarvisdgl import data, models
 from jarvisdgl.config import TrainingConfig
 
 
+def group_decay(model):
+    """Omit weight decay from bias and batchnorm params."""
+    decay, no_decay = [], []
+
+    for name, p in model.named_parameters():
+        if "bias" in name or "bn" in name:
+            no_decay.append(p)
+        else:
+            decay.append(p)
+
+    return [
+        {"params": decay},
+        {"params": no_decay, "weight_decay": 0},
+    ]
+
+
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
+    model: nn.Module = None,
+    progress: bool = False,
     log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -60,24 +77,32 @@ def train_dgl(
     )
 
     # define network, optimizer, scheduler
-    net = models.CGCNN(
-        atom_input_features=config.atom_input_features,
-        conv_layers=config.conv_layers,
-        edge_features=config.edge_features,
-        node_features=config.node_features,
-        logscale=config.logscale,
-    )
+    if model is None:
+
+        net = models.CGCNN(
+            atom_input_features=config.atom_input_features,
+            conv_layers=config.conv_layers,
+            edge_features=config.edge_features,
+            node_features=config.node_features,
+            logscale=config.logscale,
+        )
+    else:
+        net = model
+
     net.to(device)
+
+    # group parameters to skip weight decay for bias and batchnorm
+    params = group_decay(net)
 
     if config.optimizer.value == "adamw":
         optimizer = torch.optim.AdamW(
-            net.parameters(),
+            params,
             lr=config.learning_rate,
             weight_decay=config.weight_decay,
         )
     elif config.optimizer.value == "sgd":
         optimizer = torch.optim.SGD(
-            net.parameters(),
+            params,
             lr=config.lr,
             momentum=0.9,
             weight_decay=config.weight_decay,
@@ -121,8 +146,9 @@ def train_dgl(
         Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
     )
 
-    pbar = ProgressBar()
-    pbar.attach(trainer, output_transform=lambda x: {"loss": x})
+    if progress:
+        pbar = ProgressBar()
+        pbar.attach(trainer, output_transform=lambda x: {"loss": x})
 
     history = {
         "train": {m: [] for m in metrics.keys()},
@@ -173,4 +199,4 @@ def train_dgl(
 if __name__ == "__main__":
     config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
     print(config)
-    history = train_dgl(config)
+    history = train_dgl(config, progress=True)
