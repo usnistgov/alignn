@@ -47,6 +47,7 @@ def group_decay(model):
 
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
+    progress: bool = False,
     log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -139,8 +140,9 @@ def train_dgl(
         Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
     )
 
-    pbar = ProgressBar()
-    pbar.attach(trainer, output_transform=lambda x: {"loss": x})
+    if progress:
+        pbar = ProgressBar()
+        pbar.attach(trainer, output_transform=lambda x: {"loss": x})
 
     history = {
         "train": {m: [] for m in metrics.keys()},
@@ -191,4 +193,4 @@ def train_dgl(
 if __name__ == "__main__":
     config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
     print(config)
-    history = train_dgl(config)
+    history = train_dgl(config, progress=True)
