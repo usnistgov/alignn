@@ -60,6 +60,11 @@ def train_dgl(
     if type(config) is dict:
         config = TrainingConfig(**config)
 
+    deterministic = False
+    if config.random_seed is not None:
+        deterministic = True
+        ignite.utils.manual_seed(config.random_seed)
+
     # torch config
     torch.set_default_dtype(torch.float32)
 
@@ -70,6 +75,7 @@ def train_dgl(
     prepare_batch = partial(data.prepare_dgl_batch, device=device)
 
     train_loader, val_loader = data.get_train_val_loaders(
+        target=config.target.value,
         n_train=config.n_train,
         n_val=config.n_val,
         batch_size=config.batch_size,
@@ -129,6 +135,7 @@ def train_dgl(
         criterion,
         prepare_batch=data.prepare_dgl_batch,
         device=device,
+        deterministic=deterministic,
     )
 
     evaluator = create_supervised_evaluator(
@@ -197,5 +204,7 @@ def train_dgl(
 
 
 if __name__ == "__main__":
-    config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
+    config = TrainingConfig(
+        random_seed=123, epochs=10, n_train=32, n_val=32, batch_size=16
+    )
     history = train_dgl(config, progress=True)

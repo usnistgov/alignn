@@ -1,6 +1,7 @@
 """Pydantic model for default configuration and validation."""
 
 from enum import Enum, auto
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -64,6 +65,7 @@ class TrainingConfig(BaseModel):
     # logging configuration
 
     # training configuration
+    random_seed: Optional[int] = None
     n_val: int = 1024
     n_train: int = 1024
 

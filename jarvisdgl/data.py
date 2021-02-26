@@ -9,6 +9,7 @@ from jarvis.core.graphs import Graph
 from jarvis.db.figshare import data as jdata
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def prepare_dgl_batch(batch, device=None, non_blocking=False):
@@ -85,12 +86,21 @@ class StructureDataset(torch.utils.data.Dataset):
         """Initialize the class."""
         self.graphs = []
         self.labels = []
-        for idx, (structure, target) in enumerate(zip(structures, targets)):
+
+        for idx, (structure, target) in enumerate(
+            tqdm(zip(structures, targets))
+        ):
+
             if idx >= maxrows:
                 break
 
             a = Atoms.from_dict(structure)
-            g = dgl_crystal(a, atom_features=atom_features)
+            try:
+                g = dgl_crystal(a, atom_features=atom_features)
+            except IndexError:
+                print("WARNING: skipping as structure")
+                print(target, structure)
+                continue
 
             self.graphs.append(g)
             self.labels.append(target)
