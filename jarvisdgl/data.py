@@ -1,4 +1,5 @@
 """Jarvis-dgl data loaders and DGLGraph utilities."""
+import functools
 from typing import List, Tuple
 
 import dgl
@@ -6,10 +7,25 @@ import numpy as np
 import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
+from jarvis.core.specie import Specie
 from jarvis.db.figshare import data as jdata
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+BASIC_FEATURES = [
+    "Z",
+    "coulmn",
+    "row",
+    "X",
+    "atom_rad",
+    "nsvalence",
+    "npvalence",
+    "ndvalence",
+    "nfvalence",
+    "first_ion_en",
+    "elec_aff",
+]
 
 
 def prepare_dgl_batch(batch, device=None, non_blocking=False):
@@ -55,6 +71,90 @@ def dgl_crystal(
     return g
 
 
+@functools.lru_cache
+def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
+
+    feature_sets = ("atomic_number", "basic", "cfid")
+
+    if atom_features not in feature_sets:
+        raise NotImplementedError(
+            f"atom features must be one of {feature_sets}"
+        )
+
+    if atom_features == "cfid":
+        return Specie(species).get_descrp_arr
+    elif atom_features == "atomic_number":
+        return [Specie(species).element_property("Z")]
+    elif atom_features == "basic":
+        return [
+            Specie(species).element_property(prop) for prop in BASIC_FEATURES
+        ]
+
+
+def dgl_multigraph(
+    atoms: Atoms,
+    cutoff: float = 8,
+    max_neighbors: int = 12,
+    atom_features="atomic_number",
+):
+    """Get DGLGraph from atoms, go through pymatgen structure."""
+    # go through pymatgen for neighbor API for now...
+    structure = atoms.pymatgen_converter()
+
+    # returns List[List[Tuple[site, distance, index, image]]]
+    all_neighbors = structure.get_all_neighbors(cutoff)
+
+    # if a site has too few neighbors, increase the cutoff radius
+    min_nbrs = min(len(neighborlist) for neighborlist in all_neighbors)
+    if min_nbrs < max_neighbors:
+
+        lat = atoms.lattice
+        r_cut = max(cutoff, lat.a, lat.b, lat.c)
+
+        return dgl_multigraph(atoms, r_cut, max_neighbors, atom_features)
+
+    # build up edge list
+    # NOTE: currently there's no guarantee that this creates undirected graphs
+    # An undirected solution would build the full edge list where nodes are
+    # keyed by (index, image), and ensure each edge has a complementary edge
+
+    u, v, r = [], [], []
+    for site_idx, neighborlist in enumerate(all_neighbors):
+
+        # sort on distance
+        neighborlist = sorted(neighborlist, key=lambda x: x[1])
+
+        ids = np.array([nbr[2] for nbr in neighborlist])
+        distances = np.array([nbr[1] for nbr in neighborlist])
+
+        # find the distance to the k-th nearest neighbor
+        max_dist = distances[max_neighbors - 1]
+
+        # keep all edges out to the neighbor shell of the k-th neighbor
+        ids = ids[distances <= max_dist]
+        distances = distances[distances <= max_dist]
+
+        u.append([site_idx] * len(ids))
+        v.append(ids)
+        r.append(distances)
+
+    u = torch.tensor(np.hstack(u))
+    v = torch.tensor(np.hstack(v))
+    r = torch.tensor(np.hstack(r)).type(torch.get_default_dtype())
+
+    # build up atom attribute tensor
+    species = [s.name for s in structure.species]
+    node_features = torch.tensor(
+        [_get_node_attributes(s, atom_features=atom_features) for s in species]
+    ).type(torch.get_default_dtype())
+
+    g = dgl.graph((u, v))
+    g.ndata["atom_features"] = node_features
+    g.edata["bondlength"] = r
+
+    return g
+
+
 class Standardize(torch.nn.Module):
     """Standardize atom_features: subtract mean and divide by std."""
 
@@ -95,8 +195,9 @@ class StructureDataset(torch.utils.data.Dataset):
                 break
 
             a = Atoms.from_dict(structure)
+
             try:
-                g = dgl_crystal(a, atom_features=atom_features)
+                g = dgl_multigraph(a, atom_features=atom_features)
             except IndexError:
                 print("WARNING: skipping as structure")
                 print(target, structure)
