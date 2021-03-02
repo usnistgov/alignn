@@ -71,7 +71,7 @@ def dgl_crystal(
     return g
 
 
-@functools.lru_cache
+@functools.lru_cache(maxsize=None)
 def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
 
     feature_sets = ("atomic_number", "basic", "cfid")
