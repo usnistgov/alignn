@@ -114,7 +114,7 @@ def train_dgl(
     elif config.optimizer.value == "sgd":
         optimizer = torch.optim.SGD(
             params,
-            lr=config.lr,
+            lr=config.learning_rate,
             momentum=0.9,
             weight_decay=config.weight_decay,
         )
