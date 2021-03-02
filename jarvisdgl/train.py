@@ -114,14 +114,21 @@ def train_dgl(
             weight_decay=config.weight_decay,
         )
 
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=config.learning_rate,
-        max_momentum=0.92,
-        base_momentum=0.88,
-        epochs=config.epochs,
-        steps_per_epoch=len(train_loader),
-    )
+    if config.scheduler.value == "none":
+        # always return multiplier of 1 (i.e. do nothing)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer, lambda epoch: 1.0
+        )
+
+    elif config.scheduler.value == "onecycle":
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=config.learning_rate,
+            max_momentum=0.92,
+            base_momentum=0.88,
+            epochs=config.epochs,
+            steps_per_epoch=len(train_loader),
+        )
 
     # select configured loss function
     criteria = {"mse": nn.MSELoss(), "l1": nn.L1Loss()}

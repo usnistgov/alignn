@@ -55,6 +55,13 @@ class OptimizerEnum(AutoName):
     sgd = auto()
 
 
+class SchedulerEnum(AutoName):
+    """Supported learning rate schedulers."""
+
+    none = auto()
+    onecycle = auto()
+
+
 class TrainingConfig(BaseModel):
     """Training config defaults and validation."""
 
@@ -76,6 +83,7 @@ class TrainingConfig(BaseModel):
     criterion: CriterionEnum = CriterionEnum.mse
     atom_features: FeatureEnum = FeatureEnum.basic
     optimizer: OptimizerEnum = OptimizerEnum.adamw
+    scheduler: SchedulerEnum = SchedulerEnum.onecycle
 
     # model configuration
     conv_layers: int = 3
