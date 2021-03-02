@@ -1,5 +1,7 @@
 """Jarvis-dgl data loaders and DGLGraph utilities."""
 import functools
+import json
+import os
 from typing import List, Tuple
 
 import dgl
@@ -26,6 +28,11 @@ BASIC_FEATURES = [
     "first_ion_en",
     "elec_aff",
 ]
+
+
+MIT_ATOM_FEATURES_JSON = os.path.join(
+    os.path.dirname(__file__), "atom_init.json"
+)
 
 
 def prepare_dgl_batch(batch, device=None, non_blocking=False):
@@ -74,7 +81,7 @@ def dgl_crystal(
 @functools.lru_cache(maxsize=None)
 def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
 
-    feature_sets = ("atomic_number", "basic", "cfid")
+    feature_sets = ("atomic_number", "basic", "cfid", "mit")
 
     if atom_features not in feature_sets:
         raise NotImplementedError(
@@ -89,6 +96,12 @@ def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
         return [
             Specie(species).element_property(prop) for prop in BASIC_FEATURES
         ]
+    elif atom_features == "mit":
+        # load from json, key by atomic number
+        key = str(Specie(species).element_property("Z"))
+        with open(MIT_ATOM_FEATURES_JSON, "r") as f:
+            i = json.load(f)
+        return i[key]
 
 
 def dgl_multigraph(
@@ -179,6 +192,7 @@ class StructureDataset(torch.utils.data.Dataset):
         self,
         structures,
         targets,
+        cutoff=8.0,
         maxrows=np.inf,
         atom_features="atomic_number",
         transform=None,
@@ -195,13 +209,7 @@ class StructureDataset(torch.utils.data.Dataset):
                 break
 
             a = Atoms.from_dict(structure)
-
-            try:
-                g = dgl_multigraph(a, atom_features=atom_features)
-            except IndexError:
-                print("WARNING: skipping as structure")
-                print(target, structure)
-                continue
+            g = dgl_multigraph(a, atom_features=atom_features, cutoff=cutoff)
 
             self.graphs.append(g)
             self.labels.append(target)

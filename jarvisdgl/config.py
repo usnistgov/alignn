@@ -36,6 +36,7 @@ class FeatureEnum(AutoName):
     basic = auto()
     atomic_number = auto()
     cfid = auto()
+    mit = auto()
 
 
 class CriterionEnum(AutoName):
@@ -45,7 +46,7 @@ class CriterionEnum(AutoName):
     l1 = auto()
 
 
-FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438}
+FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "mit": 92}
 
 
 class OptimizerEnum(AutoName):

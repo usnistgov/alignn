@@ -74,13 +74,18 @@ def train_dgl(
 
     prepare_batch = partial(data.prepare_dgl_batch, device=device)
 
+    # use input standardization for all real-valued feature sets
+    standardize = True
+    if config.atom_features.value == "mit":
+        standardize = False
+
     train_loader, val_loader = data.get_train_val_loaders(
         target=config.target.value,
         n_train=config.n_train,
         n_val=config.n_val,
         batch_size=config.batch_size,
         atom_features=config.atom_features.value,
-        standardize=True,
+        standardize=standardize,
     )
 
     # define network, optimizer, scheduler
