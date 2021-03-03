@@ -215,7 +215,7 @@ class StructureDataset(torch.utils.data.Dataset):
             self.graphs.append(g)
             self.labels.append(target)
 
-        self.labels = torch.tensor(self.labels)
+        self.labels = torch.tensor(self.labels).type(torch.get_default_dtype())
         self.transform = transform
 
     def __len__(self):
