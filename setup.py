@@ -29,6 +29,7 @@ setup(
         "pytorch-ignite",
         "pydantic",
         "tqdm",
+        "pymatgen",
     ],
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",

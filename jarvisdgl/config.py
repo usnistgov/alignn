@@ -1,8 +1,14 @@
 """Pydantic model for default configuration and validation."""
 
+import subprocess
 from enum import Enum, auto
+from typing import Optional
 
-from pydantic import BaseModel, ValidationError, validator
+from pydantic import BaseModel
+
+VERSION = (
+    subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+)
 
 
 class AutoName(Enum):
@@ -35,6 +41,7 @@ class FeatureEnum(AutoName):
     basic = auto()
     atomic_number = auto()
     cfid = auto()
+    mit = auto()
 
 
 class CriterionEnum(AutoName):
@@ -44,7 +51,7 @@ class CriterionEnum(AutoName):
     l1 = auto()
 
 
-FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438}
+FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "mit": 92}
 
 
 class OptimizerEnum(AutoName):
@@ -54,8 +61,17 @@ class OptimizerEnum(AutoName):
     sgd = auto()
 
 
+class SchedulerEnum(AutoName):
+    """Supported learning rate schedulers."""
+
+    none = auto()
+    onecycle = auto()
+
+
 class TrainingConfig(BaseModel):
     """Training config defaults and validation."""
+
+    version: str = VERSION
 
     # dataset configuration
     dataset: DatasetEnum = DatasetEnum.dft_3d
@@ -64,6 +80,7 @@ class TrainingConfig(BaseModel):
     # logging configuration
 
     # training configuration
+    random_seed: Optional[int] = None
     n_val: int = 1024
     n_train: int = 1024
 
@@ -74,6 +91,7 @@ class TrainingConfig(BaseModel):
     criterion: CriterionEnum = CriterionEnum.mse
     atom_features: FeatureEnum = FeatureEnum.basic
     optimizer: OptimizerEnum = OptimizerEnum.adamw
+    scheduler: SchedulerEnum = SchedulerEnum.onecycle
 
     # model configuration
     conv_layers: int = 3

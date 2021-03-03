@@ -16,9 +16,9 @@ class RBFExpansion(nn.Module):
 
     def __init__(
         self,
-        vmin: float = 1,
-        vmax: float = 5,
-        bins: int = 10,
+        vmin: float = 0,
+        vmax: float = 8,
+        bins: int = 40,
         lengthscale: Optional[float] = None,
     ):
         """Register torch parameters for RBF expansion."""
@@ -130,7 +130,7 @@ class CGCNN(nn.Module):
         self,
         atom_input_features: int = 1,
         node_features: int = 32,
-        edge_features: int = 32,
+        edge_features: int = 40,
         conv_layers: int = 3,
         fc_features: int = 64,
         output_features: int = 1,
@@ -139,7 +139,7 @@ class CGCNN(nn.Module):
         """Set up CGCNN modules."""
         super().__init__()
 
-        self.rbf = RBFExpansion(vmin=1, vmax=5, bins=edge_features)
+        self.rbf = RBFExpansion(vmin=0, vmax=8.0, bins=edge_features)
         self.atom_embedding = nn.Linear(atom_input_features, node_features)
 
         self.conv_layers = nn.ModuleList(
