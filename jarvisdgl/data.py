@@ -2,6 +2,7 @@
 import functools
 import json
 import os
+import random
 from typing import List, Tuple
 
 import dgl
@@ -255,8 +256,10 @@ def get_train_val_loaders(
     atom_features: str = "atomic_number",
     n_train: int = 32,
     n_val: int = 32,
+    n_test: int = 32,
     batch_size: int = 8,
     standardize: bool = False,
+    split_seed=123,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     d = jdata(dataset)
@@ -266,22 +269,29 @@ def get_train_val_loaders(
         if row[target] != "na":
             structures.append(row["atoms"])
             targets.append(row[target])
+    structures = np.array(structures)
+    targets = np.array(targets)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        structures, targets, test_size=0.33, random_state=int(37)
-    )
+    # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
+    # i.e. shuffle the index in place with standard library random.shuffle
+    ids = np.arange(len(structures))
+    random.seed(split_seed)
+    random.shuffle(ids)
+
+    id_train = ids[:n_train]
+    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
+    # id_test = ids[:-n_test]
 
     train_data = StructureDataset(
-        X_train, y_train, atom_features=atom_features, maxrows=n_train
+        structures[id_train], targets[id_train], atom_features=atom_features
     )
     if standardize:
         train_data.setup_standardizer()
 
     val_data = StructureDataset(
-        X_test,
-        y_test,
+        structures[id_val],
+        targets[id_val],
         atom_features=atom_features,
-        maxrows=n_val,
         transform=train_data.transform,
     )
 
