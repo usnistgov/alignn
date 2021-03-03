@@ -1,9 +1,14 @@
 """Pydantic model for default configuration and validation."""
 
+import subprocess
 from enum import Enum, auto
 from typing import Optional
 
 from pydantic import BaseModel
+
+VERSION = (
+    subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+)
 
 
 class AutoName(Enum):
@@ -65,6 +70,8 @@ class SchedulerEnum(AutoName):
 
 class TrainingConfig(BaseModel):
     """Training config defaults and validation."""
+
+    version: str = VERSION
 
     # dataset configuration
     dataset: DatasetEnum = DatasetEnum.dft_3d
