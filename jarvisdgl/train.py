@@ -4,8 +4,9 @@ from the repository root, run
 `PYTHONPATH=$PYTHONPATH:. python jarvisdgl/train.py`
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
-from dataclasses import dataclass
+
 from functools import partial
+from pathlib import Path
 from typing import Any, Dict, Union
 
 import ignite
@@ -22,7 +23,7 @@ from ignite.engine import (
     create_supervised_trainer,
 )
 from ignite.handlers import TerminateOnNan
-from ignite.metrics import Loss, MeanAbsoluteError, RunningAverage
+from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
 
 from jarvisdgl import data, models
@@ -59,6 +60,11 @@ def train_dgl(
     if type(config) is dict:
         config = TrainingConfig(**config)
 
+    deterministic = False
+    if config.random_seed is not None:
+        deterministic = True
+        ignite.utils.manual_seed(config.random_seed)
+
     # torch config
     torch.set_default_dtype(torch.float32)
 
@@ -68,17 +74,22 @@ def train_dgl(
 
     prepare_batch = partial(data.prepare_dgl_batch, device=device)
 
+    # use input standardization for all real-valued feature sets
+    standardize = True
+    if config.atom_features.value == "mit":
+        standardize = False
+
     train_loader, val_loader = data.get_train_val_loaders(
+        target=config.target.value,
         n_train=config.n_train,
         n_val=config.n_val,
         batch_size=config.batch_size,
         atom_features=config.atom_features.value,
-        standardize=True,
+        standardize=standardize,
     )
 
     # define network, optimizer, scheduler
     if model is None:
-
         net = models.CGCNN(
             atom_input_features=config.atom_input_features,
             conv_layers=config.conv_layers,
@@ -103,19 +114,26 @@ def train_dgl(
     elif config.optimizer.value == "sgd":
         optimizer = torch.optim.SGD(
             params,
-            lr=config.lr,
+            lr=config.learning_rate,
             momentum=0.9,
             weight_decay=config.weight_decay,
         )
 
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=config.learning_rate,
-        max_momentum=0.92,
-        base_momentum=0.88,
-        epochs=config.epochs,
-        steps_per_epoch=len(train_loader),
-    )
+    if config.scheduler.value == "none":
+        # always return multiplier of 1 (i.e. do nothing)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer, lambda epoch: 1.0
+        )
+
+    elif config.scheduler.value == "onecycle":
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=config.learning_rate,
+            max_momentum=0.92,
+            base_momentum=0.88,
+            epochs=config.epochs,
+            steps_per_epoch=len(train_loader),
+        )
 
     # select configured loss function
     criteria = {"mse": nn.MSELoss(), "l1": nn.L1Loss()}
@@ -129,6 +147,7 @@ def train_dgl(
         criterion,
         prepare_batch=data.prepare_dgl_batch,
         device=device,
+        deterministic=deterministic,
     )
 
     evaluator = create_supervised_evaluator(
@@ -197,6 +216,7 @@ def train_dgl(
 
 
 if __name__ == "__main__":
-    config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
-    print(config)
+    config = TrainingConfig(
+        random_seed=123, epochs=10, n_train=32, n_val=32, batch_size=16
+    )
     history = train_dgl(config, progress=True)

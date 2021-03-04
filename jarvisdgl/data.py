@@ -1,4 +1,8 @@
 """Jarvis-dgl data loaders and DGLGraph utilities."""
+import functools
+import json
+import os
+import random
 from typing import List, Tuple
 
 import dgl
@@ -6,9 +10,30 @@ import numpy as np
 import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
+from jarvis.core.specie import Specie
 from jarvis.db.figshare import data as jdata
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+BASIC_FEATURES = [
+    "Z",
+    "coulmn",
+    "row",
+    "X",
+    "atom_rad",
+    "nsvalence",
+    "npvalence",
+    "ndvalence",
+    "nfvalence",
+    "first_ion_en",
+    "elec_aff",
+]
+
+
+MIT_ATOM_FEATURES_JSON = os.path.join(
+    os.path.dirname(__file__), "atom_init.json"
+)
 
 
 def prepare_dgl_batch(batch, device=None, non_blocking=False):
@@ -54,6 +79,96 @@ def dgl_crystal(
     return g
 
 
+@functools.lru_cache(maxsize=None)
+def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
+
+    feature_sets = ("atomic_number", "basic", "cfid", "mit")
+
+    if atom_features not in feature_sets:
+        raise NotImplementedError(
+            f"atom features must be one of {feature_sets}"
+        )
+
+    if atom_features == "cfid":
+        return Specie(species).get_descrp_arr
+    elif atom_features == "atomic_number":
+        return [Specie(species).element_property("Z")]
+    elif atom_features == "basic":
+        return [
+            Specie(species).element_property(prop) for prop in BASIC_FEATURES
+        ]
+    elif atom_features == "mit":
+        # load from json, key by atomic number
+        key = str(Specie(species).element_property("Z"))
+        with open(MIT_ATOM_FEATURES_JSON, "r") as f:
+            i = json.load(f)
+        return i[key]
+
+
+def dgl_multigraph(
+    atoms: Atoms,
+    cutoff: float = 8,
+    max_neighbors: int = 12,
+    atom_features="atomic_number",
+):
+    """Get DGLGraph from atoms, go through pymatgen structure."""
+    # go through pymatgen for neighbor API for now...
+    structure = atoms.pymatgen_converter()
+
+    # returns List[List[Tuple[site, distance, index, image]]]
+    all_neighbors = structure.get_all_neighbors(cutoff)
+
+    # if a site has too few neighbors, increase the cutoff radius
+    min_nbrs = min(len(neighborlist) for neighborlist in all_neighbors)
+    if min_nbrs < max_neighbors:
+
+        lat = atoms.lattice
+        r_cut = max(cutoff, lat.a, lat.b, lat.c)
+
+        return dgl_multigraph(atoms, r_cut, max_neighbors, atom_features)
+
+    # build up edge list
+    # NOTE: currently there's no guarantee that this creates undirected graphs
+    # An undirected solution would build the full edge list where nodes are
+    # keyed by (index, image), and ensure each edge has a complementary edge
+
+    u, v, r = [], [], []
+    for site_idx, neighborlist in enumerate(all_neighbors):
+
+        # sort on distance
+        neighborlist = sorted(neighborlist, key=lambda x: x[1])
+
+        ids = np.array([nbr[2] for nbr in neighborlist])
+        distances = np.array([nbr[1] for nbr in neighborlist])
+
+        # find the distance to the k-th nearest neighbor
+        max_dist = distances[max_neighbors - 1]
+
+        # keep all edges out to the neighbor shell of the k-th neighbor
+        ids = ids[distances <= max_dist]
+        distances = distances[distances <= max_dist]
+
+        u.append([site_idx] * len(ids))
+        v.append(ids)
+        r.append(distances)
+
+    u = torch.tensor(np.hstack(u))
+    v = torch.tensor(np.hstack(v))
+    r = torch.tensor(np.hstack(r)).type(torch.get_default_dtype())
+
+    # build up atom attribute tensor
+    species = [s.name for s in structure.species]
+    node_features = torch.tensor(
+        [_get_node_attributes(s, atom_features=atom_features) for s in species]
+    ).type(torch.get_default_dtype())
+
+    g = dgl.graph((u, v))
+    g.ndata["atom_features"] = node_features
+    g.edata["bondlength"] = r
+
+    return g
+
+
 class Standardize(torch.nn.Module):
     """Standardize atom_features: subtract mean and divide by std."""
 
@@ -78,6 +193,7 @@ class StructureDataset(torch.utils.data.Dataset):
         self,
         structures,
         targets,
+        cutoff=8.0,
         maxrows=np.inf,
         atom_features="atomic_number",
         transform=None,
@@ -85,17 +201,21 @@ class StructureDataset(torch.utils.data.Dataset):
         """Initialize the class."""
         self.graphs = []
         self.labels = []
-        for idx, (structure, target) in enumerate(zip(structures, targets)):
+
+        for idx, (structure, target) in enumerate(
+            tqdm(zip(structures, targets))
+        ):
+
             if idx >= maxrows:
                 break
 
             a = Atoms.from_dict(structure)
-            g = dgl_crystal(a, atom_features=atom_features)
+            g = dgl_multigraph(a, atom_features=atom_features, cutoff=cutoff)
 
             self.graphs.append(g)
             self.labels.append(target)
 
-        self.labels = torch.tensor(self.labels)
+        self.labels = torch.tensor(self.labels).type(torch.get_default_dtype())
         self.transform = transform
 
     def __len__(self):
@@ -136,8 +256,10 @@ def get_train_val_loaders(
     atom_features: str = "atomic_number",
     n_train: int = 32,
     n_val: int = 32,
+    n_test: int = 32,
     batch_size: int = 8,
     standardize: bool = False,
+    split_seed=123,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     d = jdata(dataset)
@@ -147,22 +269,29 @@ def get_train_val_loaders(
         if row[target] != "na":
             structures.append(row["atoms"])
             targets.append(row[target])
+    structures = np.array(structures)
+    targets = np.array(targets)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        structures, targets, test_size=0.33, random_state=int(37)
-    )
+    # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
+    # i.e. shuffle the index in place with standard library random.shuffle
+    ids = np.arange(len(structures))
+    random.seed(split_seed)
+    random.shuffle(ids)
+
+    id_train = ids[:n_train]
+    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
+    # id_test = ids[:-n_test]
 
     train_data = StructureDataset(
-        X_train, y_train, atom_features=atom_features, maxrows=n_train
+        structures[id_train], targets[id_train], atom_features=atom_features
     )
     if standardize:
         train_data.setup_standardizer()
 
     val_data = StructureDataset(
-        X_test,
-        y_test,
+        structures[id_val],
+        targets[id_val],
         atom_features=atom_features,
-        maxrows=n_val,
         transform=train_data.transform,
     )
 
