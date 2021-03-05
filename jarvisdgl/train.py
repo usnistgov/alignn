@@ -8,9 +8,10 @@ then `tensorboard --logdir tb_logs/test` to monitor results...
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Union
-
+import numpy as np
 import ignite
 import torch
+from ignite.contrib.handlers.stores import EpochOutputStore
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.tensorboard_logger import (
     OutputHandler,
@@ -156,6 +157,8 @@ def train_dgl(
     train_evaluator = create_supervised_evaluator(
         net, metrics=metrics, prepare_batch=prepare_batch, device=device
     )
+    eos = EpochOutputStore()
+    eos.attach(evaluator)
 
     # ignite event handlers:
     trainer.add_event_handler(Events.EPOCH_COMPLETED, TerminateOnNan())
@@ -172,6 +175,10 @@ def train_dgl(
     history = {
         "train": {m: [] for m in metrics.keys()},
         "validation": {m: [] for m in metrics.keys()},
+        "predictions": [],
+        "targets": [],
+        "all_state": [],
+        "EOS": [],
     }
 
     # collect evaluation performance
@@ -183,10 +190,26 @@ def train_dgl(
 
         tmetrics = train_evaluator.state.metrics
         vmetrics = evaluator.state.metrics
-
+        # print ('pred',evaluator.state)#tmetrics.EpochMetric._predictions)
+        # print ('predooo',evaluator.state.output)#tmetrics.EpochMetric._predictions)
+        # print ('met',evaluator.state.dataloader.dataset.labels)#tmetrics.EpochMetric._predictions)
         for metric in metrics.keys():
             history["train"][metric].append(tmetrics[metric])
             history["validation"][metric].append(vmetrics[metric])
+            # history["predictions"].extend(np.array([j[0].cpu().numpy() for j in eos.data]).tolist())
+        # history['all_state'].append([[j[0].cpu().numpy().tolist() for j in eos.data],evaluator.state.dataloader.dataset.labels.cpu().numpy().tolist()])
+        # history['all_state'].append([np.array([j[0].cpu().numpy().tolist() for j in eos.data]).tolist(),evaluator.state.dataloader.dataset.labels.cpu().numpy().tolist()])
+        # history["predictions"].append(np.array([j[0].cpu().numpy().tolist() for j in eos.data]).tolist())
+        history["targets"] = (
+            evaluator.state.dataloader.dataset.labels.cpu().numpy().tolist()
+        )
+        history["EOS"] = eos.data
+        """
+        targetss=result['all_state'][-1][1]
+        mean_absolute_error(result['all_state'][-1][0][-1],result['all_state'][-1][1])
+        """
+        # output = eos.data
+        # print ('output',len(output))
 
     # optionally log results to tensorboard
     if log_tensorboard:
@@ -208,9 +231,9 @@ def train_dgl(
     trainer.run(train_loader, max_epochs=config.epochs)
     test_loss = evaluator.state.metrics["loss"]
 
-    if log_tensorboard:
-        tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
-        tb_logger.close()
+    # if log_tensorboard:
+    #    tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
+    #    tb_logger.close()
 
     return history
 
