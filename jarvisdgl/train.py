@@ -190,26 +190,10 @@ def train_dgl(
 
         tmetrics = train_evaluator.state.metrics
         vmetrics = evaluator.state.metrics
-        # print ('pred',evaluator.state)#tmetrics.EpochMetric._predictions)
-        # print ('predooo',evaluator.state.output)#tmetrics.EpochMetric._predictions)
-        # print ('met',evaluator.state.dataloader.dataset.labels)#tmetrics.EpochMetric._predictions)
         for metric in metrics.keys():
             history["train"][metric].append(tmetrics[metric])
             history["validation"][metric].append(vmetrics[metric])
-            # history["predictions"].extend(np.array([j[0].cpu().numpy() for j in eos.data]).tolist())
-        # history['all_state'].append([[j[0].cpu().numpy().tolist() for j in eos.data],evaluator.state.dataloader.dataset.labels.cpu().numpy().tolist()])
-        # history['all_state'].append([np.array([j[0].cpu().numpy().tolist() for j in eos.data]).tolist(),evaluator.state.dataloader.dataset.labels.cpu().numpy().tolist()])
-        # history["predictions"].append(np.array([j[0].cpu().numpy().tolist() for j in eos.data]).tolist())
-        history["targets"] = (
-            evaluator.state.dataloader.dataset.labels.cpu().numpy().tolist()
-        )
         history["EOS"] = eos.data
-        """
-        targetss=result['all_state'][-1][1]
-        mean_absolute_error(result['all_state'][-1][0][-1],result['all_state'][-1][1])
-        """
-        # output = eos.data
-        # print ('output',len(output))
 
     # optionally log results to tensorboard
     if log_tensorboard:
