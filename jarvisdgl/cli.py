@@ -14,6 +14,7 @@ from jarvisdgl.train import train_dgl
 def cli(
     config: Optional[Path] = typer.Argument(None),
     progress: bool = False,
+    store_outputs: bool = False,
     tensorboard: bool = False,
 ):
     """Jarvis-dgl training cli.
@@ -32,7 +33,12 @@ def cli(
             config = json.load(f)
             config = TrainingConfig(**config)
 
-    hist = train_dgl(config, progress=progress, log_tensorboard=tensorboard)
+    hist = train_dgl(
+        config,
+        progress=progress,
+        store_outputs=store_outputs,
+        log_tensorboard=tensorboard,
+    )
 
     print(model_dir)
     with open(model_dir / "metrics.json", "w") as f:

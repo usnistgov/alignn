@@ -8,11 +8,12 @@ then `tensorboard --logdir tb_logs/test` to monitor results...
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Union
-import numpy as np
+
 import ignite
+import numpy as np
 import torch
-from ignite.contrib.handlers.stores import EpochOutputStore
 from ignite.contrib.handlers import TensorboardLogger
+from ignite.contrib.handlers.stores import EpochOutputStore
 from ignite.contrib.handlers.tensorboard_logger import (
     OutputHandler,
     global_step_from_engine,
@@ -51,6 +52,7 @@ def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
     progress: bool = False,
+    store_outputs: bool = True,
     log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -157,8 +159,6 @@ def train_dgl(
     train_evaluator = create_supervised_evaluator(
         net, metrics=metrics, prepare_batch=prepare_batch, device=device
     )
-    eos = EpochOutputStore()
-    eos.attach(evaluator)
 
     # ignite event handlers:
     trainer.add_event_handler(Events.EPOCH_COMPLETED, TerminateOnNan())
@@ -175,11 +175,13 @@ def train_dgl(
     history = {
         "train": {m: [] for m in metrics.keys()},
         "validation": {m: [] for m in metrics.keys()},
-        "predictions": [],
-        "targets": [],
-        "all_state": [],
-        "EOS": [],
     }
+
+    if store_outputs:
+        # log_results handler will save epoch output
+        # in history["EOS"]
+        eos = EpochOutputStore()
+        eos.attach(evaluator)
 
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -193,7 +195,9 @@ def train_dgl(
         for metric in metrics.keys():
             history["train"][metric].append(tmetrics[metric])
             history["validation"][metric].append(vmetrics[metric])
-        history["EOS"] = eos.data
+
+        if store_outputs:
+            history["EOS"] = eos.data
 
     # optionally log results to tensorboard
     if log_tensorboard:
@@ -213,11 +217,11 @@ def train_dgl(
 
     # train the model!
     trainer.run(train_loader, max_epochs=config.epochs)
-    test_loss = evaluator.state.metrics["loss"]
 
-    # if log_tensorboard:
-    #    tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
-    #    tb_logger.close()
+    if log_tensorboard:
+        test_loss = evaluator.state.metrics["loss"]
+        tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
+        tb_logger.close()
 
     return history
 
