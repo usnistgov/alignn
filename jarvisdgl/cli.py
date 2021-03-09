@@ -14,6 +14,7 @@ from jarvisdgl.train import train_dgl
 def cli(
     config: Optional[Path] = typer.Argument(None),
     progress: bool = False,
+    checkpoint_dir: Path = Path("/tmp/models"),
     store_outputs: bool = False,
     tensorboard: bool = False,
 ):
@@ -23,6 +24,8 @@ def cli(
     progress: enable tqdm console logging
     tensorboard: enable tensorboard logging
     """
+    model_dir = config.parent
+
     if config is None:
         model_dir = os.getcwd()
         config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
@@ -36,6 +39,7 @@ def cli(
     hist = train_dgl(
         config,
         progress=progress,
+        checkpoint_dir=checkpoint_dir,
         store_outputs=store_outputs,
         log_tensorboard=tensorboard,
     )
@@ -46,6 +50,10 @@ def cli(
 
     with open(model_dir / "fullconfig.json", "w") as f:
         json.dump(json.loads(config.json()), f, indent=2)
+
+    # move temporary checkpoint data into model_dir
+    for checkpoint in checkpoint_dir.glob("*.pt"):
+        checkpoint.replace(model_dir / checkpoint.name)
 
 
 if __name__ == "__main__":

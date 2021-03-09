@@ -24,7 +24,7 @@ from ignite.engine import (
     create_supervised_evaluator,
     create_supervised_trainer,
 )
-from ignite.handlers import TerminateOnNan
+from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
 
@@ -52,6 +52,7 @@ def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
     progress: bool = False,
+    checkpoint_dir: Path = Path("/tmp/models"),
     store_outputs: bool = True,
     log_tensorboard: bool = False,
 ):
@@ -167,6 +168,21 @@ def train_dgl(
     trainer.add_event_handler(
         Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
     )
+
+    # model checkpointing
+    to_save = {
+        "model": net,
+        "optimizer": optimizer,
+        "lr_scheduler": scheduler,
+        "trainer": trainer,
+    }
+    handler = Checkpoint(
+        to_save,
+        DiskSaver(checkpoint_dir, create_dir=True),
+        n_saved=2,
+        global_step_transform=lambda *_: trainer.state.epoch,
+    )
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
 
     if progress:
         pbar = ProgressBar()
