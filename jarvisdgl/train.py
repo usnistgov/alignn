@@ -133,8 +133,6 @@ def train_dgl(
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
-            max_momentum=0.92,
-            base_momentum=0.88,
             epochs=config.epochs,
             steps_per_epoch=len(train_loader),
         )
