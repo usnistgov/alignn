@@ -5,15 +5,19 @@ from dgl.nn import AvgPooling, GraphConv
 from torch import nn
 from torch.nn import functional as F
 
+from jarvisdgl.config import SimpleGCNConfig
+
 
 class SimpleGCN(nn.Module):
     """Module for simple GCN."""
 
-    def __init__(self, in_features=1, conv_layers=2, width=32):
+    def __init__(
+        self, config: SimpleGCNConfig = SimpleGCNConfig(name="simplegcn")
+    ):
         """Initialize class with number of input features, conv layers."""
         super().__init__()
-        self.layer1 = GraphConv(in_features, width, allow_zero_in_degree=True)
-        self.layer2 = GraphConv(width, 1, allow_zero_in_degree=True)
+        self.layer1 = GraphConv(config.atom_input_features, config.width)
+        self.layer2 = GraphConv(config.width, config.output_features)
         self.readout = AvgPooling()
 
     def forward(self, g):

@@ -48,6 +48,24 @@ def group_decay(model):
     ]
 
 
+def setup_optimizer(params, config: TrainingConfig):
+    """Set up optimizer for param groups."""
+    if config.optimizer == "adamw":
+        optimizer = torch.optim.AdamW(
+            params,
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+        )
+    elif config.optimizer == "sgd":
+        optimizer = torch.optim.SGD(
+            params,
+            lr=config.learning_rate,
+            momentum=0.9,
+            weight_decay=config.weight_decay,
+        )
+    return optimizer
+
+
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
@@ -94,13 +112,7 @@ def train_dgl(
 
     # define network, optimizer, scheduler
     if model is None:
-        net = models.CGCNN(
-            atom_input_features=config.atom_input_features,
-            conv_layers=config.conv_layers,
-            edge_features=config.edge_features,
-            node_features=config.node_features,
-            logscale=config.logscale,
-        )
+        net = models.CGCNN(config.model)
     else:
         net = model
 
@@ -108,20 +120,7 @@ def train_dgl(
 
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
-
-    if config.optimizer == "adamw":
-        optimizer = torch.optim.AdamW(
-            params,
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-        )
-    elif config.optimizer == "sgd":
-        optimizer = torch.optim.SGD(
-            params,
-            lr=config.learning_rate,
-            momentum=0.9,
-            weight_decay=config.weight_decay,
-        )
+    optimizer = setup_optimizer(params, config)
 
     if config.scheduler == "none":
         # always return multiplier of 1 (i.e. do nothing)

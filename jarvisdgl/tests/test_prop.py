@@ -1,9 +1,11 @@
 """Training script test suite."""
+import time
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 from jarvisdgl.main import train_property_model
 from jarvisdgl.train import train_dgl
-import time
-import numpy as np
-import matplotlib.pyplot as plt
 
 plt.switch_backend("agg")
 from sklearn.metrics import mean_absolute_error

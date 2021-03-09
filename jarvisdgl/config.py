@@ -2,13 +2,26 @@
 
 import subprocess
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseSettings as PydanticBaseSettings
+from pydantic import Field, root_validator, validator
+from pydantic.typing import Literal
 
 VERSION = (
     subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
 )
+
+
+class BaseSettings(PydanticBaseSettings):
+    """Add configuration to default Pydantic BaseSettings."""
+
+    class Config:
+        """Configure BaseSettings behavior."""
+
+        extra = "forbid"
+        use_enum_values = True
+        env_prefix = "jv_"
 
 
 class AutoName(Enum):
@@ -68,7 +81,43 @@ class SchedulerEnum(AutoName):
     onecycle = auto()
 
 
-class TrainingConfig(BaseModel):
+class CGCNNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.cgcnn."""
+
+    name: Literal["cgcnn"]
+    conv_layers: int = 3
+    atom_input_features: int = 1
+    edge_features: int = 16
+    node_features: int = 64
+    fc_layers: int = 1
+    fc_features: int = 64
+    output_features: int = 1
+
+    # if logscale is set, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    logscale: bool = False
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
+class SimpleGCNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.gcn."""
+
+    name: Literal["simplegcn"]
+    atom_input_features: int = 1
+    width: int = 64
+    output_features: int = 1
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
+class TrainingConfig(BaseSettings):
     """Training config defaults and validation."""
 
     version: str = VERSION
@@ -94,28 +143,18 @@ class TrainingConfig(BaseModel):
     scheduler: SchedulerEnum = SchedulerEnum.onecycle.value
 
     # model configuration
-    conv_layers: int = 3
-    edge_features: int = 16
-    node_features: int = 64
+    model: Union[CGCNNConfig, SimpleGCNConfig] = CGCNNConfig(name="cgcnn")
 
-    node_features: int = 32
-    edge_features: int = 32
-
-    fc_layers: int = 1
-    fc_features: int = 64
-    output_features: int = 1
-
-    # if logscale is set, apply `exp` to final outputs
-    # to constrain predictions to be positive
-    logscale: bool = False
-
-    class Config:
-        """Configure TrainingConfig pydantic model behavior."""
-
-        extra = "forbid"
-        use_enum_values = True
-
-    @property
-    def atom_input_features(self):
+    @root_validator()
+    def set_input_size(cls, values):
         """Automatically configure node feature dimensionality."""
-        return FEATURESET_SIZE[self.atom_features]
+        values["model"].atom_input_features = FEATURESET_SIZE[
+            values["atom_features"]
+        ]
+
+        return values
+
+    # @property
+    # def atom_input_features(self):
+    #     """Automatically configure node feature dimensionality."""
+    #     return FEATURESET_SIZE[self.atom_features]
