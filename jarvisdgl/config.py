@@ -4,7 +4,7 @@ import subprocess
 from enum import Enum, auto
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Extra
 
 VERSION = (
     subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
@@ -74,8 +74,8 @@ class TrainingConfig(BaseModel):
     version: str = VERSION
 
     # dataset configuration
-    dataset: DatasetEnum = DatasetEnum.dft_3d
-    target: TargetEnum = TargetEnum.formation_energy_peratom
+    dataset: DatasetEnum = DatasetEnum.dft_3d.value
+    target: TargetEnum = TargetEnum.formation_energy_peratom.value
 
     # logging configuration
 
@@ -88,10 +88,10 @@ class TrainingConfig(BaseModel):
     batch_size: int = 32
     weight_decay: float = 0
     learning_rate: float = 1e-2
-    criterion: CriterionEnum = CriterionEnum.mse
-    atom_features: FeatureEnum = FeatureEnum.basic
-    optimizer: OptimizerEnum = OptimizerEnum.adamw
-    scheduler: SchedulerEnum = SchedulerEnum.onecycle
+    criterion: CriterionEnum = CriterionEnum.mse.value
+    atom_features: FeatureEnum = FeatureEnum.basic.value
+    optimizer: OptimizerEnum = OptimizerEnum.adamw.value
+    scheduler: SchedulerEnum = SchedulerEnum.onecycle.value
 
     # model configuration
     conv_layers: int = 3
@@ -109,7 +109,13 @@ class TrainingConfig(BaseModel):
     # to constrain predictions to be positive
     logscale: bool = False
 
+    class Config:
+        """Configure TrainingConfig pydantic model behavior."""
+
+        extra = "forbid"
+        use_enum_values = True
+
     @property
     def atom_input_features(self):
         """Automatically configure node feature dimensionality."""
-        return FEATURESET_SIZE[self.atom_features.value]
+        return FEATURESET_SIZE[self.atom_features]

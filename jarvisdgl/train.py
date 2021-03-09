@@ -80,15 +80,15 @@ def train_dgl(
 
     # use input standardization for all real-valued feature sets
     standardize = True
-    if config.atom_features.value == "mit":
+    if config.atom_features == "mit":
         standardize = False
 
     train_loader, val_loader = data.get_train_val_loaders(
-        target=config.target.value,
+        target=config.target,
         n_train=config.n_train,
         n_val=config.n_val,
         batch_size=config.batch_size,
-        atom_features=config.atom_features.value,
+        atom_features=config.atom_features,
         standardize=standardize,
     )
 
@@ -109,13 +109,13 @@ def train_dgl(
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
 
-    if config.optimizer.value == "adamw":
+    if config.optimizer == "adamw":
         optimizer = torch.optim.AdamW(
             params,
             lr=config.learning_rate,
             weight_decay=config.weight_decay,
         )
-    elif config.optimizer.value == "sgd":
+    elif config.optimizer == "sgd":
         optimizer = torch.optim.SGD(
             params,
             lr=config.learning_rate,
@@ -123,13 +123,13 @@ def train_dgl(
             weight_decay=config.weight_decay,
         )
 
-    if config.scheduler.value == "none":
+    if config.scheduler == "none":
         # always return multiplier of 1 (i.e. do nothing)
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer, lambda epoch: 1.0
         )
 
-    elif config.scheduler.value == "onecycle":
+    elif config.scheduler == "onecycle":
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
@@ -141,7 +141,7 @@ def train_dgl(
 
     # select configured loss function
     criteria = {"mse": nn.MSELoss(), "l1": nn.L1Loss()}
-    criterion = criteria[config.criterion.value]
+    criterion = criteria[config.criterion]
 
     # set up training engine and evaluators
     metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
