@@ -112,7 +112,10 @@ def train_dgl(
 
     # define network, optimizer, scheduler
     if model is None:
-        net = models.CGCNN(config.model)
+        if config.model.name == "cgcnn":
+            net = models.CGCNN(config.model)
+        elif config.model.name == "densegcn":
+            net = models.DenseGCN(config.model)
     else:
         net = model
 

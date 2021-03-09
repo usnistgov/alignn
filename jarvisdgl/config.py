@@ -54,7 +54,26 @@ class SimpleGCNConfig(BaseSettings):
 
     name: Literal["simplegcn"]
     atom_input_features: int = 1
+    weight_edges: bool = True
     width: int = 64
+    output_features: int = 1
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
+class DenseGCNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.densegcn."""
+
+    name: Literal["densegcn"]
+    atom_input_features: int = 1
+    edge_lengthscale: float = 4.0
+    weight_edges: bool = True
+    conv_layers: int = 4
+    node_features: int = 32
+    growth_rate: int = 32
     output_features: int = 1
 
     class Config:
@@ -91,7 +110,9 @@ class TrainingConfig(BaseSettings):
     scheduler: Literal["onecycle", "none"] = "onecycle"
 
     # model configuration
-    model: Union[CGCNNConfig, SimpleGCNConfig] = CGCNNConfig(name="cgcnn")
+    model: Union[CGCNNConfig, SimpleGCNConfig, DenseGCNConfig] = CGCNNConfig(
+        name="cgcnn"
+    )
 
     @root_validator()
     def set_input_size(cls, values):
