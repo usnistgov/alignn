@@ -3,6 +3,7 @@ import functools
 import json
 import os
 import random
+from collections import defaultdict
 from typing import List, Tuple
 
 import dgl
@@ -121,6 +122,7 @@ def dgl_multigraph(
     # if a site has too few neighbors, increase the cutoff radius
     min_nbrs = min(len(neighborlist) for neighborlist in all_neighbors)
     if min_nbrs < max_neighbors:
+        print("extending cutoff radius!")
 
         lat = atoms.lattice
         r_cut = max(cutoff, lat.a, lat.b, lat.c)
@@ -132,25 +134,52 @@ def dgl_multigraph(
     # An undirected solution would build the full edge list where nodes are
     # keyed by (index, image), and ensure each edge has a complementary edge
 
+    # indeed, JVASP-59628 is an example of a calculation where this produces
+    # a graph where one site has no incident edges!
+
+    # build an edge dictionary u -> v
+    # so later we can run through the dictionary
+    # and remove all pairs of edges
+    # so what's left is the odd ones out
+    edges = defaultdict(list)
+
     u, v, r = [], [], []
     for site_idx, neighborlist in enumerate(all_neighbors):
 
         # sort on distance
         neighborlist = sorted(neighborlist, key=lambda x: x[1])
 
-        ids = np.array([nbr[2] for nbr in neighborlist])
         distances = np.array([nbr[1] for nbr in neighborlist])
+        ids = np.array([nbr[2] for nbr in neighborlist])
+        c = np.array([nbr[3] for nbr in neighborlist])
 
         # find the distance to the k-th nearest neighbor
         max_dist = distances[max_neighbors - 1]
 
         # keep all edges out to the neighbor shell of the k-th neighbor
         ids = ids[distances <= max_dist]
+        c = c[distances <= max_dist]
         distances = distances[distances <= max_dist]
 
         u.append([site_idx] * len(ids))
         v.append(ids)
         r.append(distances)
+
+        # keep track of cell-resolved edges
+        # to enforce undirected graph construction
+        for dst, cell_id in zip(ids, c):
+            u_key = f"{site_idx}-(0.0, 0.0, 0.0)"
+            v_key = f"{dst}-{tuple(cell_id)}"
+            edge_key = tuple(sorted((u_key, v_key)))
+            edges[edge_key].append((site_idx, dst))
+
+    # add complementary edges to unpaired edges
+    for edge_pair in edges.values():
+        if len(edge_pair) == 1:
+            src, dst = edge_pair[0]
+            u.append(src)
+            v.append(dst)
+            r.append(structure.distance_matrix[src, dst])
 
     u = torch.tensor(np.hstack(u))
     v = torch.tensor(np.hstack(v))
@@ -193,6 +222,7 @@ class StructureDataset(torch.utils.data.Dataset):
         self,
         structures,
         targets,
+        ids=None,
         cutoff=8.0,
         maxrows=np.inf,
         atom_features="atomic_number",
@@ -201,9 +231,10 @@ class StructureDataset(torch.utils.data.Dataset):
         """Initialize the class."""
         self.graphs = []
         self.labels = []
+        self.ids = []
 
-        for idx, (structure, target) in enumerate(
-            tqdm(zip(structures, targets))
+        for idx, (structure, target, jid) in enumerate(
+            tqdm(zip(structures, targets, ids))
         ):
 
             if idx >= maxrows:
@@ -214,6 +245,7 @@ class StructureDataset(torch.utils.data.Dataset):
 
             self.graphs.append(g)
             self.labels.append(target)
+            self.ids.append(jid)
 
         self.labels = torch.tensor(self.labels).type(torch.get_default_dtype())
         self.transform = transform
@@ -264,13 +296,15 @@ def get_train_val_loaders(
     """Help function to set up Jarvis train and val dataloaders."""
     d = jdata(dataset)
 
-    structures, targets = [], []
+    structures, targets, jv_ids = [], [], []
     for row in d:
         if row[target] != "na":
             structures.append(row["atoms"])
             targets.append(row[target])
+            jv_ids.append(row["jid"])
     structures = np.array(structures)
     targets = np.array(targets)
+    jv_ids = np.array(jv_ids)
 
     # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
     # i.e. shuffle the index in place with standard library random.shuffle
@@ -283,7 +317,10 @@ def get_train_val_loaders(
     # id_test = ids[:-n_test]
 
     train_data = StructureDataset(
-        structures[id_train], targets[id_train], atom_features=atom_features
+        structures[id_train],
+        targets[id_train],
+        ids=jv_ids[id_train],
+        atom_features=atom_features,
     )
     if standardize:
         train_data.setup_standardizer()
@@ -291,6 +328,7 @@ def get_train_val_loaders(
     val_data = StructureDataset(
         structures[id_val],
         targets[id_val],
+        ids=jv_ids[id_val],
         atom_features=atom_features,
         transform=train_data.transform,
     )
