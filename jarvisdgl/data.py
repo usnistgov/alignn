@@ -177,8 +177,8 @@ def dgl_multigraph(
     for edge_pair in edges.values():
         if len(edge_pair) == 1:
             src, dst = edge_pair[0]
-            u.append(src)
-            v.append(dst)
+            u.append(dst)  # swap the order!
+            v.append(src)
             r.append(structure.distance_matrix[src, dst])
 
     u = torch.tensor(np.hstack(u))
