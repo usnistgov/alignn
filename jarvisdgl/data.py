@@ -112,6 +112,7 @@ def nearest_neighbor_edges(
     structure: PymatgenStructure,
     cutoff: float = 8,
     max_neighbors: int = 12,
+    enforce_undirected: bool = False,
 ):
     """Construct k-NN edge list."""
     # returns List[List[Tuple[site, distance, index, image]]]
@@ -171,6 +172,15 @@ def nearest_neighbor_edges(
             edge_key = tuple(sorted((u_key, v_key)))
             edges[edge_key].append((site_idx, dst))
 
+    if enforce_undirected:
+        # add complementary edges to unpaired edges
+        for edge_pair in edges.values():
+            if len(edge_pair) == 1:
+                src, dst = edge_pair[0]
+                u.append(dst)  # swap the order!
+                v.append(src)
+                r.append(structure.distance_matrix[src, dst])
+
     return u, v, r, edges
 
 
@@ -182,7 +192,6 @@ def voronoi_edges(structure: PymatgenStructure):
     vnn = VoronoiNN(extra_nn_info=False, allow_pathological=True, cutoff=20)
 
     edges = defaultdict(list)
-    u, v, r = [], [], []
     for src in range(len(structure)):
         edge_data = vnn.get_nn_info(structure, src)
 
@@ -204,13 +213,18 @@ def voronoi_edges(structure: PymatgenStructure):
             assert src_image == (0, 0, 0)
             edges[(src_id, dst_id)].append(dst_image)
 
+    # second pass: construct *undirected* graph
+    u, v, r = [], [], []
+    for (src_id, dst_id), images in edges.items():
+
+        for dst_image in images:
             dist, _ = structure[src_id].distance_and_image(
                 structure[dst_id], jimage=dst_image
             )
-
-            u.append(src_id)
-            v.append(dst_id)
-            r.append(dist)
+            for uu, vv in zip((src_id, dst_id), (dst_id, src_id)):
+                u.append(src_id)
+                v.append(dst_id)
+                r.append(dist)
 
     return u, v, r, edges
 
@@ -229,19 +243,13 @@ def dgl_multigraph(
 
     if neighbor_strategy == "k-nearest":
         u, v, r, edges = nearest_neighbor_edges(
-            structure, cutoff=cutoff, max_neighbors=max_neighbors
+            structure,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
+            enforce_undirected=enforce_undirected,
         )
     elif neighbor_strategy == "voronoi":
         u, v, r, edges = voronoi_edges(structure)
-
-    if enforce_undirected:
-        # add complementary edges to unpaired edges
-        for edge_pair in edges.values():
-            if len(edge_pair) == 1:
-                src, dst = edge_pair[0]
-                u.append(dst)  # swap the order!
-                v.append(src)
-                r.append(structure.distance_matrix[src, dst])
 
     u = torch.tensor(np.hstack(u))
     v = torch.tensor(np.hstack(v))
@@ -257,7 +265,7 @@ def dgl_multigraph(
     g.ndata["atom_features"] = node_features
     g.edata["bondlength"] = r
 
-    return g
+    return g, edges
 
 
 class Standardize(torch.nn.Module):
