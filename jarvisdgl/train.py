@@ -107,6 +107,7 @@ def train_dgl(
         n_val=config.n_val,
         batch_size=config.batch_size,
         atom_features=config.atom_features,
+        enforce_undirected=config.enforce_undirected,
         standardize=standardize,
     )
 
@@ -178,7 +179,7 @@ def train_dgl(
     }
     handler = Checkpoint(
         to_save,
-        DiskSaver(checkpoint_dir, create_dir=True),
+        DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
         n_saved=2,
         global_step_transform=lambda *_: trainer.state.epoch,
     )
