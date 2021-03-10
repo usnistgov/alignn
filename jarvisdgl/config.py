@@ -106,6 +106,7 @@ class TrainingConfig(BaseSettings):
     learning_rate: float = 1e-2
     criterion: Literal["mse", "l1"] = "mse"
     atom_features: Literal["basic", "atomic_number", "cfid", "mit"] = "basic"
+    enforce_undirected: False
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
 

@@ -110,7 +110,8 @@ def dgl_multigraph(
     atoms: Atoms,
     cutoff: float = 8,
     max_neighbors: int = 12,
-    atom_features="atomic_number",
+    atom_features: str = "atomic_number",
+    enforce_undirected: bool = False,
 ):
     """Get DGLGraph from atoms, go through pymatgen structure."""
     # go through pymatgen for neighbor API for now...
@@ -173,13 +174,14 @@ def dgl_multigraph(
             edge_key = tuple(sorted((u_key, v_key)))
             edges[edge_key].append((site_idx, dst))
 
-    # add complementary edges to unpaired edges
-    for edge_pair in edges.values():
-        if len(edge_pair) == 1:
-            src, dst = edge_pair[0]
-            u.append(dst)  # swap the order!
-            v.append(src)
-            r.append(structure.distance_matrix[src, dst])
+    if enforce_undirected:
+        # add complementary edges to unpaired edges
+        for edge_pair in edges.values():
+            if len(edge_pair) == 1:
+                src, dst = edge_pair[0]
+                u.append(dst)  # swap the order!
+                v.append(src)
+                r.append(structure.distance_matrix[src, dst])
 
     u = torch.tensor(np.hstack(u))
     v = torch.tensor(np.hstack(v))
@@ -226,6 +228,7 @@ class StructureDataset(torch.utils.data.Dataset):
         cutoff=8.0,
         maxrows=np.inf,
         atom_features="atomic_number",
+        enforce_undirected=False,
         transform=None,
     ):
         """Initialize the class."""
@@ -241,7 +244,12 @@ class StructureDataset(torch.utils.data.Dataset):
                 break
 
             a = Atoms.from_dict(structure)
-            g = dgl_multigraph(a, atom_features=atom_features, cutoff=cutoff)
+            g = dgl_multigraph(
+                a,
+                atom_features=atom_features,
+                enforce_undirected=enforce_undirected,
+                cutoff=cutoff,
+            )
 
             self.graphs.append(g)
             self.labels.append(target)
@@ -286,6 +294,7 @@ def get_train_val_loaders(
     dataset: str = "dft_3d",
     target: str = "formation_energy_peratom",
     atom_features: str = "atomic_number",
+    enforce_undirected: bool = False,
     n_train: int = 32,
     n_val: int = 32,
     n_test: int = 32,
@@ -321,6 +330,7 @@ def get_train_val_loaders(
         targets[id_train],
         ids=jv_ids[id_train],
         atom_features=atom_features,
+        enforce_undirected=enforce_undirected,
     )
     if standardize:
         train_data.setup_standardizer()
@@ -330,6 +340,7 @@ def get_train_val_loaders(
         targets[id_val],
         ids=jv_ids[id_val],
         atom_features=atom_features,
+        enforce_undirected=enforce_undirected,
         transform=train_data.transform,
     )
 
