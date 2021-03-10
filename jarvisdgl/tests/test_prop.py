@@ -29,13 +29,16 @@ config_d = {
     "criterion": "mse",
     "atom_features": "basic",
     "optimizer": "adamw",
-    "conv_layers": 3,
-    "edge_features": 16,
-    "node_features": 64,
-    "fc_layers": 1,
-    "fc_features": 128,
-    "output_features": 1,
-    "logscale": False,
+    "model": {
+        "name": "cgcnn",
+        "conv_layers": 3,
+        "edge_features": 16,
+        "node_features": 64,
+        "fc_layers": 1,
+        "fc_features": 128,
+        "output_features": 1,
+        "logscale": False,
+    },
 }
 
 config_dd = {
@@ -52,13 +55,16 @@ config_dd = {
     "atom_features": "mit",
     "optimizer": "adamw",
     "scheduler": "onecycle",
-    "conv_layers": 3,
-    "edge_features": 41,
-    "node_features": 64,
-    "fc_layers": 1,
-    "fc_features": 128,
-    "output_features": 1,
-    "logscale": False,
+    "model": {
+        "name": "cgcnn",
+        "conv_layers": 3,
+        "edge_features": 41,
+        "node_features": 64,
+        "fc_layers": 1,
+        "fc_features": 128,
+        "output_features": 1,
+        "logscale": False,
+    },
     "log_tensorboard": False,
 }
 
@@ -76,13 +82,16 @@ config_d = {
     "atom_features": "mit",
     "optimizer": "adamw",
     "scheduler": "onecycle",
-    "conv_layers": 3,
-    "edge_features": 41,
-    "node_features": 64,
-    "fc_layers": 1,
-    "fc_features": 128,
-    "output_features": 1,
-    "logscale": False,
+    "model": {
+        "name": "cgcnn",
+        "conv_layers": 3,
+        "edge_features": 41,
+        "node_features": 64,
+        "fc_layers": 1,
+        "fc_features": 128,
+        "output_features": 1,
+        "logscale": False,
+    },
 }
 
 
