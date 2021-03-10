@@ -13,6 +13,7 @@ from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
 from jarvis.core.specie import Specie
 from jarvis.db.figshare import data as jdata
+from pymatgen.analysis.local_env import VoronoiNN
 from pymatgen.core.structure import Structure as PymatgenStructure
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
@@ -173,8 +174,50 @@ def nearest_neighbor_edges(
     return u, v, r, edges
 
 
+def voronoi_edges(structure: PymatgenStructure):
+    """Add edges from voronoi nearest neighbors.
+
+    Follow conventions from pymatgen.StructureGraph
+    """
+    vnn = VoronoiNN(extra_nn_info=False, allow_pathological=True, cutoff=20)
+
+    edges = defaultdict(list)
+    u, v, r = [], [], []
+    for src in range(len(structure)):
+        edge_data = vnn.get_nn_info(structure, src)
+
+        for edge in edge_data:
+            src_id, src_image = src, (0, 0, 0)
+            dst_id, dst_image = edge["site_index"], edge["image"]
+
+            # store directed edges src_id <= dst_id
+            if dst_id < src_id:
+                src_id, dst_id = dst_id, src_id
+                src_image, dst_image = dst_image, src_image
+
+            # shift periodic images so that src is in (0,0,0) image
+            if not np.array_equal(src_image, (0, 0, 0)):
+                shift = src_image
+                src_image = tuple(np.subtract(src_image, shift))
+                dst_image = tuple(np.subtract(dst_image, shift))
+
+            assert src_image == (0, 0, 0)
+            edges[(src_id, dst_id)].append(dst_image)
+
+            dist, _ = structure[src_id].distance_and_image(
+                structure[dst_id], jimage=dst_image
+            )
+
+            u.append(src_id)
+            v.append(dst_id)
+            r.append(dist)
+
+    return u, v, r, edges
+
+
 def dgl_multigraph(
     atoms: Atoms,
+    neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
     max_neighbors: int = 12,
     atom_features: str = "atomic_number",
@@ -184,9 +227,12 @@ def dgl_multigraph(
     # go through pymatgen for neighbor API for now...
     structure = atoms.pymatgen_converter()
 
-    u, v, r, edges = nearest_neighbor_edges(
-        structure, cutoff=cutoff, max_neighbors=max_neighbors
-    )
+    if neighbor_strategy == "k-nearest":
+        u, v, r, edges = nearest_neighbor_edges(
+            structure, cutoff=cutoff, max_neighbors=max_neighbors
+        )
+    elif neighbor_strategy == "voronoi":
+        u, v, r, edges = voronoi_edges(structure)
 
     if enforce_undirected:
         # add complementary edges to unpaired edges
