@@ -13,6 +13,7 @@ from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
 from jarvis.core.specie import Specie
 from jarvis.db.figshare import data as jdata
+from pymatgen.core.structure import Structure as PymatgenStructure
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -106,17 +107,12 @@ def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
         return i[key]
 
 
-def dgl_multigraph(
-    atoms: Atoms,
+def nearest_neighbor_edges(
+    structure: PymatgenStructure,
     cutoff: float = 8,
     max_neighbors: int = 12,
-    atom_features: str = "atomic_number",
-    enforce_undirected: bool = False,
 ):
-    """Get DGLGraph from atoms, go through pymatgen structure."""
-    # go through pymatgen for neighbor API for now...
-    structure = atoms.pymatgen_converter()
-
+    """Construct k-NN edge list."""
     # returns List[List[Tuple[site, distance, index, image]]]
     all_neighbors = structure.get_all_neighbors(cutoff)
 
@@ -125,10 +121,10 @@ def dgl_multigraph(
     if min_nbrs < max_neighbors:
         print("extending cutoff radius!")
 
-        lat = atoms.lattice
+        lat = structure.lattice
         r_cut = max(cutoff, lat.a, lat.b, lat.c)
 
-        return dgl_multigraph(atoms, r_cut, max_neighbors, atom_features)
+        return nearest_neighbor_edges(structure, r_cut, max_neighbors)
 
     # build up edge list
     # NOTE: currently there's no guarantee that this creates undirected graphs
@@ -173,6 +169,24 @@ def dgl_multigraph(
             v_key = f"{dst}-{tuple(cell_id)}"
             edge_key = tuple(sorted((u_key, v_key)))
             edges[edge_key].append((site_idx, dst))
+
+    return u, v, r, edges
+
+
+def dgl_multigraph(
+    atoms: Atoms,
+    cutoff: float = 8,
+    max_neighbors: int = 12,
+    atom_features: str = "atomic_number",
+    enforce_undirected: bool = False,
+):
+    """Get DGLGraph from atoms, go through pymatgen structure."""
+    # go through pymatgen for neighbor API for now...
+    structure = atoms.pymatgen_converter()
+
+    u, v, r, edges = nearest_neighbor_edges(
+        structure, cutoff=cutoff, max_neighbors=max_neighbors
+    )
 
     if enforce_undirected:
         # add complementary edges to unpaired edges
