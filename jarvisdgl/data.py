@@ -181,6 +181,10 @@ def nearest_neighbor_edges(
                 v.append(src)
                 r.append(structure.distance_matrix[src, dst])
 
+    u = torch.tensor(np.hstack(u))
+    v = torch.tensor(np.hstack(v))
+    r = torch.tensor(np.hstack(r)).type(torch.get_default_dtype())
+
     return u, v, r, edges
 
 
@@ -191,9 +195,19 @@ def voronoi_edges(structure: PymatgenStructure):
     """
     vnn = VoronoiNN(extra_nn_info=False, allow_pathological=True)
 
+    # computing all voronoi polyhedra at once is more efficient
+    # but breaks on some structures -- go site-by-site for these
+    try:
+        all_edge_data = vnn.get_all_nn_info(structure)
+    except ValueError:
+        # some structures report
+        # No Voronoi neighbours found for site - try increasing cutoff
+        all_edge_data = [
+            vnn.get_nn_info(structure, src) for src in range(len(structure))
+        ]
+
     edges = defaultdict(list)
-    for src in range(len(structure)):
-        edge_data = vnn.get_nn_info(structure, src)
+    for src, edge_data in enumerate(all_edge_data):
 
         for edge in edge_data:
             src_id, src_image = src, (0, 0, 0)
@@ -222,9 +236,13 @@ def voronoi_edges(structure: PymatgenStructure):
                 structure[dst_id], jimage=dst_image
             )
             for uu, vv in zip((src_id, dst_id), (dst_id, src_id)):
-                u.append(src_id)
-                v.append(dst_id)
+                u.append(uu)
+                v.append(vv)
                 r.append(dist)
+
+    u = torch.tensor(u)
+    v = torch.tensor(v)
+    r = torch.tensor(r).type(torch.get_default_dtype())
 
     return u, v, r, edges
 
@@ -250,10 +268,6 @@ def dgl_multigraph(
         )
     elif neighbor_strategy == "voronoi":
         u, v, r, edges = voronoi_edges(structure)
-
-    u = torch.tensor(np.hstack(u))
-    v = torch.tensor(np.hstack(v))
-    r = torch.tensor(np.hstack(r)).type(torch.get_default_dtype())
 
     # build up atom attribute tensor
     species = [s.name for s in structure.species]
@@ -296,6 +310,7 @@ class StructureDataset(torch.utils.data.Dataset):
         cutoff=8.0,
         maxrows=np.inf,
         atom_features="atomic_number",
+        neighbor_strategy="k-nearest",
         enforce_undirected=False,
         transform=None,
     ):
@@ -315,6 +330,7 @@ class StructureDataset(torch.utils.data.Dataset):
             g = dgl_multigraph(
                 a,
                 atom_features=atom_features,
+                neighbor_strategy=neighbor_strategy,
                 enforce_undirected=enforce_undirected,
                 cutoff=cutoff,
             )
@@ -362,6 +378,7 @@ def get_train_val_loaders(
     dataset: str = "dft_3d",
     target: str = "formation_energy_peratom",
     atom_features: str = "atomic_number",
+    neighbor_strategy: str = "k-nearest",
     enforce_undirected: bool = False,
     n_train: int = 32,
     n_val: int = 32,
@@ -398,6 +415,7 @@ def get_train_val_loaders(
         targets[id_train],
         ids=jv_ids[id_train],
         atom_features=atom_features,
+        neighbor_strategy=neighbor_strategy,
         enforce_undirected=enforce_undirected,
     )
     if standardize:
@@ -408,6 +426,7 @@ def get_train_val_loaders(
         targets[id_val],
         ids=jv_ids[id_val],
         atom_features=atom_features,
+        neighbor_strategy=neighbor_strategy,
         enforce_undirected=enforce_undirected,
         transform=train_data.transform,
     )
