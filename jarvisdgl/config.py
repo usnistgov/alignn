@@ -92,6 +92,8 @@ class TrainingConfig(BaseSettings):
     target: Literal[
         "formation_energy_peratom", "optb88vdw_bandgap"
     ] = "formation_energy_peratom"
+    atom_features: Literal["basic", "atomic_number", "cfid", "mit"] = "basic"
+    enforce_undirected: bool = False
 
     # logging configuration
 
@@ -99,14 +101,11 @@ class TrainingConfig(BaseSettings):
     random_seed: Optional[int] = None
     n_val: int = 1024
     n_train: int = 1024
-
     epochs: int = 100
     batch_size: int = 32
     weight_decay: float = 0
     learning_rate: float = 1e-2
     criterion: Literal["mse", "l1"] = "mse"
-    atom_features: Literal["basic", "atomic_number", "cfid", "mit"] = "basic"
-    enforce_undirected: bool = False
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
 
