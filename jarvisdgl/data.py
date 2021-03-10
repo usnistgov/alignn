@@ -265,7 +265,7 @@ def dgl_multigraph(
     g.ndata["atom_features"] = node_features
     g.edata["bondlength"] = r
 
-    return g, edges
+    return g
 
 
 class Standardize(torch.nn.Module):
