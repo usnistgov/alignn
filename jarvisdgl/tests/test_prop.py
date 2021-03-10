@@ -4,17 +4,10 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from jarvisdgl.main import train_property_model
 from jarvisdgl.train import train_dgl
 
 plt.switch_backend("agg")
 from sklearn.metrics import mean_absolute_error
-
-
-def test_prop():
-    """Test full training run with small batch size."""
-    train_property_model(epochs=2, maxrows=16, batch_size=8)
-
 
 config_d = {
     "dataset": "dft_3d",
