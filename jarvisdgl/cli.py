@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -53,7 +54,7 @@ def cli(
 
     # move temporary checkpoint data into model_dir
     for checkpoint in checkpoint_dir.glob("*.pt"):
-        checkpoint.replace(model_dir / checkpoint.name)
+        shutil.copy(checkpoint, model_dir / checkpoint.name)
 
 
 if __name__ == "__main__":
