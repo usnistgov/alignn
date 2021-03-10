@@ -189,7 +189,7 @@ def voronoi_edges(structure: PymatgenStructure):
 
     Follow conventions from pymatgen.StructureGraph
     """
-    vnn = VoronoiNN(extra_nn_info=False, allow_pathological=True, cutoff=20)
+    vnn = VoronoiNN(extra_nn_info=False, allow_pathological=True)
 
     edges = defaultdict(list)
     for src in range(len(structure)):
