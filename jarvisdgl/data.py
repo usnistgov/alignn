@@ -3,8 +3,8 @@ import functools
 import json
 import os
 import random
-from collections import defaultdict
-from typing import List, Tuple
+from collections import Counter, defaultdict
+from typing import Dict, List, Set, Tuple
 
 import dgl
 import numpy as np
@@ -108,11 +108,62 @@ def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
         return i[key]
 
 
+def canonize_edge(
+    src_id: int,
+    dst_id: int,
+    src_image: Tuple[int, int, int],
+    dst_image: Tuple[int, int, int],
+):
+    """Compute canonical edge representation.
+
+    sort vertex ids
+    shift periodic images so the first vertex is in (0,0,0) image
+    """
+    # store directed edges src_id <= dst_id
+    if dst_id < src_id:
+        src_id, dst_id = dst_id, src_id
+        src_image, dst_image = dst_image, src_image
+
+    # shift periodic images so that src is in (0,0,0) image
+    if not np.array_equal(src_image, (0, 0, 0)):
+        shift = src_image
+        src_image = tuple(np.subtract(src_image, shift))
+        dst_image = tuple(np.subtract(dst_image, shift))
+
+    assert src_image == (0, 0, 0)
+
+    return src_id, dst_id, src_image, dst_image
+
+
+def build_undirected_edgedata(
+    structure: PymatgenStructure,
+    edges: Dict[Tuple[int, int], Set[Tuple[int, int, int]]],
+):
+    """Build undirected graph data from edge set."""
+    # second pass: construct *undirected* graph
+    u, v, r = [], [], []
+    for (src_id, dst_id), images in edges.items():
+
+        for dst_image in images:
+            dist, _ = structure[src_id].distance_and_image(
+                structure[dst_id], jimage=dst_image
+            )
+            for uu, vv in zip((src_id, dst_id), (dst_id, src_id)):
+                u.append(uu)
+                v.append(vv)
+                r.append(dist)
+
+    u = torch.tensor(u)
+    v = torch.tensor(v)
+    r = torch.tensor(r).type(torch.get_default_dtype())
+
+    return u, v, r
+
+
 def nearest_neighbor_edges(
     structure: PymatgenStructure,
     cutoff: float = 8,
     max_neighbors: int = 12,
-    enforce_undirected: bool = False,
 ):
     """Construct k-NN edge list."""
     # returns List[List[Tuple[site, distance, index, image]]]
@@ -140,9 +191,7 @@ def nearest_neighbor_edges(
     # so later we can run through the dictionary
     # and remove all pairs of edges
     # so what's left is the odd ones out
-    edges = defaultdict(list)
-
-    u, v, r = [], [], []
+    edges = defaultdict(set)
     for site_idx, neighborlist in enumerate(all_neighbors):
 
         # sort on distance
@@ -150,42 +199,25 @@ def nearest_neighbor_edges(
 
         distances = np.array([nbr[1] for nbr in neighborlist])
         ids = np.array([nbr[2] for nbr in neighborlist])
-        c = np.array([nbr[3] for nbr in neighborlist])
+        images = np.array([nbr[3] for nbr in neighborlist])
 
         # find the distance to the k-th nearest neighbor
         max_dist = distances[max_neighbors - 1]
 
         # keep all edges out to the neighbor shell of the k-th neighbor
         ids = ids[distances <= max_dist]
-        c = c[distances <= max_dist]
+        images = images[distances <= max_dist]
         distances = distances[distances <= max_dist]
-
-        u.append([site_idx] * len(ids))
-        v.append(ids)
-        r.append(distances)
 
         # keep track of cell-resolved edges
         # to enforce undirected graph construction
-        for dst, cell_id in zip(ids, c):
-            u_key = f"{site_idx}-(0.0, 0.0, 0.0)"
-            v_key = f"{dst}-{tuple(cell_id)}"
-            edge_key = tuple(sorted((u_key, v_key)))
-            edges[edge_key].append((site_idx, dst))
+        for dst, image in zip(ids, images):
+            src_id, dst_id, src_image, dst_image = canonize_edge(
+                site_idx, dst, (0, 0, 0), tuple(image)
+            )
+            edges[(src_id, dst_id)].add(dst_image)
 
-    if enforce_undirected:
-        # add complementary edges to unpaired edges
-        for edge_pair in edges.values():
-            if len(edge_pair) == 1:
-                src, dst = edge_pair[0]
-                u.append(dst)  # swap the order!
-                v.append(src)
-                r.append(structure.distance_matrix[src, dst])
-
-    u = torch.tensor(np.hstack(u))
-    v = torch.tensor(np.hstack(v))
-    r = torch.tensor(np.hstack(r)).type(torch.get_default_dtype())
-
-    return u, v, r, edges
+    return edges
 
 
 def voronoi_edges(structure: PymatgenStructure):
@@ -206,45 +238,20 @@ def voronoi_edges(structure: PymatgenStructure):
             vnn.get_nn_info(structure, src) for src in range(len(structure))
         ]
 
-    edges = defaultdict(list)
+    edges = defaultdict(set)
     for src, edge_data in enumerate(all_edge_data):
 
         for edge in edge_data:
             src_id, src_image = src, (0, 0, 0)
             dst_id, dst_image = edge["site_index"], edge["image"]
 
-            # store directed edges src_id <= dst_id
-            if dst_id < src_id:
-                src_id, dst_id = dst_id, src_id
-                src_image, dst_image = dst_image, src_image
-
-            # shift periodic images so that src is in (0,0,0) image
-            if not np.array_equal(src_image, (0, 0, 0)):
-                shift = src_image
-                src_image = tuple(np.subtract(src_image, shift))
-                dst_image = tuple(np.subtract(dst_image, shift))
-
-            assert src_image == (0, 0, 0)
-            edges[(src_id, dst_id)].append(dst_image)
-
-    # second pass: construct *undirected* graph
-    u, v, r = [], [], []
-    for (src_id, dst_id), images in edges.items():
-
-        for dst_image in images:
-            dist, _ = structure[src_id].distance_and_image(
-                structure[dst_id], jimage=dst_image
+            src_id, dst_id, src_image, dst_image = canonize_edge(
+                src_id, dst_id, src_image, dst_image
             )
-            for uu, vv in zip((src_id, dst_id), (dst_id, src_id)):
-                u.append(uu)
-                v.append(vv)
-                r.append(dist)
 
-    u = torch.tensor(u)
-    v = torch.tensor(v)
-    r = torch.tensor(r).type(torch.get_default_dtype())
+            edges[(src_id, dst_id)].add(dst_image)
 
-    return u, v, r, edges
+    return edges
 
 
 def dgl_multigraph(
@@ -253,21 +260,21 @@ def dgl_multigraph(
     cutoff: float = 8,
     max_neighbors: int = 12,
     atom_features: str = "atomic_number",
-    enforce_undirected: bool = False,
 ):
     """Get DGLGraph from atoms, go through pymatgen structure."""
     # go through pymatgen for neighbor API for now...
     structure = atoms.pymatgen_converter()
 
     if neighbor_strategy == "k-nearest":
-        u, v, r, edges = nearest_neighbor_edges(
+        edges = nearest_neighbor_edges(
             structure,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
-            enforce_undirected=enforce_undirected,
         )
     elif neighbor_strategy == "voronoi":
-        u, v, r, edges = voronoi_edges(structure)
+        edges = voronoi_edges(structure)
+
+    u, v, r = build_undirected_edgedata(structure, edges)
 
     # build up atom attribute tensor
     species = [s.name for s in structure.species]
@@ -311,7 +318,6 @@ class StructureDataset(torch.utils.data.Dataset):
         maxrows=np.inf,
         atom_features="atomic_number",
         neighbor_strategy="k-nearest",
-        enforce_undirected=False,
         transform=None,
     ):
         """Initialize the class."""
@@ -331,7 +337,6 @@ class StructureDataset(torch.utils.data.Dataset):
                 a,
                 atom_features=atom_features,
                 neighbor_strategy=neighbor_strategy,
-                enforce_undirected=enforce_undirected,
                 cutoff=cutoff,
             )
 
@@ -379,7 +384,6 @@ def get_train_val_loaders(
     target: str = "formation_energy_peratom",
     atom_features: str = "atomic_number",
     neighbor_strategy: str = "k-nearest",
-    enforce_undirected: bool = False,
     n_train: int = 32,
     n_val: int = 32,
     n_test: int = 32,
@@ -416,7 +420,6 @@ def get_train_val_loaders(
         ids=jv_ids[id_train],
         atom_features=atom_features,
         neighbor_strategy=neighbor_strategy,
-        enforce_undirected=enforce_undirected,
     )
     if standardize:
         train_data.setup_standardizer()
@@ -427,7 +430,6 @@ def get_train_val_loaders(
         ids=jv_ids[id_val],
         atom_features=atom_features,
         neighbor_strategy=neighbor_strategy,
-        enforce_undirected=enforce_undirected,
         transform=train_data.transform,
     )
 

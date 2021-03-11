@@ -94,7 +94,6 @@ class TrainingConfig(BaseSettings):
     ] = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "mit"] = "basic"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
-    enforce_undirected: bool = False
 
     # logging configuration
 

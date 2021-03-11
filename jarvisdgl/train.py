@@ -108,7 +108,6 @@ def train_dgl(
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
-        enforce_undirected=config.enforce_undirected,
         standardize=standardize,
     )
 
