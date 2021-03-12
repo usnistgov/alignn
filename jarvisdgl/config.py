@@ -2,105 +2,39 @@
 
 import subprocess
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseSettings as PydanticBaseSettings
+from pydantic import Field, root_validator, validator
+from pydantic.typing import Literal
 
 VERSION = (
     subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
 )
 
 
-class AutoName(Enum):
-    """Auto string enum.
+class BaseSettings(PydanticBaseSettings):
+    """Add configuration to default Pydantic BaseSettings."""
 
-    https://stackoverflow.com/questions/44781681/how-to-compare-a-string-with-a-python-enum/44785241#44785241
-    """
+    class Config:
+        """Configure BaseSettings behavior."""
 
-    def _generate_next_value_(name, start, count, last_values):
-        return name
-
-
-class DatasetEnum(AutoName):
-    """Supported datasets."""
-
-    dft_3d = auto()
-    dft_2d = auto()
-
-
-class TargetEnum(AutoName):
-    """Supported targets."""
-
-    formation_energy_peratom = auto()
-    optb88vdw_bandgap = auto()
-
-
-class FeatureEnum(AutoName):
-    """Supported atom feature sets."""
-
-    basic = auto()
-    atomic_number = auto()
-    cfid = auto()
-    mit = auto()
-
-
-class CriterionEnum(AutoName):
-    """Supported optimizer criteria."""
-
-    mse = auto()
-    l1 = auto()
+        extra = "forbid"
+        use_enum_values = True
+        env_prefix = "jv_"
 
 
 FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "mit": 92}
 
 
-class OptimizerEnum(AutoName):
-    """Supported optimizers."""
+class CGCNNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.cgcnn."""
 
-    adamw = auto()
-    sgd = auto()
-
-
-class SchedulerEnum(AutoName):
-    """Supported learning rate schedulers."""
-
-    none = auto()
-    onecycle = auto()
-
-
-class TrainingConfig(BaseModel):
-    """Training config defaults and validation."""
-
-    version: str = VERSION
-
-    # dataset configuration
-    dataset: DatasetEnum = DatasetEnum.dft_3d
-    target: TargetEnum = TargetEnum.formation_energy_peratom
-
-    # logging configuration
-
-    # training configuration
-    random_seed: Optional[int] = None
-    n_val: int = 1024
-    n_train: int = 1024
-
-    epochs: int = 100
-    batch_size: int = 32
-    weight_decay: float = 0
-    learning_rate: float = 1e-2
-    criterion: CriterionEnum = CriterionEnum.mse
-    atom_features: FeatureEnum = FeatureEnum.basic
-    optimizer: OptimizerEnum = OptimizerEnum.adamw
-    scheduler: SchedulerEnum = SchedulerEnum.onecycle
-
-    # model configuration
+    name: Literal["cgcnn"]
     conv_layers: int = 3
+    atom_input_features: int = 1
     edge_features: int = 16
     node_features: int = 64
-
-    node_features: int = 32
-    edge_features: int = 32
-
     fc_layers: int = 1
     fc_features: int = 64
     output_features: int = 1
@@ -109,7 +43,87 @@ class TrainingConfig(BaseModel):
     # to constrain predictions to be positive
     logscale: bool = False
 
-    @property
-    def atom_input_features(self):
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
+class SimpleGCNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.gcn."""
+
+    name: Literal["simplegcn"]
+    atom_input_features: int = 1
+    weight_edges: bool = True
+    width: int = 64
+    output_features: int = 1
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
+class DenseGCNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.densegcn."""
+
+    name: Literal["densegcn"]
+    atom_input_features: int = 1
+    edge_lengthscale: float = 4.0
+    weight_edges: bool = True
+    conv_layers: int = 4
+    node_features: int = 32
+    growth_rate: int = 32
+    output_features: int = 1
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
+class TrainingConfig(BaseSettings):
+    """Training config defaults and validation."""
+
+    version: str = VERSION
+
+    # dataset configuration
+    dataset: Literal["dft_3d", "dft_2d"] = "dft_3d"
+    target: Literal[
+        "formation_energy_peratom", "optb88vdw_bandgap"
+    ] = "formation_energy_peratom"
+    atom_features: Literal["basic", "atomic_number", "cfid", "mit"] = "basic"
+    enforce_undirected: bool = False
+
+    # logging configuration
+
+    # training configuration
+    random_seed: Optional[int] = None
+    n_val: int = 1024
+    n_train: int = 1024
+    epochs: int = 100
+    batch_size: int = 32
+    weight_decay: float = 0
+    learning_rate: float = 1e-2
+    criterion: Literal["mse", "l1"] = "mse"
+    optimizer: Literal["adamw", "sgd"] = "adamw"
+    scheduler: Literal["onecycle", "none"] = "onecycle"
+
+    # model configuration
+    model: Union[CGCNNConfig, SimpleGCNConfig, DenseGCNConfig] = CGCNNConfig(
+        name="cgcnn"
+    )
+
+    @root_validator()
+    def set_input_size(cls, values):
         """Automatically configure node feature dimensionality."""
-        return FEATURESET_SIZE[self.atom_features.value]
+        values["model"].atom_input_features = FEATURESET_SIZE[
+            values["atom_features"]
+        ]
+
+        return values
+
+    # @property
+    # def atom_input_features(self):
+    #     """Automatically configure node feature dimensionality."""
+    #     return FEATURESET_SIZE[self.atom_features]

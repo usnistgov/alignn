@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Any, Dict, Union
 
 import ignite
+import numpy as np
 import torch
 from ignite.contrib.handlers import TensorboardLogger
+from ignite.contrib.handlers.stores import EpochOutputStore
 from ignite.contrib.handlers.tensorboard_logger import (
     OutputHandler,
     global_step_from_engine,
@@ -22,7 +24,7 @@ from ignite.engine import (
     create_supervised_evaluator,
     create_supervised_trainer,
 )
-from ignite.handlers import TerminateOnNan
+from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
 
@@ -46,10 +48,30 @@ def group_decay(model):
     ]
 
 
+def setup_optimizer(params, config: TrainingConfig):
+    """Set up optimizer for param groups."""
+    if config.optimizer == "adamw":
+        optimizer = torch.optim.AdamW(
+            params,
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+        )
+    elif config.optimizer == "sgd":
+        optimizer = torch.optim.SGD(
+            params,
+            lr=config.learning_rate,
+            momentum=0.9,
+            weight_decay=config.weight_decay,
+        )
+    return optimizer
+
+
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
     progress: bool = False,
+    checkpoint_dir: Path = Path("/tmp/models"),
+    store_outputs: bool = True,
     log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -76,27 +98,25 @@ def train_dgl(
 
     # use input standardization for all real-valued feature sets
     standardize = True
-    if config.atom_features.value == "mit":
+    if config.atom_features == "mit":
         standardize = False
 
     train_loader, val_loader = data.get_train_val_loaders(
-        target=config.target.value,
+        target=config.target,
         n_train=config.n_train,
         n_val=config.n_val,
         batch_size=config.batch_size,
-        atom_features=config.atom_features.value,
+        atom_features=config.atom_features,
+        enforce_undirected=config.enforce_undirected,
         standardize=standardize,
     )
 
     # define network, optimizer, scheduler
     if model is None:
-        net = models.CGCNN(
-            atom_input_features=config.atom_input_features,
-            conv_layers=config.conv_layers,
-            edge_features=config.edge_features,
-            node_features=config.node_features,
-            logscale=config.logscale,
-        )
+        if config.model.name == "cgcnn":
+            net = models.CGCNN(config.model)
+        elif config.model.name == "densegcn":
+            net = models.DenseGCN(config.model)
     else:
         net = model
 
@@ -104,40 +124,25 @@ def train_dgl(
 
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
+    optimizer = setup_optimizer(params, config)
 
-    if config.optimizer.value == "adamw":
-        optimizer = torch.optim.AdamW(
-            params,
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-        )
-    elif config.optimizer.value == "sgd":
-        optimizer = torch.optim.SGD(
-            params,
-            lr=config.learning_rate,
-            momentum=0.9,
-            weight_decay=config.weight_decay,
-        )
-
-    if config.scheduler.value == "none":
+    if config.scheduler == "none":
         # always return multiplier of 1 (i.e. do nothing)
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer, lambda epoch: 1.0
         )
 
-    elif config.scheduler.value == "onecycle":
+    elif config.scheduler == "onecycle":
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
-            max_momentum=0.92,
-            base_momentum=0.88,
             epochs=config.epochs,
             steps_per_epoch=len(train_loader),
         )
 
     # select configured loss function
     criteria = {"mse": nn.MSELoss(), "l1": nn.L1Loss()}
-    criterion = criteria[config.criterion.value]
+    criterion = criteria[config.criterion]
 
     # set up training engine and evaluators
     metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
@@ -165,6 +170,21 @@ def train_dgl(
         Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
     )
 
+    # model checkpointing
+    to_save = {
+        "model": net,
+        "optimizer": optimizer,
+        "lr_scheduler": scheduler,
+        "trainer": trainer,
+    }
+    handler = Checkpoint(
+        to_save,
+        DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
+        n_saved=2,
+        global_step_transform=lambda *_: trainer.state.epoch,
+    )
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
+
     if progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
@@ -173,6 +193,12 @@ def train_dgl(
         "train": {m: [] for m in metrics.keys()},
         "validation": {m: [] for m in metrics.keys()},
     }
+
+    if store_outputs:
+        # log_results handler will save epoch output
+        # in history["EOS"]
+        eos = EpochOutputStore()
+        eos.attach(evaluator)
 
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -183,10 +209,12 @@ def train_dgl(
 
         tmetrics = train_evaluator.state.metrics
         vmetrics = evaluator.state.metrics
-
         for metric in metrics.keys():
             history["train"][metric].append(tmetrics[metric])
             history["validation"][metric].append(vmetrics[metric])
+
+        if store_outputs:
+            history["EOS"] = eos.data
 
     # optionally log results to tensorboard
     if log_tensorboard:
@@ -206,9 +234,9 @@ def train_dgl(
 
     # train the model!
     trainer.run(train_loader, max_epochs=config.epochs)
-    test_loss = evaluator.state.metrics["loss"]
 
     if log_tensorboard:
+        test_loss = evaluator.state.metrics["loss"]
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
 

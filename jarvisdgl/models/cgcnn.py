@@ -10,6 +10,8 @@ import torch.nn.functional as F
 from dgl.nn import AvgPooling
 from torch import nn
 
+from jarvisdgl.config import CGCNNConfig
+
 
 class RBFExpansion(nn.Module):
     """Expand interatomic distances with radial basis functions."""
@@ -126,37 +128,30 @@ class CGCNNConv(nn.Module):
 class CGCNN(nn.Module):
     """CGCNN dgl implementation."""
 
-    def __init__(
-        self,
-        atom_input_features: int = 1,
-        node_features: int = 32,
-        edge_features: int = 40,
-        conv_layers: int = 3,
-        fc_features: int = 64,
-        output_features: int = 1,
-        logscale=False,
-    ):
+    def __init__(self, config: CGCNNConfig = CGCNNConfig(name="cgcnn")):
         """Set up CGCNN modules."""
         super().__init__()
 
-        self.rbf = RBFExpansion(vmin=0, vmax=8.0, bins=edge_features)
-        self.atom_embedding = nn.Linear(atom_input_features, node_features)
+        self.rbf = RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_features)
+        self.atom_embedding = nn.Linear(
+            config.atom_input_features, config.node_features
+        )
 
         self.conv_layers = nn.ModuleList(
             [
-                CGCNNConv(node_features, edge_features)
-                for _ in range(conv_layers)
+                CGCNNConv(config.node_features, config.edge_features)
+                for _ in range(config.conv_layers)
             ]
         )
 
         self.readout = AvgPooling()
 
         self.fc = nn.Sequential(
-            nn.Linear(node_features, fc_features), nn.Softplus()
+            nn.Linear(config.node_features, config.fc_features), nn.Softplus()
         )
 
-        self.fc_out = nn.Linear(fc_features, output_features)
-        self.logscale = logscale
+        self.fc_out = nn.Linear(config.fc_features, config.output_features)
+        self.logscale = config.logscale
 
     def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
         """CGCNN function mapping graph to outputs."""

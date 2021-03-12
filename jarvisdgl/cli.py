@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -14,6 +15,8 @@ from jarvisdgl.train import train_dgl
 def cli(
     config: Optional[Path] = typer.Argument(None),
     progress: bool = False,
+    checkpoint_dir: Path = Path("/tmp/models"),
+    store_outputs: bool = False,
     tensorboard: bool = False,
 ):
     """Jarvis-dgl training cli.
@@ -22,6 +25,8 @@ def cli(
     progress: enable tqdm console logging
     tensorboard: enable tensorboard logging
     """
+    model_dir = config.parent
+
     if config is None:
         model_dir = os.getcwd()
         config = TrainingConfig(epochs=10, n_train=32, n_val=32, batch_size=16)
@@ -32,7 +37,13 @@ def cli(
             config = json.load(f)
             config = TrainingConfig(**config)
 
-    hist = train_dgl(config, progress=progress, log_tensorboard=tensorboard)
+    hist = train_dgl(
+        config,
+        progress=progress,
+        checkpoint_dir=checkpoint_dir,
+        store_outputs=store_outputs,
+        log_tensorboard=tensorboard,
+    )
 
     print(model_dir)
     with open(model_dir / "metrics.json", "w") as f:
@@ -40,6 +51,10 @@ def cli(
 
     with open(model_dir / "fullconfig.json", "w") as f:
         json.dump(json.loads(config.json()), f, indent=2)
+
+    # move temporary checkpoint data into model_dir
+    for checkpoint in checkpoint_dir.glob("*.pt"):
+        shutil.copy(checkpoint, model_dir / checkpoint.name)
 
 
 if __name__ == "__main__":
