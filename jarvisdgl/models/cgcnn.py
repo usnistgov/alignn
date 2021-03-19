@@ -153,6 +153,12 @@ class CGCNN(nn.Module):
         self.fc_out = nn.Linear(config.fc_features, config.output_features)
         self.logscale = config.logscale
 
+        if self.logscale:
+            avg_gap = 0.7  # magic number -- average bandgap in dft_3d
+            self.fc_out.bias.data = torch.tensor(
+                np.log(avg_gap), dtype=torch.float
+            )
+
     def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
         """CGCNN function mapping graph to outputs."""
         g = g.local_var()
