@@ -161,6 +161,6 @@ class CGCNN(nn.Module):
         if self.hurdle:
             logits = self.fc_hurdle(features)
             p = torch.sigmoid(logits)
-            out[p < 0.5] = 0.0
+            out = torch.where(p < 0.5, torch.zeros_like(out), out)
 
         return torch.squeeze(out)
