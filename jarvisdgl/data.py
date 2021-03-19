@@ -174,8 +174,14 @@ def nearest_neighbor_edges(
     if min_nbrs < max_neighbors:
         print("extending cutoff radius!")
 
+        # first iteration: set cutoff to cell size
         lat = structure.lattice
-        r_cut = max(cutoff, lat.a, lat.b, lat.c)
+        if cutoff < max(lat.a, lat.b, lat.c):
+            r_cut = max(lat.a, lat.b, lat.c)
+
+        else:
+            # recursive iterations:
+            r_cut = 2 * cutoff
 
         return nearest_neighbor_edges(structure, r_cut, max_neighbors)
 
@@ -445,7 +451,7 @@ def get_train_val_loaders(
     val_loader = DataLoader(
         val_data,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=False,
         collate_fn=val_data.collate,
         drop_last=True,
     )
