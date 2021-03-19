@@ -115,6 +115,14 @@ class CGCNN(nn.Module):
             nn.Linear(config.node_features, config.fc_features), nn.Softplus()
         )
 
+        if config.hurdle:
+            # add latent Bernoulli variable model to zero out
+            # predictions in non-negative regression model
+            self.hurdle = True
+            self.fc_hurdle = nn.Linear(config.fc_features, 1)
+        else:
+            self.hurdle = False
+
         self.fc_out = nn.Linear(config.fc_features, config.output_features)
         self.logscale = config.logscale
 
@@ -149,5 +157,10 @@ class CGCNN(nn.Module):
 
         if self.logscale:
             out = torch.exp(out)
+
+        if self.hurdle:
+            logits = self.fc_hurdle(features)
+            p = torch.sigmoid(logits)
+            out[p < 0.5] = 0.0
 
         return torch.squeeze(out)

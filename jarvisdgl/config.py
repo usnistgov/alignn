@@ -42,6 +42,7 @@ class CGCNNConfig(BaseSettings):
     # if logscale is set, apply `exp` to final outputs
     # to constrain predictions to be positive
     logscale: bool = False
+    hurdle: bool = False
 
     class Config:
         """Configure model settings behavior."""
