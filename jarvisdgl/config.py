@@ -105,7 +105,7 @@ class TrainingConfig(BaseSettings):
     batch_size: int = 32
     weight_decay: float = 0
     learning_rate: float = 1e-2
-    criterion: Literal["mse", "l1"] = "mse"
+    criterion: Literal["mse", "l1", "poisson"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
 
