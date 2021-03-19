@@ -141,7 +141,11 @@ def train_dgl(
         )
 
     # select configured loss function
-    criteria = {"mse": nn.MSELoss(), "l1": nn.L1Loss()}
+    criteria = {
+        "mse": nn.MSELoss(),
+        "l1": nn.L1Loss(),
+        "poisson": nn.PoissonNLLLoss(log_input=False, full=True),
+    }
     criterion = criteria[config.criterion]
 
     # set up training engine and evaluators
