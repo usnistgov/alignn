@@ -50,6 +50,29 @@ class CGCNNConfig(BaseSettings):
         env_prefix = "jv_model"
 
 
+class ICGCNNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.icgcnn."""
+
+    name: Literal["icgcnn"]
+    conv_layers: int = 3
+    atom_input_features: int = 1
+    edge_features: int = 16
+    node_features: int = 64
+    fc_layers: int = 1
+    fc_features: int = 64
+    output_features: int = 1
+
+    # if logscale is set, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    logscale: bool = False
+    hurdle: bool = False
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
 class SimpleGCNConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.gcn."""
 
@@ -111,9 +134,9 @@ class TrainingConfig(BaseSettings):
     scheduler: Literal["onecycle", "none"] = "onecycle"
 
     # model configuration
-    model: Union[CGCNNConfig, SimpleGCNConfig, DenseGCNConfig] = CGCNNConfig(
-        name="cgcnn"
-    )
+    model: Union[
+        CGCNNConfig, ICGCNNConfig, SimpleGCNConfig, DenseGCNConfig
+    ] = CGCNNConfig(name="cgcnn")
 
     @root_validator()
     def set_input_size(cls, values):
