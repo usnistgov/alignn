@@ -7,7 +7,7 @@ then `tensorboard --logdir tb_logs/test` to monitor results...
 
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Callable, Dict, Union
 
 import ignite
 import numpy as np
@@ -147,11 +147,25 @@ def train_dgl(
         "mse": nn.MSELoss(),
         "l1": nn.L1Loss(),
         "poisson": nn.PoissonNLLLoss(log_input=False, full=True),
+        "zig": models.cgcnn.ZeroInflatedGammaLoss(),
     }
     criterion = criteria[config.criterion]
 
     # set up training engine and evaluators
     metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
+    if config.criterion == "zig":
+
+        def zig_prediction_transform(x):
+            output, y = x
+            return criterion.predict(output), y
+
+        metrics = {
+            "loss": Loss(criterion),
+            "mae": MeanAbsoluteError(
+                output_transform=zig_prediction_transform
+            ),
+        }
+
     trainer = create_supervised_trainer(
         net,
         optimizer,

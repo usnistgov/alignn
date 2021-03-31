@@ -39,10 +39,10 @@ class CGCNNConfig(BaseSettings):
     fc_features: int = 64
     output_features: int = 1
 
-    # if logscale is set, apply `exp` to final outputs
+    # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
-    logscale: bool = False
-    hurdle: bool = False
+    link: Literal["identity", "log", "logit"] = "identity"
+    zero_inflated: bool = False
 
     class Config:
         """Configure model settings behavior."""
@@ -129,7 +129,7 @@ class TrainingConfig(BaseSettings):
     batch_size: int = 32
     weight_decay: float = 0
     learning_rate: float = 1e-2
-    criterion: Literal["mse", "l1", "poisson"] = "mse"
+    criterion: Literal["mse", "l1", "poisson", "zig"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
 

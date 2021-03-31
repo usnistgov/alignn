@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+import torch
 import typer
 
 from jarvisdgl.config import TrainingConfig
@@ -45,9 +46,11 @@ def cli(
         log_tensorboard=tensorboard,
     )
 
-    print(model_dir)
-    with open(model_dir / "metrics.json", "w") as f:
-        json.dump(hist, f)
+    # print(model_dir)
+    # with open(model_dir / "metrics.json", "w") as f:
+    #     json.dump(hist, f)
+
+    torch.save(hist, model_dir / "metrics.pt")
 
     with open(model_dir / "fullconfig.json", "w") as f:
         json.dump(json.loads(config.json()), f, indent=2)

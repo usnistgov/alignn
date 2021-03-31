@@ -1,6 +1,6 @@
 """CGCNN: dgl implementation."""
 
-from typing import Optional
+from typing import Tuple
 
 import dgl
 import dgl.function as fn
@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from dgl.nn import AvgPooling
+from pydantic.typing import Literal
 from torch import nn
 
 from jarvisdgl.config import CGCNNConfig
@@ -115,24 +116,37 @@ class CGCNN(nn.Module):
             nn.Linear(config.node_features, config.fc_features), nn.Softplus()
         )
 
-        if config.hurdle:
+        if config.zero_inflated:
             # add latent Bernoulli variable model to zero out
             # predictions in non-negative regression model
-            self.hurdle = True
-            self.fc_hurdle = nn.Linear(config.fc_features, 1)
-        else:
-            self.hurdle = False
-
-        self.fc_out = nn.Linear(config.fc_features, config.output_features)
-        self.logscale = config.logscale
-
-        if self.logscale:
-            avg_gap = 0.7  # magic number -- average bandgap in dft_3d
-            self.fc_out.bias.data = torch.tensor(
-                np.log(avg_gap), dtype=torch.float
+            self.zero_inflated = True
+            self.fc_nonzero = nn.Linear(config.fc_features, 1)
+            self.fc_scale = nn.Linear(config.fc_features, 1)
+            self.fc_shape = nn.Linear(config.fc_features, 1)
+            self.fc_scale.bias.data = torch.tensor(
+                np.log(2.1), dtype=torch.float
             )
+        else:
+            self.zero_inflated = False
+            self.fc_out = nn.Linear(config.fc_features, config.output_features)
 
-    def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
+        self.link = None
+        self.link_name = config.link
+        if config.link == "identity":
+            self.link = lambda x: x
+        elif config.link == "log":
+            self.link = torch.exp
+            avg_gap = 0.7  # magic number -- average bandgap in dft_3d
+            if not self.zero_inflated:
+                self.fc_out.bias.data = torch.tensor(
+                    np.log(avg_gap), dtype=torch.float
+                )
+        elif config.link == "logit":
+            self.link = torch.sigmoid
+
+    def forward(
+        self, g: dgl.DGLGraph, mode=Literal["train", "predict"]
+    ) -> torch.Tensor:
         """CGCNN function mapping graph to outputs."""
         g = g.local_var()
 
@@ -153,14 +167,86 @@ class CGCNN(nn.Module):
         features = self.fc(features)
         features = F.softplus(features)
 
-        out = self.fc_out(features)
+        if self.zero_inflated:
+            logit_p = self.fc_nonzero(features)
+            log_scale = self.fc_scale(features)
+            log_shape = self.fc_shape(features)
 
-        if self.logscale:
-            out = torch.exp(out)
+            # pred = (torch.sigmoid(logit_p)
+            #         * torch.exp(log_scale)
+            #         * torch.exp(log_shape))
+            # out = torch.where(p < 0.5, torch.zeros_like(out), out)
+            return (
+                torch.squeeze(logit_p),
+                torch.squeeze(log_scale),
+                torch.squeeze(log_shape),
+            )
 
-        if self.hurdle:
-            logits = self.fc_hurdle(features)
-            p = torch.sigmoid(logits)
-            out = torch.where(p < 0.5, torch.zeros_like(out), out)
+        else:
+            out = self.fc_out(features)
+            if self.link:
+                out = self.link(out)
 
         return torch.squeeze(out)
+
+
+class ZeroInflatedGammaLoss(nn.modules.loss._Loss):
+    """Zero inflated Gamma regression loss."""
+
+    def predict(self, inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]):
+        """Combine ZIG multi-part outputs to yield real-valued predictions."""
+        logit_p, log_scale, log_shape = inputs
+        return (
+            torch.sigmoid(logit_p)
+            * torch.exp(log_scale)
+            * (1 + torch.exp(log_shape))
+        )
+
+    def forward(
+        self,
+        inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        target: torch.Tensor,
+    ) -> torch.Tensor:
+        """Zero-inflated Gamma loss.
+
+        binary crossentropy loss combined with Gamma negative log likelihood
+        """
+
+        def _gamma_log_likelihood(log_scale, log_shape, target):
+            """Gamma log likelihood parameterized with scale and concentration.
+
+            scale: gamma scale parameter (1/rate)
+            shape: gamma concentration parameter
+            """
+            scale = torch.exp(log_scale) + 1e-7
+            shape = torch.exp(log_shape) + 1.0
+
+            # need to mask this since there may be zeros in `target`
+            gamma_loss = (
+                (shape - 1) * torch.log(target)
+                - shape * log_scale
+                - target / scale
+                - torch.lgamma(shape)
+            )
+
+            return gamma_loss
+
+        logit_p, log_scale, log_shape = inputs
+
+        bce_loss = F.binary_cross_entropy_with_logits(
+            logit_p, target, reduction="none"
+        )
+
+        indicator = target > 0
+        gamma_loss = _gamma_log_likelihood(
+            log_scale[indicator], log_shape[indicator], target[indicator]
+        )
+        return torch.mean(bce_loss) - torch.sum(gamma_loss) / target.numel()
+
+        # gamma_loss = torch.where(
+        #     target > 0,
+        #     _gamma_log_likelihood(log_scale, log_shape, target),
+        #     torch.zeros_like(target),
+        # )
+
+        # return torch.mean(bce_loss - gamma_loss)
