@@ -219,6 +219,8 @@ def train_dgl(
         # in history["EOS"]
         eos = EpochOutputStore()
         eos.attach(evaluator)
+        train_eos = EpochOutputStore()
+        train_eos.attach(train_evaluator)
 
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -235,6 +237,7 @@ def train_dgl(
 
         if store_outputs:
             history["EOS"] = eos.data
+            history["trainEOS"] = train_eos.data
 
     # optionally log results to tensorboard
     if log_tensorboard:

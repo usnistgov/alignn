@@ -122,9 +122,11 @@ class CGCNN(nn.Module):
             self.zero_inflated = True
             self.fc_nonzero = nn.Linear(config.fc_features, 1)
             self.fc_scale = nn.Linear(config.fc_features, 1)
-            self.fc_shape = nn.Linear(config.fc_features, 1)
+            # self.fc_shape = nn.Linear(config.fc_features, 1)
             self.fc_scale.bias.data = torch.tensor(
-                np.log(2.1), dtype=torch.float
+                # np.log(2.1), dtype=torch.float
+                2.1,
+                dtype=torch.float,
             )
         else:
             self.zero_inflated = False
@@ -170,7 +172,7 @@ class CGCNN(nn.Module):
         if self.zero_inflated:
             logit_p = self.fc_nonzero(features)
             log_scale = self.fc_scale(features)
-            log_shape = self.fc_shape(features)
+            # log_shape = self.fc_shape(features)
 
             # pred = (torch.sigmoid(logit_p)
             #         * torch.exp(log_scale)
@@ -179,7 +181,7 @@ class CGCNN(nn.Module):
             return (
                 torch.squeeze(logit_p),
                 torch.squeeze(log_scale),
-                torch.squeeze(log_shape),
+                # torch.squeeze(log_shape),
             )
 
         else:
@@ -193,60 +195,47 @@ class CGCNN(nn.Module):
 class ZeroInflatedGammaLoss(nn.modules.loss._Loss):
     """Zero inflated Gamma regression loss."""
 
-    def predict(self, inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]):
+    def predict(self, inputs: Tuple[torch.Tensor, torch.Tensor]):
         """Combine ZIG multi-part outputs to yield real-valued predictions."""
-        logit_p, log_scale, log_shape = inputs
+        # logit_p, log_scale, log_shape = inputs
+        logit_p, log_scale = inputs
         return (
             torch.sigmoid(logit_p)
-            * torch.exp(log_scale)
-            * (1 + torch.exp(log_shape))
+            * F.softplus(log_scale)
+            # * torch.exp(log_scale)
+            # * (1 + torch.exp(log_shape))
         )
 
     def forward(
         self,
-        inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        inputs: Tuple[torch.Tensor, torch.Tensor],
         target: torch.Tensor,
     ) -> torch.Tensor:
         """Zero-inflated Gamma loss.
 
         binary crossentropy loss combined with Gamma negative log likelihood
         """
-
-        def _gamma_log_likelihood(log_scale, log_shape, target):
-            """Gamma log likelihood parameterized with scale and concentration.
-
-            scale: gamma scale parameter (1/rate)
-            shape: gamma concentration parameter
-            """
-            scale = torch.exp(log_scale) + 1e-7
-            shape = torch.exp(log_shape) + 1.0
-
-            # need to mask this since there may be zeros in `target`
-            gamma_loss = (
-                (shape - 1) * torch.log(target)
-                - shape * log_scale
-                - target / scale
-                - torch.lgamma(shape)
-            )
-
-            return gamma_loss
-
-        logit_p, log_scale, log_shape = inputs
+        # logit_p, log_scale, log_shape = inputs
+        logit_p, log_scale = inputs
 
         bce_loss = F.binary_cross_entropy_with_logits(
-            logit_p, target, reduction="none"
+            logit_p, target, reduction="sum"
         )
 
         indicator = target > 0
-        gamma_loss = _gamma_log_likelihood(
-            log_scale[indicator], log_shape[indicator], target[indicator]
-        )
-        return torch.mean(bce_loss) - torch.sum(gamma_loss) / target.numel()
-
-        # gamma_loss = torch.where(
-        #     target > 0,
-        #     _gamma_log_likelihood(log_scale, log_shape, target),
-        #     torch.zeros_like(target),
+        # g_loss = F.mse_loss(
+        #     log_scale[indicator],
+        #     torch.log(target[indicator]), reduction="sum"
         # )
+        # g_loss = F.mse_loss(
+        #     torch.exp(log_scale[indicator]),
+        # target[indicator], reduction="sum"
+        # )
+        g_loss = F.mse_loss(
+            F.softplus(log_scale[indicator]),
+            target[indicator],
+            reduction="sum",
+        )
 
-        # return torch.mean(bce_loss - gamma_loss)
+        return (bce_loss + g_loss) / target.numel()
+        # return bce_loss + torch.tensor(2.0) * g_loss.sum() / indicator.sum()
