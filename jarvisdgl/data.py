@@ -139,19 +139,27 @@ def build_undirected_edgedata(
     structure: PymatgenStructure,
     edges: Dict[Tuple[int, int], Set[Tuple[int, int, int]]],
 ):
-    """Build undirected graph data from edge set."""
+    """Build undirected graph data from edge set.
+
+    edges: dictionary mapping (src_id, dst_id) to set of dst_image
+    r: cartesian displacement vector from src -> dst
+    """
     # second pass: construct *undirected* graph
     u, v, r = [], [], []
     for (src_id, dst_id), images in edges.items():
 
         for dst_image in images:
-            dist, _ = structure[src_id].distance_and_image(
-                structure[dst_id], jimage=dst_image
+            # fractional coordinate for periodic image of dst
+            dst_coord = structure[dst_id].frac_coords + dst_image
+            # cartesian displacement vector pointing from src -> dst
+            d = structure.lattice.get_cartesian_coords(
+                dst_coord - structure[src_id].frac_coords
             )
-            for uu, vv in zip((src_id, dst_id), (dst_id, src_id)):
+            # add edges for both directions
+            for uu, vv, dd in [(src_id, dst_id, d), (dst_id, src_id, -d)]:
                 u.append(uu)
                 v.append(vv)
-                r.append(dist)
+                r.append(dd)
 
     u = torch.tensor(u)
     v = torch.tensor(v)
@@ -269,7 +277,10 @@ def dgl_multigraph(
 ):
     """Get DGLGraph from atoms, go through pymatgen structure."""
     # go through pymatgen for neighbor API for now...
-    structure = atoms.pymatgen_converter()
+    try:
+        structure = atoms.pymatgen_converter()
+    except AttributeError:
+        structure = atoms
 
     if neighbor_strategy == "k-nearest":
         edges = nearest_neighbor_edges(
@@ -290,7 +301,7 @@ def dgl_multigraph(
 
     g = dgl.graph((u, v))
     g.ndata["atom_features"] = node_features
-    g.edata["bondlength"] = r
+    g.edata["r"] = r
 
     return g
 

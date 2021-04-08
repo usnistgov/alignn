@@ -93,7 +93,7 @@ class DenseGCN(nn.Module):
         g = g.local_var()
 
         if self.weight_edges:
-            r = g.edata["bondlength"]
+            r = torch.norm(g.edata["r"], dim=1)
             edge_weights = torch.exp(-(r ** 2) / self.edge_lengthscale ** 2)
         else:
             edge_weights = None

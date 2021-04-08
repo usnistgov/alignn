@@ -153,7 +153,8 @@ class CGCNN(nn.Module):
         g = g.local_var()
 
         # fixed edge features: RBF-expanded bondlengths
-        edge_features = self.rbf(g.edata.pop("bondlength"))
+        bondlength = torch.norm(g.edata.pop("r"), dim=1)
+        edge_features = self.rbf(bondlength)
 
         # initial node features: atom feature network...
         v = g.ndata.pop("atom_features")
