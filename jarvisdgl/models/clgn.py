@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import dgl
 import dgl.function as fn
+import numpy as np
 import torch
 from dgl.nn import AvgPooling, CFConv
 from torch import nn
@@ -71,13 +72,15 @@ class CLGNLayer(nn.Module):
         y: torch.Tensor,
         z: torch.Tensor,
     ):
-        """Node and Edge updates for CLGN layer."""
-        # x: g.ndata["h"]
-        # y: lg.ndata["h"]
-        # z: lg.edata["h"]
+        """Node and Edge updates for CLGN layer.
 
+        x: node input features
+        y: edge input features
+        z: edge pair input features
+        """
         # node update
         # like CFConv, but save edge messages to fuse to line graph
+        # https://docs.dgl.ai/_modules/dgl/nn/pytorch/conv/cfconv.html
         # x = self.g_conv(g, x, y)
         g.srcdata["hv"] = self.project_node(x)
         g.edata["he"] = self.project_edge(y)
@@ -142,6 +145,19 @@ class CLGN(nn.Module):
 
         self.fc = nn.Linear(config.node_features, config.output_features)
 
+        self.link = None
+        self.link_name = config.link
+        if config.link == "identity":
+            self.link = lambda x: x
+        elif config.link == "log":
+            self.link = torch.exp
+            avg_gap = 0.7  # magic number -- average bandgap in dft_3d
+            self.fc.bias.data = torch.tensor(
+                np.log(avg_gap), dtype=torch.float
+            )
+        elif config.link == "logit":
+            self.link = torch.sigmoid
+
     def forward(self, g):
         """Baseline SimpleGCN : start with `atom_features`."""
         g = g.local_var()
@@ -171,5 +187,8 @@ class CLGN(nn.Module):
         h = self.readout(g, h)
 
         out = self.fc(h)
+
+        if self.link:
+            out = self.link(out)
 
         return torch.squeeze(out)
