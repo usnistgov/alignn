@@ -50,6 +50,31 @@ class CGCNNConfig(BaseSettings):
         env_prefix = "jv_model"
 
 
+class CLGNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.clgn."""
+
+    name: Literal["clgn"]
+    conv_layers: int = 3
+    atom_input_features: int = 1
+    edge_features: int = 16
+    angle_features: int = 16
+    node_features: int = 64
+    hidden_features: int = 32
+    fc_layers: int = 1
+    fc_features: int = 64
+    output_features: int = 1
+
+    # if link == log, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    link: Literal["identity", "log", "logit"] = "identity"
+    zero_inflated: bool = False
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
+
+
 class ICGCNNConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.icgcnn."""
 
@@ -135,7 +160,7 @@ class TrainingConfig(BaseSettings):
 
     # model configuration
     model: Union[
-        CGCNNConfig, ICGCNNConfig, SimpleGCNConfig, DenseGCNConfig
+        CGCNNConfig, ICGCNNConfig, SimpleGCNConfig, DenseGCNConfig, CLGNConfig
     ] = CGCNNConfig(name="cgcnn")
 
     @root_validator()

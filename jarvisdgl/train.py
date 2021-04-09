@@ -116,6 +116,7 @@ def train_dgl(
         "cgcnn": models.CGCNN,
         "icgcnn": models.iCGCNN,
         "densegcn": models.DenseGCN,
+        "clgn": models.CLGN,
     }
     if model is None:
         net = _model.get(config.model.name)(config.model)
