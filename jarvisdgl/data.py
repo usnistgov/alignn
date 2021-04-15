@@ -435,9 +435,15 @@ class StructureDataset(torch.utils.data.Dataset):
 
         return g, label
 
-    def setup_standardizer(self):
+    def setup_standardizer(self, ids):
         """Atom-wise feature standardization transform."""
-        x = torch.cat([g.ndata["atom_features"] for g in self.graphs])
+        x = torch.cat(
+            [
+                g.ndata["atom_features"]
+                for idx, g in enumerate(self.graphs)
+                if idx in ids
+            ]
+        )
         self.atom_feature_mean = x.mean(0)
         self.atom_feature_std = x.std(0)
 
