@@ -10,6 +10,7 @@ import torch
 import typer
 
 from jarvisdgl.config import TrainingConfig
+from jarvisdgl.profile import profile_dgl
 from jarvisdgl.train import train_dgl
 
 
@@ -19,12 +20,14 @@ def cli(
     checkpoint_dir: Path = Path("/tmp/models"),
     store_outputs: bool = False,
     tensorboard: bool = False,
+    profile: bool = False,
 ):
     """Jarvis-dgl training cli.
 
     config: path to json config file (conform to TrainingConfig)
     progress: enable tqdm console logging
     tensorboard: enable tensorboard logging
+    profile: run profiling script for one epoch instead of training
     """
     model_dir = config.parent
 
@@ -37,6 +40,10 @@ def cli(
         with open(config, "r") as f:
             config = json.load(f)
             config = TrainingConfig(**config)
+
+    if profile:
+        profile_dgl(config)
+        return
 
     hist = train_dgl(
         config,
