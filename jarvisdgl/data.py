@@ -542,6 +542,7 @@ def get_train_val_loaders(
         shuffle=True,
         collate_fn=data.collate,
         drop_last=True,
+        num_workers=4,
     )
 
     val_loader = DataLoader(
@@ -550,6 +551,7 @@ def get_train_val_loaders(
         shuffle=False,
         collate_fn=data.collate,
         drop_last=True,
+        num_workers=4,
     )
 
     return train_loader, val_loader
