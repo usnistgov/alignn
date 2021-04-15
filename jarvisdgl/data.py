@@ -4,20 +4,25 @@ import json
 import os
 import random
 from collections import Counter, defaultdict
+from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
 import dgl
 import numpy as np
+import pandas as pd
 import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
-from jarvis.core.specie import Specie
+from jarvis.core.specie import Specie, chem_data
 from jarvis.db.figshare import data as jdata
 from pymatgen.analysis.local_env import VoronoiNN
 from pymatgen.core.structure import Structure as PymatgenStructure
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
+
+# use pandas progress_apply
+tqdm.pandas()
 
 BASIC_FEATURES = [
     "Z",
@@ -37,6 +42,11 @@ BASIC_FEATURES = [
 MIT_ATOM_FEATURES_JSON = os.path.join(
     os.path.dirname(__file__), "atom_init.json"
 )
+
+with open(MIT_ATOM_FEATURES_JSON, "r") as f:
+    MIT_ATOM_FEATURES = json.load(f)
+
+z_table = {v["Z"]: s for s, v in chem_data.items()}
 
 
 def prepare_dgl_batch(batch, device=None, non_blocking=False):
@@ -106,6 +116,55 @@ def _get_node_attributes(species: str, atom_features: str = "atomic_number"):
         with open(MIT_ATOM_FEATURES_JSON, "r") as f:
             i = json.load(f)
         return i[key]
+
+
+def _load_cfid(atomic_number):
+    return Specie(z_table[atomic_number]).get_descrp_arr
+
+
+def _load_basic(atomic_number):
+    return [
+        Specie(z_table[atomic_number]).element_property(prop)
+        for prop in BASIC_FEATURES
+    ]
+
+
+def _load_mit(atomic_number):
+    print(atomic_number)
+    try:
+        return MIT_ATOM_FEATURES[str(atomic_number)]
+    except KeyError:
+        return None
+
+
+@functools.lru_cache(maxsize=None)
+def _get_attribute_lookup(atom_features: str = "atomic_number"):
+
+    feature_sets = ("atomic_number", "basic", "cfid", "mit")
+
+    if atom_features not in feature_sets:
+        raise NotImplementedError(
+            f"atom features must be one of {feature_sets}"
+        )
+
+    load = {
+        "cfid": _load_cfid,
+        "atomic_number": lambda x: x,
+        "basic": _load_basic,
+        "mit": _load_mit,
+    }
+
+    # get feature shape (referencing Carbon)
+    template = load[atom_features](6)
+
+    features = np.zeros((1 + max(z_table.keys()), len(template)))
+
+    for z in range(1, 1 + max(z_table.keys())):
+        x = load[atom_features](z)
+        if x is not None:
+            features[z, :] = x
+
+    return features
 
 
 def canonize_edge(
@@ -328,8 +387,9 @@ class StructureDataset(torch.utils.data.Dataset):
 
     def __init__(
         self,
-        structures,
-        targets,
+        df,
+        graphs,
+        target,
         ids=None,
         cutoff=8.0,
         maxrows=np.inf,
@@ -338,31 +398,28 @@ class StructureDataset(torch.utils.data.Dataset):
         transform=None,
     ):
         """Initialize the class."""
-        self.graphs = []
-        self.labels = []
-        self.ids = []
-
-        for idx, (structure, target, jid) in enumerate(
-            tqdm(zip(structures, targets, ids))
-        ):
-
-            if idx >= maxrows:
-                break
-
-            a = Atoms.from_dict(structure)
-            g = dgl_multigraph(
-                a,
-                atom_features=atom_features,
-                neighbor_strategy=neighbor_strategy,
-                cutoff=cutoff,
-            )
-
-            self.graphs.append(g)
-            self.labels.append(target)
-            self.ids.append(jid)
-
-        self.labels = torch.tensor(self.labels).type(torch.get_default_dtype())
+        self.df = df
+        self.graphs = graphs
+        self.target = target
+        self.labels = self.df[target]
+        self.ids = self.df["jid"]
+        self.labels = torch.tensor(self.df[target]).type(
+            torch.get_default_dtype()
+        )
         self.transform = transform
+
+        features = _get_attribute_lookup(atom_features)
+
+        # load selected node representation
+        # assume graphs contain atomic number in g.ndata["atom_features"]
+        for g in graphs:
+            z = g.ndata.pop("atom_features")
+            g.ndata["atomic_number"] = z
+            z = z.type(torch.IntTensor).squeeze()
+            f = torch.tensor(features[z]).type(torch.FloatTensor)
+            if g.num_nodes() == 1:
+                f = f.unsqueeze(0)
+            g.ndata["atom_features"] = f
 
     def __len__(self):
         """Get length."""
@@ -396,6 +453,34 @@ class StructureDataset(torch.utils.data.Dataset):
         return batched_graph, torch.tensor(labels)
 
 
+def engraph(atoms):
+    """Convert structure dict to DGLGraph."""
+    structure = Atoms.from_dict(atoms)
+    return dgl_multigraph(structure)
+
+
+def load_dataset(
+    name: str = "dft_3d",
+    neighbor_strategy: str = "k-nearest",
+    cachedir: Path = Path("data"),
+):
+    """Load DGLGraph dataset.
+
+    If DGLGraph binary cache file is not available, construct graphs and save
+    """
+    d = pd.DataFrame(jdata(name))
+    d = d.replace("na", np.nan)
+
+    cachefile = cachedir / f"{name}-{neighbor_strategy}.bin"
+    if cachefile.is_file():
+        graphs, labels = dgl.load_graphs(str(cachefile))
+    else:
+        graphs = d["atoms"].progress_apply(engraph).values
+        dgl.save_graphs(str(cachefile), graphs.tolist())
+
+    return d, graphs
+
+
 def get_train_val_loaders(
     dataset: str = "dft_3d",
     target: str = "formation_energy_peratom",
@@ -409,53 +494,47 @@ def get_train_val_loaders(
     split_seed=123,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
-    d = jdata(dataset)
-
-    structures, targets, jv_ids = [], [], []
-    for row in d:
-        if row[target] != "na":
-            structures.append(row["atoms"])
-            targets.append(row[target])
-            jv_ids.append(row["jid"])
-    structures = np.array(structures)
-    targets = np.array(targets)
-    jv_ids = np.array(jv_ids)
+    d, graphs = load_dataset(dataset, neighbor_strategy)
+    data = StructureDataset(
+        d,
+        graphs,
+        target=target,
+        atom_features=atom_features,
+    )
 
     # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
     # i.e. shuffle the index in place with standard library random.shuffle
-    ids = np.arange(len(structures))
+    # first obtain only valid indices
+    (ids,) = torch.where(torch.isfinite(data.labels))
     random.seed(split_seed)
     random.shuffle(ids)
 
-    id_train = ids[:n_train]
-    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
-    # id_test = ids[:-n_test]
+    N = len(ids)
+    train_size = round(N * 0.6)
+    val_size = round(N * 0.2)
+    # test_size = round(N * 0.2)
 
-    train_data = StructureDataset(
-        structures[id_train],
-        targets[id_train],
-        ids=jv_ids[id_train],
-        atom_features=atom_features,
-        neighbor_strategy=neighbor_strategy,
-    )
+    # full train/val test split
+    id_train = ids[:train_size]
+    id_val = ids[train_size : train_size + val_size]  # noqa:E203
+    # id_test = ids[-test_size:]
+
     if standardize:
-        train_data.setup_standardizer()
+        data.setup_standardizer(id_train)
 
-    val_data = StructureDataset(
-        structures[id_val],
-        targets[id_val],
-        ids=jv_ids[id_val],
-        atom_features=atom_features,
-        neighbor_strategy=neighbor_strategy,
-        transform=train_data.transform,
-    )
+    train_data = Subset(data, id_train)
+    val_data = Subset(data, id_val)
+
+    # id_train = ids[:n_train]
+    # id_val = ids[-(n_val + n_test) : -n_test]
+    # # id_test = ids[:-n_test]
 
     # use a regular pytorch dataloader
     train_loader = DataLoader(
         train_data,
         batch_size=batch_size,
         shuffle=True,
-        collate_fn=train_data.collate,
+        collate_fn=data.collate,
         drop_last=True,
     )
 
@@ -463,7 +542,7 @@ def get_train_val_loaders(
         val_data,
         batch_size=batch_size,
         shuffle=False,
-        collate_fn=val_data.collate,
+        collate_fn=data.collate,
         drop_last=True,
     )
 
