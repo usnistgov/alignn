@@ -452,7 +452,10 @@ class StructureDataset(torch.utils.data.Dataset):
                 f = f.unsqueeze(0)
             g.ndata["atom_features"] = f
 
+        self.prepare_batch = prepare_dgl_batch
         if line_graph:
+            self.prepare_batch = prepare_line_graph_batch
+
             print("building line graphs")
             self.line_graphs = []
             for g in tqdm(graphs):

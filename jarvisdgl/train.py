@@ -31,6 +31,13 @@ from torch import nn
 from jarvisdgl import data, models
 from jarvisdgl.config import TrainingConfig
 
+# torch config
+torch.set_default_dtype(torch.float32)
+
+device = "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
 
 def group_decay(model):
     """Omit weight decay from bias and batchnorm params."""
@@ -87,17 +94,6 @@ def train_dgl(
         deterministic = True
         ignite.utils.manual_seed(config.random_seed)
 
-    # torch config
-    torch.set_default_dtype(torch.float32)
-
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-
-    prepare_batch = partial(data.prepare_dgl_batch, device=device)
-    if config.model.name == "clgn":
-        prepare_batch = partial(data.prepare_line_graph_batch, device=device)
-
     # use input standardization for all real-valued feature sets
     train_loader, val_loader = data.get_train_val_loaders(
         target=config.target,
@@ -109,6 +105,8 @@ def train_dgl(
         standardize=config.atom_features != "mit",
         line_graph=config.model.name == "clgn",
     )
+
+    prepare_batch = partial(train_loader.prepare_batch, device=device)
 
     # define network, optimizer, scheduler
     _model = {

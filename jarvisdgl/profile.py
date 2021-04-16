@@ -22,8 +22,6 @@ device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
 
-prepare_batch = partial(data.prepare_dgl_batch, device=device)
-
 
 def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
     """Training entry point for DGL networks.
@@ -35,9 +33,6 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
         config = TrainingConfig(**config)
 
     # use input standardization for all real-valued feature sets
-    standardize = True
-    if config.atom_features == "mit":
-        standardize = False
 
     train_loader, val_loader = data.get_train_val_loaders(
         target=config.target,
@@ -46,8 +41,10 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
-        standardize=standardize,
+        standardize=config.atom_features != "mit",
+        line_graph=config.model.name == "clgn",
     )
+    prepare_batch = partial(train_loader.prepare_batch, device=device)
 
     # define network, optimizer, scheduler
     _model = {
