@@ -54,6 +54,7 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
         "icgcnn": models.iCGCNN,
         "densegcn": models.DenseGCN,
         "clgn": models.CLGN,
+        "alignn": models.ALIGNN,
     }
     model = _model.get(config.model.name)(config.model)
     model.to(device)
