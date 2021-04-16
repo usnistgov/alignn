@@ -32,6 +32,8 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
     if type(config) is dict:
         config = TrainingConfig(**config)
 
+    lg_models = set("clgn", "alignn")
+
     # use input standardization for all real-valued feature sets
 
     train_loader, val_loader, prepare_batch = data.get_train_val_loaders(
@@ -42,7 +44,7 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
         standardize=config.atom_features != "mit",
-        line_graph=config.model.name == "clgn",
+        line_graph=config.model.name in lg_models,
     )
     prepare_batch = partial(prepare_batch, device=device)
 
