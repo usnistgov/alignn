@@ -65,6 +65,8 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
     with torch.profiler.profile(
         schedule=torch.profiler.schedule(wait=2, warmup=2, active=6, repeat=1),
         on_trace_ready=torch.profiler.tensorboard_trace_handler("."),
+        with_stack=True,
+        profile_memory=True,
     ) as profiler:
         # train for one epoch
         for batch in tqdm(train_loader):
