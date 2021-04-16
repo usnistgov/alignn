@@ -170,7 +170,7 @@ def train_dgl(
         net,
         optimizer,
         criterion,
-        prepare_batch=data.prepare_dgl_batch,
+        prepare_batch=prepare_batch,
         device=device,
         deterministic=deterministic,
     )
