@@ -34,7 +34,7 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
 
     # use input standardization for all real-valued feature sets
 
-    train_loader, val_loader = data.get_train_val_loaders(
+    train_loader, val_loader, prepare_batch = data.get_train_val_loaders(
         target=config.target,
         n_train=config.n_train,
         n_val=config.n_val,
@@ -44,7 +44,7 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
         standardize=config.atom_features != "mit",
         line_graph=config.model.name == "clgn",
     )
-    prepare_batch = partial(train_loader.prepare_batch, device=device)
+    prepare_batch = partial(prepare_batch, device=device)
 
     # define network, optimizer, scheduler
     _model = {

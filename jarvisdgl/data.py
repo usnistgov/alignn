@@ -619,4 +619,4 @@ def get_train_val_loaders(
         num_workers=workers,
     )
 
-    return train_loader, val_loader
+    return train_loader, val_loader, data.prepare_batch
