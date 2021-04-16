@@ -159,7 +159,6 @@ def _load_basic(atomic_number):
 
 
 def _load_mit(atomic_number):
-    print(atomic_number)
     try:
         return MIT_ATOM_FEATURES[str(atomic_number)]
     except KeyError:
