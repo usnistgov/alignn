@@ -94,8 +94,9 @@ def train_dgl(
     if torch.cuda.is_available():
         device = torch.device("cuda")
 
-    # prepare_batch = partial(data.prepare_dgl_batch, device=device)
-    prepare_batch = partial(data.prepare_batch, device=device)
+    prepare_batch = partial(data.prepare_dgl_batch, device=device)
+    if config.model.name == "clgn":
+        prepare_batch = partial(data.prepare_line_graph_batch, device=device)
 
     # use input standardization for all real-valued feature sets
     train_loader, val_loader = data.get_train_val_loaders(

@@ -76,7 +76,7 @@ def prepare_dgl_batch(batch, device=None, non_blocking=False):
 def prepare_line_graph_batch(batch, device=None, non_blocking=False):
     """Send batched dgl graph to device."""
     g, lg, t = batch
-    batch = (g.to(device), lg.to(device), t.to(device))
+    batch = ((g.to(device), lg.to(device)), t.to(device))
 
     return batch
 
