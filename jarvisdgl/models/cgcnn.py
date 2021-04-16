@@ -97,11 +97,17 @@ class CGCNNConv(nn.Module):
     10.1103/PhysRevLett.120.145301
     """
 
-    def __init__(self, node_features: int = 64, edge_features: int = 32):
+    def __init__(
+        self,
+        node_features: int = 64,
+        edge_features: int = 32,
+        return_messages: bool = False,
+    ):
         """Initialize torch modules for CGCNNConv layer."""
         super().__init__()
         self.node_features = node_features
         self.edge_features = edge_features
+        self.return_messages = return_messages
 
         # CGCNN-Conv operates on augmented edge features
         # z_ij = cat(v_i, v_j, u_ij)
@@ -145,7 +151,8 @@ class CGCNNConv(nn.Module):
         # i.e. compute the term inside the summation in eq 5
         # σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
         h_f, h_s = torch.chunk(m, 2, dim=1)
-        g.edata["m"] = F.sigmoid(h_f) * F.softplus(h_s)
+        m = F.sigmoid(h_f) * F.softplus(h_s)
+        g.edata["m"] = m
 
         # apply the convolution term in eq. 5 (without residual connection)
         # storing the results in edge features `h`
@@ -158,7 +165,12 @@ class CGCNNConv(nn.Module):
         h = self.bn(g.ndata.pop("h"))
 
         # residual connection plus nonlinearity
-        return F.softplus(node_feats + h)
+        out = F.softplus(node_feats + h)
+
+        if self.return_messages:
+            return out, m
+
+        return out
 
 
 class CGCNN(nn.Module):

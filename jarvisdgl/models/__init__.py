@@ -1,4 +1,5 @@
 """Graph neural network implementations."""
+from jarvisdgl.models.alignn import ALIGNN
 from jarvisdgl.models.cgcnn import CGCNN
 from jarvisdgl.models.clgn import CLGN
 from jarvisdgl.models.densegcn import DenseGCN
