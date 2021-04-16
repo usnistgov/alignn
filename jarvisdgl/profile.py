@@ -32,7 +32,7 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
     if type(config) is dict:
         config = TrainingConfig(**config)
 
-    lg_models = set("clgn", "alignn")
+    lg_models = {"clgn", "alignn"}
 
     # use input standardization for all real-valued feature sets
 
