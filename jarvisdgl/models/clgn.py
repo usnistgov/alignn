@@ -160,12 +160,14 @@ class CLGN(nn.Module):
 
     def forward(self, g):
         """Baseline SimpleGCN : start with `atom_features`."""
+        g, lg = g
         g = g.local_var()
-        lg = g.line_graph(shared=True)
+        lg = lg.local_var()
+        # lg = g.line_graph(shared=True)
 
         # obtain bond angle cosines from displacement vectors
         # store them in lg.edata["h"]
-        lg.apply_edges(compute_bond_cosines)
+        # lg.apply_edges(compute_bond_cosines)
 
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
         edge_features = self.rbf(bondlength)

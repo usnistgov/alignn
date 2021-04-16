@@ -49,12 +49,41 @@ with open(MIT_ATOM_FEATURES_JSON, "r") as f:
 z_table = {v["Z"]: s for s, v in chem_data.items()}
 
 
+def compute_bond_cosines(edges):
+    """Compute bond angle cosines from bond displacement vectors."""
+    # line graph edge: (a, b), (b, c)
+    # `a -> b -> c`
+    # use law of cosines to compute angles cosines
+    # negate src bond so displacements are like `a <- b -> c`
+    # cos(theta) = ba \dot bc / (||ba|| ||bc||)
+    r1 = -edges.src["r"]
+    r2 = edges.dst["r"]
+    bond_cosine = torch.sum(r1 * r2, dim=1) / (
+        torch.norm(r1, dim=1) * torch.norm(r2, dim=1)
+    )
+    bond_cosine = torch.clamp(bond_cosine, -1, 1)
+    return {"h": bond_cosine}
+
+
 def prepare_dgl_batch(batch, device=None, non_blocking=False):
     """Send batched dgl graph to device."""
     g, t = batch
     batch = (g.to(device), t.to(device))
 
     return batch
+
+
+def prepare_line_graph_batch(batch, device=None, non_blocking=False):
+    """Send batched dgl graph to device."""
+    g, lg, t = batch
+    batch = (g.to(device), lg.to(device), t.to(device))
+
+    return batch
+
+
+def prepare_batch(batch, device=None):
+    """Send tuple to device, including DGLGraphs."""
+    return tuple(x.to(device) for x in batch)
 
 
 def dgl_crystal(
@@ -396,11 +425,14 @@ class StructureDataset(torch.utils.data.Dataset):
         atom_features="atomic_number",
         neighbor_strategy="k-nearest",
         transform=None,
+        line_graph=False,
     ):
         """Initialize the class."""
         self.df = df
         self.graphs = graphs
         self.target = target
+        self.line_graph = line_graph
+
         self.labels = self.df[target]
         self.ids = self.df["jid"]
         self.labels = torch.tensor(self.df[target]).type(
@@ -421,6 +453,14 @@ class StructureDataset(torch.utils.data.Dataset):
                 f = f.unsqueeze(0)
             g.ndata["atom_features"] = f
 
+        if line_graph:
+            print("building line graphs")
+            self.line_graphs = []
+            for g in tqdm(graphs):
+                lg = g.line_graph(shared=True)
+                lg.apply_edges(compute_bond_cosines)
+                self.line_graphs.append(lg)
+
     def __len__(self):
         """Get length."""
         return self.labels.shape[0]
@@ -432,6 +472,9 @@ class StructureDataset(torch.utils.data.Dataset):
 
         if self.transform:
             g = self.transform(g)
+
+        if self.line_graph:
+            return g, self.line_graphs[idx], label
 
         return g, label
 
@@ -457,6 +500,16 @@ class StructureDataset(torch.utils.data.Dataset):
         graphs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         return batched_graph, torch.tensor(labels)
+
+    @staticmethod
+    def collate_line_graph(
+        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+    ):
+        """Dataloader helper to batch graphs cross `samples`."""
+        graphs, line_graphs, labels = map(list, zip(*samples))
+        batched_graph = dgl.batch(graphs)
+        batched_line_graph = dgl.batch(line_graphs)
+        return batched_graph, batched_line_graph, torch.tensor(labels)
 
 
 def engraph(atoms):
@@ -497,7 +550,9 @@ def get_train_val_loaders(
     n_test: int = 32,
     batch_size: int = 8,
     standardize: bool = False,
-    split_seed=123,
+    line_graph: bool = False,
+    split_seed: int = 123,
+    workers: int = 1,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     d, graphs = load_dataset(dataset, neighbor_strategy)
@@ -506,6 +561,7 @@ def get_train_val_loaders(
         graphs,
         target=target,
         atom_features=atom_features,
+        line_graph=line_graph,
     )
 
     # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
@@ -525,6 +581,9 @@ def get_train_val_loaders(
     id_val = ids[train_size : train_size + val_size]  # noqa:E203
     # id_test = ids[-test_size:]
 
+    id_train = id_train[:n_train]
+    id_val = id_val[:n_val]
+
     if standardize:
         data.setup_standardizer(id_train)
 
@@ -535,23 +594,27 @@ def get_train_val_loaders(
     # id_val = ids[-(n_val + n_test) : -n_test]
     # # id_test = ids[:-n_test]
 
+    collate_fn = data.collate
+    if line_graph:
+        collate_fn = data.collate_line_graph
+
     # use a regular pytorch dataloader
     train_loader = DataLoader(
         train_data,
         batch_size=batch_size,
         shuffle=True,
-        collate_fn=data.collate,
+        collate_fn=collate_fn,
         drop_last=True,
-        num_workers=4,
+        num_workers=workers,
     )
 
     val_loader = DataLoader(
         val_data,
         batch_size=batch_size,
         shuffle=False,
-        collate_fn=data.collate,
+        collate_fn=collate_fn,
         drop_last=True,
-        num_workers=4,
+        num_workers=workers,
     )
 
     return train_loader, val_loader

@@ -94,13 +94,10 @@ def train_dgl(
     if torch.cuda.is_available():
         device = torch.device("cuda")
 
-    prepare_batch = partial(data.prepare_dgl_batch, device=device)
+    # prepare_batch = partial(data.prepare_dgl_batch, device=device)
+    prepare_batch = partial(data.prepare_batch, device=device)
 
     # use input standardization for all real-valued feature sets
-    standardize = True
-    if config.atom_features == "mit":
-        standardize = False
-
     train_loader, val_loader = data.get_train_val_loaders(
         target=config.target,
         n_train=config.n_train,
@@ -108,7 +105,8 @@ def train_dgl(
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
-        standardize=standardize,
+        standardize=config.atom_features != "mit",
+        line_graph=config.model.name == "clgn",
     )
 
     # define network, optimizer, scheduler
