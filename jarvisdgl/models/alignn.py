@@ -31,9 +31,12 @@ class ALIGNNConv(nn.Module):
         self.node_update = CGCNNConv(
             node_features, edge_features, return_messages=True
         )
-        self.edge_update = CGCNNConv(
-            node_features + edge_features, angle_features
+        self.edge_bottleneck = nn.Sequential(
+            nn.Linear(node_features + edge_features, edge_features),
+            nn.BatchNorm1d(edge_features),
+            nn.Softplus(),
         )
+        self.edge_update = CGCNNConv(edge_features, angle_features)
 
     def forward(
         self,
@@ -55,7 +58,8 @@ class ALIGNNConv(nn.Module):
         x, m = self.node_update(g, x, y)
 
         # fuse messages to line graph inputs
-        y = torch.cat((y, m), 1)
+        m = self.edge_bottleneck(torch.cat((y, m), 1))
+        y = y + m
 
         # CGCNN update on line graph
         y = self.edge_update(lg, y, z)
