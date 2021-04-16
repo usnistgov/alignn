@@ -15,7 +15,7 @@ from jarvisdgl.config import CGCNNConfig
 from jarvisdgl.models.utils import RBFExpansion
 
 
-class CGCNNConv(nn.Module):
+class CGCNNConvFull(nn.Module):
     """Xie and Grossman graph convolution function.
 
     10.1103/PhysRevLett.120.145301
@@ -81,6 +81,76 @@ class CGCNNConv(nn.Module):
         # storing the results in edge features `h`
         g.update_all(
             message_func=self.combine_edge_features,
+            reduce_func=fn.sum("z", "h"),
+        )
+
+        # final batchnorm
+        h = self.bn(g.ndata.pop("h"))
+
+        # residual connection plus nonlinearity
+        return F.softplus(node_feats + h)
+
+
+class CGCNNConv(nn.Module):
+    """Xie and Grossman graph convolution function.
+
+    10.1103/PhysRevLett.120.145301
+    """
+
+    def __init__(self, node_features: int = 64, edge_features: int = 32):
+        """Initialize torch modules for CGCNNConv layer."""
+        super().__init__()
+        self.node_features = node_features
+        self.edge_features = edge_features
+
+        # CGCNN-Conv operates on augmented edge features
+        # z_ij = cat(v_i, v_j, u_ij)
+        # m_ij = σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
+        # coalesce parameters for W_f and W_s
+        # but -- split them up along feature dimension
+        self.linear_src = nn.Linear(node_features, 2 * node_features)
+        self.linear_dst = nn.Linear(node_features, 2 * node_features)
+        self.linear_edge = nn.Linear(edge_features, 2 * node_features)
+        self.bn_message = nn.BatchNorm1d(2 * node_features)
+
+        # final batchnorm
+        self.bn = nn.BatchNorm1d(node_features)
+
+    def forward(
+        self,
+        g: dgl.DGLGraph,
+        node_feats: torch.Tensor,
+        edge_feats: torch.Tensor,
+    ) -> torch.Tensor:
+        """CGCNN convolution defined in Eq 5.
+
+        10.1103/PhysRevLett.120.14530
+        """
+        g = g.local_var()
+
+        # instead of concatenating (u || v || e) and applying one weight matrix
+        # split the weight matrix into three, apply, then sum
+        # see https://docs.dgl.ai/guide/message-efficient.html
+        # compute edge messages -- coalesce W_f and W_s from the paper
+        # but split them on feature dimensions to update u, v, e separately
+        # m = BatchNorm(Linear(cat(u, v, e)))
+        g.ndata["h_src"] = self.linear_src(node_feats)
+        g.ndata["h_dst"] = self.linear_dst(node_feats)
+        g.apply_edges(fn.u_add_v("h_src", "h_dst", "h_nodes"))
+        m = g.edata.pop("h_nodes") + self.linear_edge(edge_feats)
+        m = self.bn_message(m)
+
+        # split messages into W_f and W_s terms
+        # multiply output of atom interaction net and edge attention net
+        # i.e. compute the term inside the summation in eq 5
+        # σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
+        h_f, h_s = torch.chunk(m, 2, dim=1)
+        g.edata["m"] = F.sigmoid(h_f) * F.softplus(h_s)
+
+        # apply the convolution term in eq. 5 (without residual connection)
+        # storing the results in edge features `h`
+        g.update_all(
+            message_func=fn.copy_e("m", "z"),
             reduce_func=fn.sum("z", "h"),
         )
 
