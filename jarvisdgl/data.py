@@ -554,7 +554,8 @@ def get_train_val_loaders(
     standardize: bool = False,
     line_graph: bool = False,
     split_seed: int = 123,
-    workers: int = 1,
+    workers: int = 4,
+    pin_memory: bool = True,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     d, graphs = load_dataset(dataset, neighbor_strategy)
@@ -608,6 +609,7 @@ def get_train_val_loaders(
         collate_fn=collate_fn,
         drop_last=True,
         num_workers=workers,
+        pin_memory=pin_memory,
     )
 
     val_loader = DataLoader(
@@ -617,6 +619,7 @@ def get_train_val_loaders(
         collate_fn=collate_fn,
         drop_last=True,
         num_workers=workers,
+        pin_memory=pin_memory,
     )
 
     return train_loader, val_loader, data.prepare_batch
