@@ -75,27 +75,48 @@ class ALIGNN(nn.Module):
         super().__init__()
         print(config)
 
-        self.rbf = RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_features)
-        self.angle_bf = RBFExpansion(
-            vmin=-1, vmax=1.0, bins=config.angle_features
-        )
         self.atom_embedding = nn.Linear(
             config.atom_input_features, config.node_features
         )
 
         self.bn = nn.BatchNorm1d(config.node_features)
 
+        self.edge_embedding = nn.Sequential(
+            RBFExpansion(
+                vmin=0, vmax=8.0, bins=config.edge_features, lengthscale=0.5
+            ),
+            nn.Linear(config.edge_features, 64),
+            nn.BatchNorm1d(64),
+            nn.Softplus(),
+            nn.Linear(64, config.hidden_features),
+            nn.BatchNorm1d(config.hidden_features),
+            nn.Softplus(),
+        )
+        self.angle_embedding = nn.Sequential(
+            RBFExpansion(
+                vmin=-1, vmax=1.0, bins=config.angle_features, lengthscale=0.1
+            ),
+            nn.Linear(config.angle_features, 64),
+            nn.BatchNorm1d(64),
+            nn.Softplus(),
+            nn.Linear(64, config.hidden_features),
+            nn.BatchNorm1d(config.hidden_features),
+            nn.Softplus(),
+        )
+
         self.alignn_layers = nn.ModuleList(
             [
                 ALIGNNConv(
                     config.node_features,
-                    config.edge_features,
-                    config.angle_features,
+                    config.hidden_features,
+                    config.hidden_features,
                 )
                 for idx in range(config.conv_layers)
             ]
         )
-        self.final_conv = CGCNNConv(config.node_features, config.edge_features)
+        self.final_conv = CGCNNConv(
+            config.node_features, config.hidden_features
+        )
 
         self.bn_final = nn.BatchNorm1d(config.node_features)
 
@@ -135,10 +156,10 @@ class ALIGNN(nn.Module):
 
         # initial bond features
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
-        y = self.rbf(bondlength)
+        y = self.edge_embedding(bondlength)
 
         # angle features (fixed)
-        z = self.angle_bf(lg.edata.pop("h"))
+        z = self.angle_embedding(lg.edata.pop("h"))
 
         for alignn_layer in self.alignn_layers:
             x, y = alignn_layer(g, lg, x, y, z)

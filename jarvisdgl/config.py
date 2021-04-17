@@ -84,6 +84,7 @@ class ALIGNNConfig(BaseSettings):
     edge_features: int = 40
     angle_features: int = 16
     node_features: int = 64
+    hidden_features: int = 32
     fc_layers: int = 1
     fc_features: int = 64
     output_features: int = 1
