@@ -43,7 +43,7 @@ def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
-        standardize=config.atom_features != "mit",
+        standardize=config.atom_features != "cgcnn",
         line_graph=config.model.name in lg_models,
     )
     prepare_batch = partial(prepare_batch, device=device)

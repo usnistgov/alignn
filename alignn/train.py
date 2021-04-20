@@ -103,7 +103,7 @@ def train_dgl(
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
-        standardize=config.atom_features != "mit",
+        standardize=config.atom_features != "cgcnn",
         line_graph=config.model.name in lg_models,
     )
 
