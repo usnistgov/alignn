@@ -2,19 +2,18 @@
 
 A prototype crystal line graph network dgl implementation.
 """
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import dgl
 import dgl.function as fn
 import numpy as np
 import torch
-from dgl.nn import AvgPooling, CFConv
+from dgl.nn import AvgPooling
 from dgl.nn.functional import edge_softmax
 from torch import nn
 from torch.nn import functional as F
 
 from alignn.config import ALIGNNConfig
-from alignn.models.cgcnn import CGCNNConv
 from alignn.models.utils import RBFExpansion
 
 
@@ -219,16 +218,23 @@ class ALIGNN(nn.Module):
         elif config.link == "logit":
             self.link = torch.sigmoid
 
-    def forward(self, g: Tuple[dgl.DGLGraph, dgl.DGLGraph]):
+    def forward(
+        self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
+    ):
         """ALIGNN : start with `atom_features`.
 
         x: atom features (g.ndata)
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
-        g, lg = g
+        if len(self.alignn_layers) > 0:
+            g, lg = g
+            lg = lg.local_var()
+
+            # angle features (fixed)
+            z = self.angle_embedding(lg.edata.pop("h"))
+
         g = g.local_var()
-        lg = lg.local_var()
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
@@ -237,9 +243,6 @@ class ALIGNN(nn.Module):
         # initial bond features
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
         y = self.edge_embedding(bondlength)
-
-        # angle features (fixed)
-        z = self.angle_embedding(lg.edata.pop("h"))
 
         # ALIGNN updates: update node, edge, triplet features
         for alignn_layer in self.alignn_layers:

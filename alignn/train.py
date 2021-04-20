@@ -94,7 +94,12 @@ def train_dgl(
         deterministic = True
         ignite.utils.manual_seed(config.random_seed)
 
-    lg_models = {"clgn", "alignn"}
+    line_graph = False
+    if config.model.name == "clgn":
+        line_graph = True
+    if config.model.name == "alignn" and config.model.alignn_layers > 0:
+        line_graph = True
+
     # use input standardization for all real-valued feature sets
     train_loader, val_loader, prepare_batch = data.get_train_val_loaders(
         target=config.target,
@@ -104,7 +109,7 @@ def train_dgl(
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
         standardize=config.atom_features != "cgcnn",
-        line_graph=config.model.name in lg_models,
+        line_graph=line_graph,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
