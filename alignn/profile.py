@@ -11,11 +11,12 @@ from typing import Any, Callable, Dict, Union
 import numpy as np
 import torch
 import torch.profiler
-from jarvisdgl import data, models
-from jarvisdgl.config import TrainingConfig
-from jarvisdgl.train import group_decay, setup_optimizer
 from torch import nn
 from tqdm import tqdm
+
+from alignn import data, models
+from alignn.config import TrainingConfig
+from alignn.train import group_decay, setup_optimizer
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -25,7 +26,7 @@ if torch.cuda.is_available():
 def profile_dgl(config: Union[TrainingConfig, Dict[str, Any]]):
     """Training entry point for DGL networks.
 
-    `config` should conform to jarvisdgl.conf.TrainingConfig, and
+    `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
     if type(config) is dict:
