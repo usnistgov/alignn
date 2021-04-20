@@ -180,6 +180,7 @@ class TrainingConfig(BaseSettings):
     batch_size: int = 32
     weight_decay: float = 0
     learning_rate: float = 1e-2
+    warmup_steps: int = 2000
     criterion: Literal["mse", "l1", "poisson", "zig"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"

@@ -135,11 +135,14 @@ def train_dgl(
         )
 
     elif config.scheduler == "onecycle":
+        steps_per_epoch = len(train_loader)
+        pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
             epochs=config.epochs,
-            steps_per_epoch=len(train_loader),
+            steps_per_epoch=steps_per_epoch,
+            pct_start=pct_start,
         )
 
     # select configured loss function
