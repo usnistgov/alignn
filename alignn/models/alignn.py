@@ -160,7 +160,7 @@ class ALIGNN(nn.Module):
         print(config)
 
         self.atom_embedding = MLPLayer(
-            config.node_input_features, config.hidden_features
+            config.atom_input_features, config.hidden_features
         )
 
         self.edge_embedding = nn.Sequential(

@@ -81,7 +81,7 @@ class ALIGNNConfig(BaseSettings):
     name: Literal["alignn"]
     alignn_layers: int = 2
     gcn_layers: int = 1
-    node_input_features: int = 1
+    atom_input_features: int = 1
     edge_input_features: int = 40
     triplet_input_features: int = 16
     embedding_features: int = 64
