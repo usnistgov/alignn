@@ -24,7 +24,7 @@ class BaseSettings(PydanticBaseSettings):
         env_prefix = "jv_"
 
 
-FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "mit": 92}
+FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "cgcnn": 92}
 
 
 class CGCNNConfig(BaseSettings):
@@ -167,7 +167,7 @@ class TrainingConfig(BaseSettings):
     target: Literal[
         "formation_energy_peratom", "optb88vdw_bandgap"
     ] = "formation_energy_peratom"
-    atom_features: Literal["basic", "atomic_number", "cfid", "mit"] = "basic"
+    atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "basic"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
 
     # logging configuration

@@ -151,7 +151,7 @@ class CGCNNConv(nn.Module):
         # i.e. compute the term inside the summation in eq 5
         # σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
         h_f, h_s = torch.chunk(m, 2, dim=1)
-        m = F.sigmoid(h_f) * F.softplus(h_s)
+        m = torch.sigmoid(h_f) * F.softplus(h_s)
         g.edata["m"] = m
 
         # apply the convolution term in eq. 5 (without residual connection)
