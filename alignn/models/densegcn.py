@@ -7,7 +7,7 @@ from dgl.nn import AvgPooling, GraphConv
 from torch import nn
 from torch.nn import functional as F
 
-from jarvisdgl.config import DenseGCNConfig
+from alignn.config import DenseGCNConfig
 
 
 class _DenseLayer(nn.Module):

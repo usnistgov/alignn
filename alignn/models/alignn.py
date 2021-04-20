@@ -13,9 +13,9 @@ from dgl.nn.functional import edge_softmax
 from torch import nn
 from torch.nn import functional as F
 
-from jarvisdgl.config import ALIGNNConfig
-from jarvisdgl.models.cgcnn import CGCNNConv
-from jarvisdgl.models.utils import RBFExpansion
+from alignn.config import ALIGNNConfig
+from alignn.models.cgcnn import CGCNNConv
+from alignn.models.utils import RBFExpansion
 
 
 class EdgeGatedGraphConv(nn.Module):

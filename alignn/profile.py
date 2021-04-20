@@ -11,12 +11,11 @@ from typing import Any, Callable, Dict, Union
 import numpy as np
 import torch
 import torch.profiler
-from torch import nn
-from tqdm import tqdm
-
 from jarvisdgl import data, models
 from jarvisdgl.config import TrainingConfig
 from jarvisdgl.train import group_decay, setup_optimizer
+from torch import nn
+from tqdm import tqdm
 
 device = "cpu"
 if torch.cuda.is_available():

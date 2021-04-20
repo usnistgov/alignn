@@ -11,8 +11,8 @@ from dgl.nn import AvgPooling
 from pydantic.typing import Literal
 from torch import nn
 
-from jarvisdgl.config import CGCNNConfig
-from jarvisdgl.models.utils import RBFExpansion
+from alignn.config import CGCNNConfig
+from alignn.models.utils import RBFExpansion
 
 
 class CGCNNConvFull(nn.Module):

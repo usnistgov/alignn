@@ -1,4 +1,4 @@
-"""Jarvisdgl: Deep graph library for materials science.
+"""ALIGNN: Atomistic LIne Graph Neural Network.
 
 https://jarvis.nist.gov.
 """
@@ -15,8 +15,8 @@ with open(os.path.join(base_dir, "README.md")) as f:
     long_d = f.read()
 
 setup(
-    name="jarvisdgl",
-    version="2021.2.22",
+    name="alignn",
+    version="2021.4.20",
     long_description=long_d,
     install_requires=[
         "numpy>=1.18.5",

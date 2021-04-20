@@ -1,7 +1,7 @@
 """Ignite training script.
 
 from the repository root, run
-`PYTHONPATH=$PYTHONPATH:. python jarvisdgl/train.py`
+`PYTHONPATH=$PYTHONPATH:. python alignn/train.py`
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 
@@ -28,8 +28,8 @@ from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
 
-from jarvisdgl import data, models
-from jarvisdgl.config import TrainingConfig
+from alignn import data, models
+from alignn.config import TrainingConfig
 
 # torch config
 torch.set_default_dtype(torch.float32)
@@ -83,7 +83,7 @@ def train_dgl(
 ):
     """Training entry point for DGL networks.
 
-    `config` should conform to jarvisdgl.conf.TrainingConfig, and
+    `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
     if type(config) is dict:

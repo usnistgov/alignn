@@ -9,8 +9,8 @@ from dgl.nn import AvgPooling, CFConv
 from torch import nn
 from torch.nn import functional as F
 
-from jarvisdgl.config import CLGNConfig
-from jarvisdgl.models.utils import RBFExpansion
+from alignn.config import CLGNConfig
+from alignn.models.utils import RBFExpansion
 
 
 def compute_bond_cosines(edges):

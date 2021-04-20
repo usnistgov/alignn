@@ -9,9 +9,9 @@ from typing import Any, Dict, Optional, Union
 import torch
 import typer
 
-from jarvisdgl.config import TrainingConfig
-from jarvisdgl.profile import profile_dgl
-from jarvisdgl.train import train_dgl
+from alignn.config import TrainingConfig
+from alignn.profile import profile_dgl
+from alignn.train import train_dgl
 
 
 def cli(
@@ -22,7 +22,7 @@ def cli(
     tensorboard: bool = False,
     profile: bool = False,
 ):
-    """Jarvis-dgl training cli.
+    """ALIGNN training cli.
 
     config: path to json config file (conform to TrainingConfig)
     progress: enable tqdm console logging

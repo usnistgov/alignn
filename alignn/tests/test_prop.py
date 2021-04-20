@@ -4,7 +4,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from jarvisdgl.train import train_dgl
+from alignn.train import train_dgl
 
 plt.switch_backend("agg")
 from sklearn.metrics import mean_absolute_error
@@ -30,7 +30,6 @@ config_d = {
         "fc_layers": 1,
         "fc_features": 128,
         "output_features": 1,
-        "logscale": False,
     },
 }
 
@@ -56,7 +55,6 @@ config_dd = {
         "fc_layers": 1,
         "fc_features": 128,
         "output_features": 1,
-        "logscale": False,
     },
     "log_tensorboard": False,
 }
@@ -83,7 +81,6 @@ config_d = {
         "fc_layers": 1,
         "fc_features": 128,
         "output_features": 1,
-        "logscale": False,
     },
 }
 

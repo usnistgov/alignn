@@ -10,8 +10,8 @@ import torch.nn.functional as F
 from dgl.nn import AvgPooling
 from torch import nn
 
-from jarvisdgl.config import ICGCNNConfig
-from jarvisdgl.models.utils import RBFExpansion
+from alignn.config import ICGCNNConfig
+from alignn.models.utils import RBFExpansion
 
 
 class CGCNNUpdate(nn.Module):
