@@ -247,7 +247,7 @@ class ALIGNN(nn.Module):
 
         # gated GCN updates: update node, edge features
         for gcn_layer in self.gcn_layers:
-            x, y = self.gcn_layer(g, x, y)
+            x, y = gcn_layer(g, x, y)
 
         # norm-relu-pool-classify
         h = self.readout(g, x)
