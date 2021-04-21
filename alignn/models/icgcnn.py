@@ -8,10 +8,34 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from dgl.nn import AvgPooling
+from pydantic.typing import Literal
 from torch import nn
 
-from alignn.config import ICGCNNConfig
 from alignn.models.utils import RBFExpansion
+from alignn.utils import BaseSettings
+
+
+class ICGCNNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.icgcnn."""
+
+    name: Literal["icgcnn"]
+    conv_layers: int = 3
+    atom_input_features: int = 1
+    edge_features: int = 16
+    node_features: int = 64
+    fc_layers: int = 1
+    fc_features: int = 64
+    output_features: int = 1
+
+    # if logscale is set, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    logscale: bool = False
+    hurdle: bool = False
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
 
 
 class CGCNNUpdate(nn.Module):

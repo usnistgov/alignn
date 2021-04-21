@@ -10,11 +10,38 @@ import numpy as np
 import torch
 from dgl.nn import AvgPooling
 from dgl.nn.functional import edge_softmax
+from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F
 
-from alignn.config import ALIGNNConfig
 from alignn.models.utils import RBFExpansion
+from alignn.utils import BaseSettings
+
+
+class ALIGNNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.alignn."""
+
+    name: Literal["alignn"]
+    alignn_layers: int = 2
+    gcn_layers: int = 1
+    atom_input_features: int = 1
+    edge_input_features: int = 40
+    triplet_input_features: int = 16
+    embedding_features: int = 64
+    hidden_features: int = 64
+    fc_layers: int = 1
+    fc_features: int = 64
+    output_features: int = 1
+
+    # if link == log, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    link: Literal["identity", "log", "logit"] = "identity"
+    zero_inflated: bool = False
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
 
 
 class EdgeGatedGraphConv(nn.Module):

@@ -2,10 +2,26 @@
 import dgl
 import torch
 from dgl.nn import AvgPooling, GraphConv
+from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F
 
-from alignn.config import SimpleGCNConfig
+from alignn.utils import BaseSettings
+
+
+class SimpleGCNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.gcn."""
+
+    name: Literal["simplegcn"]
+    atom_input_features: int = 1
+    weight_edges: bool = True
+    width: int = 64
+    output_features: int = 1
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
 
 
 class SimpleGCN(nn.Module):

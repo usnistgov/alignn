@@ -4,10 +4,29 @@ from typing import List, Optional
 import dgl
 import torch
 from dgl.nn import AvgPooling, GraphConv
+from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F
 
-from alignn.config import DenseGCNConfig
+from alignn.utils import BaseSettings
+
+
+class DenseGCNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.densegcn."""
+
+    name: Literal["densegcn"]
+    atom_input_features: int = 1
+    edge_lengthscale: float = 4.0
+    weight_edges: bool = True
+    conv_layers: int = 4
+    node_features: int = 32
+    growth_rate: int = 32
+    output_features: int = 1
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
 
 
 class _DenseLayer(nn.Module):

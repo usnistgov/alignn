@@ -11,8 +11,31 @@ from dgl.nn import AvgPooling
 from pydantic.typing import Literal
 from torch import nn
 
-from alignn.config import CGCNNConfig
 from alignn.models.utils import RBFExpansion
+from alignn.utils import BaseSettings
+
+
+class CGCNNConfig(BaseSettings):
+    """Hyperparameter schema for jarvisdgl.models.cgcnn."""
+
+    name: Literal["cgcnn"]
+    conv_layers: int = 3
+    atom_input_features: int = 1
+    edge_features: int = 16
+    node_features: int = 64
+    fc_layers: int = 1
+    fc_features: int = 64
+    output_features: int = 1
+
+    # if link == log, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    link: Literal["identity", "log", "logit"] = "identity"
+    zero_inflated: bool = False
+
+    class Config:
+        """Configure model settings behavior."""
+
+        env_prefix = "jv_model"
 
 
 class CGCNNConvFull(nn.Module):

@@ -1,7 +1,6 @@
 """Graph neural network implementations."""
-from alignn.models.alignn import ALIGNN
-from alignn.models.cgcnn import CGCNN
-from alignn.models.clgn import CLGN
-from alignn.models.densegcn import DenseGCN
-from alignn.models.gcn import SimpleGCN
-from alignn.models.icgcnn import iCGCNN
+from alignn.models.alignn import ALIGNN, ALIGNNConfig
+from alignn.models.cgcnn import CGCNN, CGCNNConfig
+from alignn.models.densegcn import DenseGCN, DenseGCNConfig
+from alignn.models.gcn import SimpleGCN, SimpleGCNConfig
+from alignn.models.icgcnn import ICGCNNConfig, iCGCNN
