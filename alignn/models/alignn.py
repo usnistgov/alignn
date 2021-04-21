@@ -28,12 +28,11 @@ class EdgeGatedGraphConv(nn.Module):
     """
 
     def __init__(
-        self,
-        input_features: int,
-        output_features: int,
+        self, input_features: int, output_features: int, residual: bool = True
     ):
         """Initialize parameters for ALIGNN update."""
         super().__init__()
+        self.residual = residual
         # CGCNN-Conv operates on augmented edge features
         # z_ij = cat(v_i, v_j, u_ij)
         # m_ij = σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
@@ -73,20 +72,31 @@ class EdgeGatedGraphConv(nn.Module):
         g.apply_edges(fn.u_add_v("e_src", "e_dst", "e_nodes"))
         m = g.edata.pop("e_nodes") + self.edge_gate(edge_feats)
 
-        # edge residual
-        y = edge_feats + F.softplus(self.bn_edges(m))
-
-        edge_gates = edge_softmax(g, y)
-
-        # compute node updates
-        # Linear(u) + edge_gates ⊙ Linear(v)
-        g.edata["gate"] = edge_gates
-        g.ndata["h_dst"] = self.dst_update(node_feats)
-        g.update_all(fn.v_mul_e("h_dst", "gate", "m"), fn.sum("m", "h"))
+        g.edata["sigma"] = torch.sigmoid(m)
+        g.ndata["Bh"] = self.dst_update(node_feats)
+        g.update_all(
+            fn.u_mul_e("Bh", "sigma", "m"), fn.sum("m", "sum_sigma_h")
+        )
+        g.update_all(fn.copy_e("sigma", "m"), fn.sum("m", "sum_sigma"))
+        g.ndata["h"] = g.ndata["sum_sigma_h"] / (g.ndata["sum_sigma"] + 1e-6)
         x = self.src_update(node_feats) + g.ndata.pop("h")
 
-        # node residual
-        x = x + F.softplus(self.bn_nodes(x))
+        # softmax version seems to perform slightly worse
+        # that the sigmoid-gated version
+        # compute node updates
+        # Linear(u) + edge_gates ⊙ Linear(v)
+        # g.edata["gate"] = edge_softmax(g, y)
+        # g.ndata["h_dst"] = self.dst_update(node_feats)
+        # g.update_all(fn.v_mul_e("h_dst", "gate", "m"), fn.sum("m", "h"))
+        # x = self.src_update(node_feats) + g.ndata.pop("h")
+
+        # node and edge updates
+        x = F.silu(self.bn_nodes(x))
+        y = F.silu(self.bn_edges(m))
+
+        if self.residual:
+            x = node_feats + x
+            y = edge_feats + y
 
         return x, y
 
@@ -133,16 +143,16 @@ class MLPLayer(nn.Module):
     """Multilayer perceptron layer helper."""
 
     def __init__(self, in_features: int, out_features: int):
-        """Linear, Batchnorm, softplus layer."""
+        """Linear, Batchnorm, SiLU layer."""
         super().__init__()
         self.layer = nn.Sequential(
             nn.Linear(in_features, out_features),
             nn.BatchNorm1d(out_features),
-            nn.Softplus(),
+            nn.SiLU(),
         )
 
     def forward(self, x):
-        """Linear, Batchnorm, softplus layer."""
+        """Linear, Batchnorm, silu layer."""
         return self.layer(x)
 
 
@@ -167,7 +177,6 @@ class ALIGNN(nn.Module):
                 vmin=0,
                 vmax=8.0,
                 bins=config.edge_input_features,
-                lengthscale=0.5,
             ),
             MLPLayer(config.edge_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
@@ -177,7 +186,6 @@ class ALIGNN(nn.Module):
                 vmin=-1,
                 vmax=1.0,
                 bins=config.triplet_input_features,
-                lengthscale=0.1,
             ),
             MLPLayer(config.triplet_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
@@ -252,7 +260,7 @@ class ALIGNN(nn.Module):
         for gcn_layer in self.gcn_layers:
             x, y = gcn_layer(g, x, y)
 
-        # norm-relu-pool-classify
+        # norm-activation-pool-classify
         h = self.readout(g, x)
         out = self.fc(h)
 
