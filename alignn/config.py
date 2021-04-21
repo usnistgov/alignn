@@ -1,10 +1,8 @@
 """Pydantic model for default configuration and validation."""
 
 import subprocess
-from enum import Enum, auto
 from typing import Optional, Union
 
-from pydantic import BaseSettings as PydanticBaseSettings
 from pydantic import Field, root_validator, validator
 from pydantic.typing import Literal
 
@@ -19,16 +17,23 @@ VERSION = (
 FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "cgcnn": 92}
 
 
+TARGET_ENUM = Literal[
+    "formation_energy_peratom",
+    "optb88vdw_bandgap",
+    "gap pbe",
+    "e_form",
+    "U0",
+]
+
+
 class TrainingConfig(BaseSettings):
     """Training config defaults and validation."""
 
     version: str = VERSION
 
     # dataset configuration
-    dataset: Literal["dft_3d", "dft_2d"] = "dft_3d"
-    target: Literal[
-        "formation_energy_peratom", "optb88vdw_bandgap"
-    ] = "formation_energy_peratom"
+    dataset: Literal["dft_3d", "dft_2d", "megnet", "qm9"] = "dft_3d"
+    target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "basic"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
 

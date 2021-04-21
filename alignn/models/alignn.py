@@ -114,7 +114,7 @@ class EdgeGatedGraphConv(nn.Module):
         # Linear(u) + edge_gates ⊙ Linear(v)
         # g.edata["gate"] = edge_softmax(g, y)
         # g.ndata["h_dst"] = self.dst_update(node_feats)
-        # g.update_all(fn.v_mul_e("h_dst", "gate", "m"), fn.sum("m", "h"))
+        # g.update_all(fn.u_mul_e("h_dst", "gate", "m"), fn.sum("m", "h"))
         # x = self.src_update(node_feats) + g.ndata.pop("h")
 
         # node and edge updates
