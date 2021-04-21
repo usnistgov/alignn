@@ -59,6 +59,7 @@ class TrainingConfig(BaseSettings):
         models.SimpleGCNConfig,
         models.DenseGCNConfig,
         models.ALIGNNConfig,
+        models.DenseALIGNNConfig,
     ] = models.CGCNNConfig(name="cgcnn")
 
     @root_validator()
