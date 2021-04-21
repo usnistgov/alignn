@@ -119,7 +119,6 @@ def train_dgl(
         "cgcnn": models.CGCNN,
         "icgcnn": models.iCGCNN,
         "densegcn": models.DenseGCN,
-        "clgn": models.CLGN,
         "alignn": models.ALIGNN,
     }
     if model is None:
