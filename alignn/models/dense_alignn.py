@@ -65,14 +65,14 @@ class EdgeGatedGraphConv(nn.Module):
         # m_ij = σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
         # coalesce parameters for W_f and W_s
         # but -- split them up along feature dimension
+        self.bn_edges = nn.BatchNorm1d(input_features)
         self.src_gate = nn.Linear(input_features, output_features)
         self.dst_gate = nn.Linear(input_features, output_features)
         self.edge_gate = nn.Linear(input_features, output_features)
-        self.bn_edges = nn.BatchNorm1d(output_features)
 
+        self.bn_nodes = nn.BatchNorm1d(input_features)
         self.src_update = nn.Linear(input_features, output_features)
         self.dst_update = nn.Linear(input_features, output_features)
-        self.bn_nodes = nn.BatchNorm1d(output_features)
 
     def forward(
         self,
