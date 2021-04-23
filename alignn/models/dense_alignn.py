@@ -57,7 +57,8 @@ class EdgeGatedGraphConv(nn.Module):
 
     def __init__(
         self,
-        input_features: int,
+        node_input_features: int,
+        edge_input_features: int,
         output_features: int,
         residual: bool = True,
         norm=nn.BatchNorm1d,
@@ -71,14 +72,14 @@ class EdgeGatedGraphConv(nn.Module):
         # m_ij = σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
         # coalesce parameters for W_f and W_s
         # but -- split them up along feature dimension
-        self.norm_edges = norm(input_features)
-        self.src_gate = nn.Linear(input_features, output_features)
-        self.dst_gate = nn.Linear(input_features, output_features)
-        self.edge_gate = nn.Linear(input_features, output_features)
+        self.norm_edges = norm(edge_input_features)
+        self.src_gate = nn.Linear(node_input_features, output_features)
+        self.dst_gate = nn.Linear(node_input_features, output_features)
+        self.edge_gate = nn.Linear(edge_input_features, output_features)
 
-        self.norm_nodes = norm(input_features)
-        self.src_update = nn.Linear(input_features, output_features)
-        self.dst_update = nn.Linear(input_features, output_features)
+        self.norm_nodes = norm(node_input_features)
+        self.src_update = nn.Linear(node_input_features, output_features)
+        self.dst_update = nn.Linear(node_input_features, output_features)
 
     def forward(
         self,
@@ -133,11 +134,19 @@ class ALIGNNConv(nn.Module):
         self,
         in_features: int,
         out_features: int,
+        residual: bool = False,
+        norm=nn.BatchNorm1d,
     ):
         """Set up ALIGNN parameters."""
         super().__init__()
-        self.node_update = EdgeGatedGraphConv(in_features, out_features)
-        self.edge_update = EdgeGatedGraphConv(out_features, out_features)
+        self.node_update = EdgeGatedGraphConv(
+            in_features, in_features, out_features, residual, norm
+        )
+        # y: out_features
+        # z: in_features
+        self.edge_update = EdgeGatedGraphConv(
+            out_features, in_features, out_features, residual, norm
+        )
 
     def forward(
         self,
@@ -156,10 +165,13 @@ class ALIGNNConv(nn.Module):
         g = g.local_var()
         lg = lg.local_var()
         # Edge-gated graph convolution update on crystal graph
-        x, m = self.node_update(g, x, y)
+        # x, y are concatenated feature maps
+        x, y = self.node_update(g, x, y)
 
         # Edge-gated graph convolution update on crystal graph
-        y, z = self.edge_update(lg, m, z)
+        # y: growth_rate
+        # z: concatenated feature map size
+        y, z = self.edge_update(lg, y, z)
 
         return x, y, z
 
@@ -233,25 +245,37 @@ class DenseALIGNN(nn.Module):
             MLPLayer(config.embedding_features, config.initial_features, norm),
         )
 
-        self.alignn_layers = nn.ModuleList(
-            [
-                ALIGNNConv(config.initial_features, config.growth_rate)
-                for idx in range(config.alignn_layers)
-            ]
-        )
-        self.gcn_layers = nn.ModuleList()
-        for idx in range(config.gcn_layers):
+        self.alignn_layers = nn.ModuleList()
+        for idx in range(config.alignn_layers):
             in_features = config.initial_features + idx * config.growth_rate
+            self.alignn_layers.append(
+                ALIGNNConv(
+                    in_features, config.growth_rate, residual=False, norm=norm
+                )
+            )
+
+        self.gcn_layers = nn.ModuleList()
+        initial_features = (
+            config.initial_features + config.growth_rate * config.alignn_layers
+        )
+
+        for idx in range(config.gcn_layers):
+            in_features = initial_features + idx * config.growth_rate
             self.gcn_layers.append(
                 EdgeGatedGraphConv(
-                    in_features, config.growth_rate, residual=False
+                    in_features,
+                    in_features,
+                    config.growth_rate,
+                    residual=False,
+                    norm=norm,
                 )
             )
 
         self.readout = AvgPooling()
 
+        dense_layers = config.alignn_layers = config.gcn_layers
         n_features = (
-            config.initial_features + config.growth_rate * config.gcn_layers
+            config.initial_features + config.growth_rate * dense_layers
         )
         self.fc = nn.Linear(n_features, config.output_features)
 
@@ -306,12 +330,20 @@ class DenseALIGNN(nn.Module):
         y = self.edge_embedding(bondlength)
 
         # ALIGNN updates: update node, edge, triplet features
+        # DenseNet style updates:
+        # maintain a list of x, y, z features
+        # and concatenate all previous feature maps
+        # to form input for each layer
+        xs, ys, zs = [x], [y], [z]
         for alignn_layer in self.alignn_layers:
-            x, y, z = alignn_layer(g, lg, x, y, z)
+            new_x, new_y, new_z = alignn_layer(
+                g, lg, torch.cat(xs, 1), torch.cat(ys, 1), torch.cat(zs, 1)
+            )
+            xs.append(new_x)
+            ys.append(new_y)
+            zs.append(new_z)
 
         # gated GCN updates: update node, edge features
-        xs = [x]
-        ys = [y]
         for gcn_layer in self.gcn_layers:
             new_x, new_y = gcn_layer(g, torch.cat(xs, 1), torch.cat(ys, 1))
             xs.append(new_x)
