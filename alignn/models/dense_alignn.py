@@ -273,7 +273,7 @@ class DenseALIGNN(nn.Module):
 
         self.readout = AvgPooling()
 
-        dense_layers = config.alignn_layers = config.gcn_layers
+        dense_layers = config.alignn_layers + config.gcn_layers
         n_features = (
             config.initial_features + config.growth_rate * dense_layers
         )
