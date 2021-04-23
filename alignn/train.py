@@ -44,7 +44,7 @@ def group_decay(model):
     decay, no_decay = [], []
 
     for name, p in model.named_parameters():
-        if "bias" in name or "bn" in name:
+        if "bias" in name or "bn" in name or "norm" in name:
             no_decay.append(p)
         else:
             decay.append(p)

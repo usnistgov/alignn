@@ -32,6 +32,7 @@ class DenseALIGNNConfig(BaseSettings):
     fc_layers: int = 1
     fc_features: int = 64
     output_features: int = 1
+    norm: Literal["batchnorm", "layernorm"] = "batchnorm"
 
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
@@ -55,22 +56,27 @@ class EdgeGatedGraphConv(nn.Module):
     """
 
     def __init__(
-        self, input_features: int, output_features: int, residual: bool = True
+        self,
+        input_features: int,
+        output_features: int,
+        residual: bool = True,
+        norm=nn.BatchNorm1d,
     ):
         """Initialize parameters for ALIGNN update."""
         super().__init__()
         self.residual = residual
+
         # CGCNN-Conv operates on augmented edge features
         # z_ij = cat(v_i, v_j, u_ij)
         # m_ij = σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
         # coalesce parameters for W_f and W_s
         # but -- split them up along feature dimension
-        self.bn_edges = nn.BatchNorm1d(input_features)
+        self.norm_edges = norm(input_features)
         self.src_gate = nn.Linear(input_features, output_features)
         self.dst_gate = nn.Linear(input_features, output_features)
         self.edge_gate = nn.Linear(input_features, output_features)
 
-        self.bn_nodes = nn.BatchNorm1d(input_features)
+        self.norm_nodes = norm(input_features)
         self.src_update = nn.Linear(input_features, output_features)
         self.dst_update = nn.Linear(input_features, output_features)
 
@@ -88,8 +94,8 @@ class EdgeGatedGraphConv(nn.Module):
 
         # pre-normalization, pre-activation
         # node and edge updates
-        x = F.silu(self.bn_nodes(node_feats))
-        y = F.silu(self.bn_edges(edge_feats))
+        x = F.silu(self.norm_nodes(node_feats))
+        y = F.silu(self.norm_edges(edge_feats))
 
         # instead of concatenating (u || v || e) and applying one weight matrix
         # split the weight matrix into three, apply, then sum
@@ -161,18 +167,24 @@ class ALIGNNConv(nn.Module):
 class MLPLayer(nn.Module):
     """Multilayer perceptron layer helper."""
 
-    def __init__(self, in_features: int, out_features: int):
+    def __init__(
+        self, in_features: int, out_features: int, norm=nn.BatchNorm1d
+    ):
         """Linear, Batchnorm, SiLU layer."""
         super().__init__()
-        self.layer = nn.Sequential(
-            nn.Linear(in_features, out_features),
-            nn.BatchNorm1d(out_features),
-            nn.SiLU(),
+        self.layer = nn.ModuleDict(
+            {
+                "linear": nn.Linear(in_features, out_features),
+                "norm": norm(out_features),
+                "activation": nn.SiLU(),
+            }
         )
 
     def forward(self, x):
         """Linear, Batchnorm, silu layer."""
-        return self.layer(x)
+        for name, cpt in self.layer.items():
+            x = cpt(x)
+        return x
 
 
 class DenseALIGNN(nn.Module):
@@ -190,8 +202,12 @@ class DenseALIGNN(nn.Module):
         super().__init__()
         print(config)
 
+        norm = {"batchnorm": nn.BatchNorm1d, "layernorm": nn.LayerNorm}[
+            config.norm
+        ]
+
         self.atom_embedding = MLPLayer(
-            config.atom_input_features, config.initial_features
+            config.atom_input_features, config.initial_features, norm
         )
 
         self.edge_embedding = nn.Sequential(
@@ -200,8 +216,10 @@ class DenseALIGNN(nn.Module):
                 vmax=8.0,
                 bins=config.edge_input_features,
             ),
-            MLPLayer(config.edge_input_features, config.embedding_features),
-            MLPLayer(config.embedding_features, config.initial_features),
+            MLPLayer(
+                config.edge_input_features, config.embedding_features, norm
+            ),
+            MLPLayer(config.embedding_features, config.initial_features, norm),
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
@@ -209,8 +227,10 @@ class DenseALIGNN(nn.Module):
                 vmax=1.0,
                 bins=config.triplet_input_features,
             ),
-            MLPLayer(config.triplet_input_features, config.embedding_features),
-            MLPLayer(config.embedding_features, config.initial_features),
+            MLPLayer(
+                config.triplet_input_features, config.embedding_features, norm
+            ),
+            MLPLayer(config.embedding_features, config.initial_features, norm),
         )
 
         self.alignn_layers = nn.ModuleList(
@@ -247,6 +267,17 @@ class DenseALIGNN(nn.Module):
             )
         elif config.link == "logit":
             self.link = torch.sigmoid
+
+        self.apply(self.reset_parameters)
+
+    @staticmethod
+    def reset_parameters(m):
+        """He initialization."""
+        if isinstance(m, nn.Linear):
+            nn.init.kaiming_normal_(
+                m.weight, mode="fan_out", nonlinearity="relu"
+            )
+            nn.init.constant_(m.bias, 0)
 
     def forward(
         self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
