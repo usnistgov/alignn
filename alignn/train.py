@@ -95,7 +95,7 @@ def train_dgl(
         ignite.utils.manual_seed(config.random_seed)
 
     line_graph = False
-    alignn_models = set("alignn", "dense_alignn")
+    alignn_models = {"alignn", "dense_alignn"}
     if config.model.name == "clgn":
         line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
