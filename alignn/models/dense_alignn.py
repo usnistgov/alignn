@@ -171,7 +171,10 @@ class ALIGNNConv(nn.Module):
         # Edge-gated graph convolution update on crystal graph
         # y: growth_rate
         # z: concatenated feature map size
-        y, z = self.edge_update(lg, y, z)
+        y_new, z = self.edge_update(lg, y, z)
+
+        # residual edge connection around line graph convolution
+        y = y + y_new
 
         return x, y, z
 
@@ -334,7 +337,14 @@ class DenseALIGNN(nn.Module):
         # maintain a list of x, y, z features
         # and concatenate all previous feature maps
         # to form input for each layer
-        xs, ys, zs = [x], [y], [z]
+        x_identity = x
+        xs = [x]
+        y_identity = y
+        ys = [y]
+        if self.alignn_layers > 0:
+            # z_identity = z
+            zs = [z]
+
         for alignn_layer in self.alignn_layers:
             new_x, new_y, new_z = alignn_layer(
                 g, lg, torch.cat(xs, 1), torch.cat(ys, 1), torch.cat(zs, 1)
@@ -343,13 +353,20 @@ class DenseALIGNN(nn.Module):
             ys.append(new_y)
             zs.append(new_z)
 
+        # residual connections around graph dense graph convolution block
+        x = x_identity + F.silu(torch.cat(xs, 1))
+        y = y_identity + F.silu(torch.cat(ys, 1))
+
         # gated GCN updates: update node, edge features
+        x_identity = x
+        y_identity = y
+        xs, ys = [x], [y]
         for gcn_layer in self.gcn_layers:
             new_x, new_y = gcn_layer(g, torch.cat(xs, 1), torch.cat(ys, 1))
             xs.append(new_x)
             ys.append(new_y)
 
-        x = torch.cat(xs, 1)
+        x = x_identity + F.silu(torch.cat(xs, 1))
 
         # norm-activation-pool-classify
         h = self.readout(g, x)
