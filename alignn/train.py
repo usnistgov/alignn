@@ -24,7 +24,7 @@ from ignite.engine import (
     create_supervised_evaluator,
     create_supervised_trainer,
 )
-from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
+from ignite.handlers import Checkpoint, DiskSaver, EarlyStopping,TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
 
@@ -76,7 +76,7 @@ def setup_optimizer(params, config: TrainingConfig):
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
-    progress: bool = False,
+    progress: bool = True,
     checkpoint_dir: Path = Path("/tmp/models"),
     store_outputs: bool = True,
     log_tensorboard: bool = False,
@@ -103,6 +103,7 @@ def train_dgl(
 
     # use input standardization for all real-valued feature sets
     train_loader, val_loader, prepare_batch = data.get_train_val_loaders(
+        dataset=config.dataset,
         target=config.target,
         n_train=config.n_train,
         n_val=config.n_val,
@@ -111,6 +112,9 @@ def train_dgl(
         neighbor_strategy=config.neighbor_strategy,
         standardize=config.atom_features != "cgcnn",
         line_graph=line_graph,
+        id_tag=config.id_tag,
+        pin_memory=config.pin_memory,
+        workers=config.workers,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
@@ -140,15 +144,16 @@ def train_dgl(
             optimizer, lambda epoch: 1.0
         )
 
+
     elif config.scheduler == "onecycle":
-        steps_per_epoch = len(train_loader)
+        steps_per_epoch = 2*len(train_loader)
         pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
             epochs=config.epochs,
             steps_per_epoch=steps_per_epoch,
-            pct_start=pct_start,
+            #pct_start=0.4,
         )
 
     # select configured loss function
@@ -191,7 +196,14 @@ def train_dgl(
         net, metrics=metrics, prepare_batch=prepare_batch, device=device
     )
 
+    def score_function(engine):
+        print ('Validation',engine.state.metrics)
+        val_loss = engine.state.metrics['mae']
+        return -val_loss
+    handler = EarlyStopping(patience=10, score_function=score_function, trainer=evaluator)
+    #handler = EarlyStopping(patience=10, score_function=lambda engine: -engine.state.metrics['mse'], trainer=trainer)
     # ignite event handlers:
+    #evaluator.add_event_handler(Events.EPOCH_COMPLETED, handler)
     trainer.add_event_handler(Events.EPOCH_COMPLETED, TerminateOnNan())
 
     # apply learning rate scheduler

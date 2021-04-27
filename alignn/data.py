@@ -18,9 +18,12 @@ from tqdm import tqdm
 tqdm.pandas()
 
 
-def load_dataset(name: str = "dft_3d", limit: Optional[int] = None):
+def load_dataset(name: str = "dft_3d",id_tag='jid', limit: Optional[int] = None):
     """Load jarvis data."""
     d = jdata(name)
+    if id_tag!='jid':
+        for i in d:
+            i['jid']=i[id_tag]
     if limit is not None:
         d = d[:limit]
     d = pd.DataFrame(d)
@@ -87,11 +90,12 @@ def get_train_val_loaders(
     standardize: bool = False,
     line_graph: bool = False,
     split_seed: int = 123,
-    workers: int = 0,
-    pin_memory: bool = True,
+    workers: int = 2,
+    pin_memory: bool = False,
+    id_tag='jid'
 ):
     """Help function to set up Jarvis train and val dataloaders."""
-    df = load_dataset(dataset, limit=None)
+    df = load_dataset(dataset, id_tag=id_tag,limit=None)
     graphs = load_graphs(
         df,
         name=dataset,

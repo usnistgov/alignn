@@ -51,7 +51,9 @@ class TrainingConfig(BaseSettings):
     criterion: Literal["mse", "l1", "poisson", "zig"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
-
+    id_tag: Literal["jid", "id"] = "id"
+    pin_memory: bool = False,
+    workers:int = 2,
     # model configuration
     model: Union[
         models.CGCNNConfig,
