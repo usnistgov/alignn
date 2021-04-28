@@ -87,7 +87,7 @@ def get_train_val_loaders(
     standardize: bool = False,
     line_graph: bool = False,
     split_seed: int = 123,
-    workers: int = 0,
+    workers: int = 4,
     pin_memory: bool = True,
 ):
     """Help function to set up Jarvis train and val dataloaders."""

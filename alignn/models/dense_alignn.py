@@ -390,6 +390,7 @@ class DenseALIGNN(nn.Module):
                 vmin=0,
                 vmax=8.0,
                 bins=config.edge_input_features,
+                lengthscale=0.5,
             ),
             MLPLayer(
                 config.edge_input_features, config.embedding_features, norm
@@ -398,8 +399,8 @@ class DenseALIGNN(nn.Module):
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
-                vmin=-1,
-                vmax=1.0,
+                vmin=-np.pi,
+                vmax=np.pi,
                 bins=config.triplet_input_features,
             ),
             MLPLayer(
@@ -447,7 +448,9 @@ class DenseALIGNN(nn.Module):
         elif config.link == "logit":
             self.link = torch.sigmoid
 
-        self.apply(self.reset_parameters)
+        # Kaiming initialization not working out
+        # stick with default Glorot
+        # self.apply(self.reset_parameters)
 
     @staticmethod
     def reset_parameters(m):
