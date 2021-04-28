@@ -432,11 +432,7 @@ class DenseALIGNN(nn.Module):
 
         self.readout = AvgPooling()
 
-        dense_layers = config.alignn_layers + config.gcn_layers
-        n_features = (
-            config.initial_features + config.growth_rate * dense_layers
-        )
-        self.fc = nn.Linear(n_features, config.output_features)
+        self.fc = nn.Linear(config.bottleneck_features, config.output_features)
 
         self.link = None
         self.link_name = config.link
