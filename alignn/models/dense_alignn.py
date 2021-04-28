@@ -338,9 +338,8 @@ class DenseALIGNNBlock(nn.Module):
         xs = [x]
         y_identity = y
         ys = [y]
-        if self.layers > 0:
-            # z_identity = z
-            zs = [z]
+        # z_identity = z
+        zs = [z]
 
         for alignn_layer in self.layers:
             new_x, new_y, new_z = alignn_layer(
