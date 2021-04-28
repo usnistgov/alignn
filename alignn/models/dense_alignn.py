@@ -342,7 +342,7 @@ class DenseALIGNNBlock(nn.Module):
             # z_identity = z
             zs = [z]
 
-        for alignn_layer in self.alignn_layers:
+        for alignn_layer in self.layers:
             new_x, new_y, new_z = alignn_layer(
                 g, lg, torch.cat(xs, 1), torch.cat(ys, 1), torch.cat(zs, 1)
             )
@@ -407,14 +407,17 @@ class DenseALIGNN(nn.Module):
             MLPLayer(config.embedding_features, config.initial_features, norm),
         )
 
-        self.alignn_block = DenseALIGNNBlock(
-            n_layers=config.alignn_layers,
-            input_features=config.initial_features,
-            growth_rate=config.growth_rate,
-            output_features=config.bottleneck_features,
-            residual=config.residual,
-            norm=norm,
-        )
+        if config.alignn_layers > 0:
+            self.alignn_block = DenseALIGNNBlock(
+                n_layers=config.alignn_layers,
+                input_features=config.initial_features,
+                growth_rate=config.growth_rate,
+                output_features=config.bottleneck_features,
+                residual=config.residual,
+                norm=norm,
+            )
+        else:
+            self.alignn_block = None
 
         initial_features = config.initial_features
         self.gcn_block = DenseGCNBlock(
@@ -467,7 +470,7 @@ class DenseALIGNN(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
-        if len(self.alignn_layers) > 0:
+        if self.alignn_block is not None:
             g, lg = g
             lg = lg.local_var()
 
