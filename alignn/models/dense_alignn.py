@@ -408,7 +408,7 @@ class DenseALIGNN(nn.Module):
         )
 
         if config.alignn_layers > 0:
-            self.alignn_block = DenseALIGNNBlock(
+            self.dense_alignn_block = DenseALIGNNBlock(
                 n_layers=config.alignn_layers,
                 input_features=config.initial_features,
                 growth_rate=config.growth_rate,
@@ -417,10 +417,10 @@ class DenseALIGNN(nn.Module):
                 norm=norm,
             )
         else:
-            self.alignn_block = None
+            self.dense_alignn_block = None
 
         initial_features = config.initial_features
-        self.gcn_block = DenseGCNBlock(
+        self.dense_gcn_block = DenseGCNBlock(
             n_layers=config.gcn_layers,
             input_features=initial_features,
             growth_rate=config.growth_rate,
@@ -470,7 +470,7 @@ class DenseALIGNN(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
-        if self.alignn_block is not None:
+        if self.dense_alignn_block is not None:
             g, lg = g
             lg = lg.local_var()
 
