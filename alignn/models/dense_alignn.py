@@ -246,6 +246,7 @@ class DenseGCNBlock(nn.Module):
     ):
         """Densely-connected gated graph convolution layers."""
         super().__init__()
+        self.residual = residual
         self.bottleneck_inputs = input_features + n_layers * growth_rate
         self.layers = nn.ModuleList()
 
@@ -306,6 +307,7 @@ class DenseALIGNNBlock(nn.Module):
     ):
         """Dense block of ALIGNN updates."""
         super().__init__()
+        self.residual = residual
         self.bottleneck_inputs = input_features + n_layers * growth_rate
 
         self.layers = nn.ModuleList()
