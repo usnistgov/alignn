@@ -1,6 +1,7 @@
 """
-GCNSimple, CGCNNSimple, ALIGNNEdge, ALIGNNSimple, ALIGNNCF.
 DGL implementation.
+
+GCNSimple, CGCNNSimple, ALIGNNEdge, ALIGNNSimple, ALIGNNCF.
 """
 from typing import Optional
 import numpy as np
@@ -9,12 +10,14 @@ from torch import nn
 from typing import Tuple
 import dgl
 import dgl.function as fn
-import numpy as np
-import torch
+
+# import numpy as np
+# import torch
 import torch.nn.functional as F
 from dgl.nn import AvgPooling, CFConv, GraphConv
 from pydantic.typing import Literal
-from torch import nn
+
+# from torch import nn
 
 # from jarvisdgl.config import CGCNNConfig
 
@@ -226,6 +229,7 @@ class ALIGNNSimple(nn.Module):
 
 class CGCNNConvSimple(nn.Module):
     """Xie and Grossman graph convolution function.
+
     10.1103/PhysRevLett.120.145301
     """
 
@@ -258,6 +262,7 @@ class CGCNNConvSimple(nn.Module):
 
     def combine_edge_features(self, edges):
         """Edge update for CGCNNConv.
+
         concatenate source and destination node features with edge features
         then apply the edge update modulated by the edge interaction model
         """
@@ -276,6 +281,7 @@ class CGCNNConvSimple(nn.Module):
         edge_feats: torch.Tensor,
     ) -> torch.Tensor:
         """CGCNN convolution defined in Eq 5.
+
         10.1103/PhysRevLett.120.14530
         """
         g = g.local_var()
@@ -361,6 +367,7 @@ class CGCNNSimple(nn.Module):
 ##################################
 class EdgeGatedGraphConv(nn.Module):
     """Edge gated graph convolution from arxiv:1711.07553.
+
     see also arxiv:2003.0098.
     This is similar to CGCNN, but edge features only go into
     the soft attention / edge gating function, and the primary
@@ -394,6 +401,7 @@ class EdgeGatedGraphConv(nn.Module):
         edge_feats: torch.Tensor,
     ) -> torch.Tensor:
         """Edge-gated graph convolution.
+
         h_i^l+1 = ReLU(U h_i + sum_{j->i} eta_{ij} ⊙ V h_j)
         """
         g = g.local_var()
@@ -872,8 +880,5 @@ class RBFExpansion(nn.Module):
     def forward(self, distance: torch.Tensor) -> torch.Tensor:
         """Apply RBF expansion to interatomic distance tensor."""
         return torch.exp(
-            -self.gamma
-            * (distance.unsqueeze(1) - (self.centers)) ** 2
-            # * (distance.unsqueeze(1) - torch.tensor(self.centers)) ** 2
-            # -self.gamma * (distance.unsqueeze(1).to(device) - torch.tensor(self.centers).to(device)) ** 2
+            -self.gamma * (distance.unsqueeze(1) - (self.centers)) ** 2
         )

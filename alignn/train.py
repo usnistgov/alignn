@@ -5,17 +5,15 @@ from the repository root, run
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 
-from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, Union
-
-import os, random, ignite
+import os
+import random
+import ignite
 import numpy as np
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.stores import EpochOutputStore
 from ignite.contrib.handlers.tensorboard_logger import (
-    OutputHandler,
     global_step_from_engine,
 )
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
@@ -32,7 +30,8 @@ from torch import nn
 
 # from jarvisdgl.config import TrainingConfig
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
+
+# from sklearn.model_selection import train_test_split
 from jarvis.db.figshare import data as jdata
 from jarvis.core.graphs import StructureDataset
 from alignn.all_models import (
@@ -43,7 +42,8 @@ from alignn.all_models import (
     ALIGNNCF,
     ZeroInflatedGammaLoss,
 )
-from torch.utils.data.sampler import SubsetRandomSampler
+
+# from torch.utils.data.sampler import SubsetRandomSampler
 from jarvis.core.graphs import prepare_line_graph_batch as prepare_dgl_batch
 
 
@@ -133,7 +133,7 @@ def get_train_val_test_loaders(
                 )
             else:
                 assert train_ratio + val_ratio + test_ratio <= 1
-        indices = list(range(total_size))
+        # indices = list(range(total_size))
         if train_size is None:
             train_size = int(train_ratio * total_size)
         if test_size is None:
@@ -308,7 +308,7 @@ def train_dgl(
         device = torch.device("cuda")
     # from jarvis.core.graphs import prepare_dgl_batch
 
-    prepare_batch = partial(prepare_dgl_batch, device=device)
+    # prepare_batch = partial(prepare_dgl_batch, device=device)
 
     # use input standardization for all real-valued feature sets
     # standardize = True
@@ -344,14 +344,15 @@ def train_dgl(
         raise ValueError(
             "Not implemented yet.",
             config.model.name,
-            "choose from: cgcnn_simple,alignn_simple,alignn_edge,alignn_cf,gcn_simple",
+            "choose from: "
+            + "cgcnn_simple,alignn_simple,alignn_edge,alignn_cf,gcn_simple",
         )
     net.to(device)
 
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
-    ##config.scheduler = "none"
+    # config.scheduler = "none"
     if config.scheduler == "none":
         # always return multiplier of 1 (i.e. do nothing)
         scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -499,10 +500,3 @@ def train_dgl(
         tb_logger.close()
 
     return history
-
-
-if __name__ == "__main__":
-    config = TrainingConfig(
-        random_seed=123, epochs=10, n_train=32, n_val=32, batch_size=16
-    )
-    history = train_dgl(config, progress=True)
