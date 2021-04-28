@@ -9,6 +9,7 @@ import dgl.function as fn
 import numpy as np
 import torch
 from dgl.nn import AvgPooling
+from pydantic import root_validator
 from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F
@@ -28,6 +29,8 @@ class DenseALIGNNConfig(BaseSettings):
     triplet_input_features: int = 180
     embedding_features: int = 64
     initial_features: int = 16
+    bottleneck_features: int = 16
+    residual: bool = True
     growth_rate: int = 16
     fc_layers: int = 1
     fc_features: int = 64
@@ -38,6 +41,20 @@ class DenseALIGNNConfig(BaseSettings):
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
+
+    @root_validator()
+    def ensure_residual_dimensions_match(cls, values):
+        """Check that residual connections are allowed."""
+        initial_features = values.get("initial_features")
+        bottleneck_features = values.get("bottleneck_features")
+        residual = values.get("residual")
+        if residual:
+            if initial_features != bottleneck_features:
+                raise ValueError(
+                    "input and bottleneck dims must match to use residuals."
+                )
+
+        return values
 
     class Config:
         """Configure model settings behavior."""
@@ -73,13 +90,23 @@ class EdgeGatedGraphConv(nn.Module):
         # coalesce parameters for W_f and W_s
         # but -- split them up along feature dimension
         self.norm_edges = norm(edge_input_features)
-        self.src_gate = nn.Linear(node_input_features, output_features)
-        self.dst_gate = nn.Linear(node_input_features, output_features)
-        self.edge_gate = nn.Linear(edge_input_features, output_features)
+        self.src_gate = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
+        self.dst_gate = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
+        self.edge_gate = nn.Linear(
+            edge_input_features, output_features, bias=False
+        )
 
         self.norm_nodes = norm(node_input_features)
-        self.src_update = nn.Linear(node_input_features, output_features)
-        self.dst_update = nn.Linear(node_input_features, output_features)
+        self.src_update = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
+        self.dst_update = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
 
     def forward(
         self,
@@ -139,6 +166,7 @@ class ALIGNNConv(nn.Module):
     ):
         """Set up ALIGNN parameters."""
         super().__init__()
+        self.residual = residual
         self.node_update = EdgeGatedGraphConv(
             in_features, in_features, out_features, residual, norm
         )
@@ -164,6 +192,8 @@ class ALIGNNConv(nn.Module):
         """
         g = g.local_var()
         lg = lg.local_var()
+        # y_initial = y
+
         # Edge-gated graph convolution update on crystal graph
         # x, y are concatenated feature maps
         x, y = self.node_update(g, x, y)
@@ -171,10 +201,10 @@ class ALIGNNConv(nn.Module):
         # Edge-gated graph convolution update on crystal graph
         # y: growth_rate
         # z: concatenated feature map size
-        y_new, z = self.edge_update(lg, y, z)
+        y, z = self.edge_update(lg, y, z)
 
-        # residual edge connection around line graph convolution
-        y = y + y_new
+        # # residual edge connection around line graph convolution
+        # y = y_initial + y
 
         return x, y, z
 
@@ -200,6 +230,135 @@ class MLPLayer(nn.Module):
         for name, cpt in self.layer.items():
             x = cpt(x)
         return x
+
+
+class DenseGCNBlock(nn.Module):
+    """Dense block of gated graph convolution layers."""
+
+    def __init__(
+        self,
+        n_layers: int = 3,
+        input_features: int = 32,
+        growth_rate: int = 32,
+        output_features: int = 32,
+        residual: bool = True,
+        norm=nn.BatchNorm1d,
+    ):
+        """Densely-connected gated graph convolution layers."""
+        super().__init__()
+        self.bottleneck_inputs = input_features + n_layers * growth_rate
+        self.layers = nn.ModuleList()
+
+        for idx in range(n_layers):
+            in_features = input_features + idx * growth_rate
+            self.layers.append(
+                EdgeGatedGraphConv(
+                    in_features,
+                    in_features,
+                    growth_rate,
+                    residual=False,
+                    norm=norm,
+                )
+            )
+
+        self.bottleneck_x = nn.Sequential(
+            norm(self.bottleneck_inputs),
+            nn.SiLU(),
+            nn.Linear(self.bottleneck_inputs, output_features, bias=False),
+        )
+        self.bottleneck_y = nn.Sequential(
+            norm(self.bottleneck_inputs),
+            nn.SiLU(),
+            nn.Linear(self.bottleneck_inputs, output_features, bias=False),
+        )
+
+    def forward(self, g, x, y):
+        """Gated GCN updates: update node, edge features."""
+        x_identity = x
+        y_identity = y
+        xs, ys = [x], [y]
+        for gcn_layer in self.layers:
+            new_x, new_y = gcn_layer(g, torch.cat(xs, 1), torch.cat(ys, 1))
+            xs.append(new_x)
+            ys.append(new_y)
+
+        x = self.bottleneck_x(torch.cat(xs, 1))
+        y = self.bottleneck_y(torch.cat(ys, 1))
+
+        if self.residual:
+            x = x_identity + x
+            y = y_identity + y
+
+        return x, y
+
+
+class DenseALIGNNBlock(nn.Module):
+    """Dense block of ALIGNN updates."""
+
+    def __init__(
+        self,
+        n_layers: int = 3,
+        input_features: int = 32,
+        growth_rate: int = 32,
+        output_features: int = 32,
+        residual: bool = True,
+        norm=nn.BatchNorm1d,
+    ):
+        """Dense block of ALIGNN updates."""
+        super().__init__()
+        self.bottleneck_inputs = input_features + n_layers * growth_rate
+
+        self.layers = nn.ModuleList()
+        for idx in range(n_layers):
+            in_features = input_features + idx * growth_rate
+            self.layers.append(
+                ALIGNNConv(in_features, growth_rate, residual=False, norm=norm)
+            )
+
+        self.bottleneck_x = nn.Sequential(
+            norm(self.bottleneck_inputs),
+            nn.SiLU(),
+            nn.Linear(self.bottleneck_inputs, output_features, bias=False),
+        )
+        self.bottleneck_y = nn.Sequential(
+            norm(self.bottleneck_inputs),
+            nn.SiLU(),
+            nn.Linear(self.bottleneck_inputs, output_features, bias=False),
+        )
+
+    def forward(self, g, lg, x, y, z):
+        """ALIGNN updates: update node, edge, triplet features.
+
+        DenseNet style updates:
+        maintain a list of x, y, z features
+        and concatenate all previous feature maps
+        to form input for each layer
+        """
+        x_identity = x
+        xs = [x]
+        y_identity = y
+        ys = [y]
+        if self.layers > 0:
+            # z_identity = z
+            zs = [z]
+
+        for alignn_layer in self.alignn_layers:
+            new_x, new_y, new_z = alignn_layer(
+                g, lg, torch.cat(xs, 1), torch.cat(ys, 1), torch.cat(zs, 1)
+            )
+            xs.append(new_x)
+            ys.append(new_y)
+            zs.append(new_z)
+
+        x = self.bottleneck_x(torch.cat(xs, 1))
+        y = self.bottleneck_y(torch.cat(ys, 1))
+
+        # residual connections around graph dense graph convolution block
+        if self.residual:
+            x = x_identity + x
+            y = y_identity + y
+
+        return x, y
 
 
 class DenseALIGNN(nn.Module):
@@ -248,31 +407,24 @@ class DenseALIGNN(nn.Module):
             MLPLayer(config.embedding_features, config.initial_features, norm),
         )
 
-        self.alignn_layers = nn.ModuleList()
-        for idx in range(config.alignn_layers):
-            in_features = config.initial_features + idx * config.growth_rate
-            self.alignn_layers.append(
-                ALIGNNConv(
-                    in_features, config.growth_rate, residual=False, norm=norm
-                )
-            )
-
-        self.gcn_layers = nn.ModuleList()
-        initial_features = (
-            config.initial_features + config.growth_rate * config.alignn_layers
+        self.alignn_block = DenseALIGNNBlock(
+            n_layers=config.alignn_layers,
+            input_features=config.initial_features,
+            growth_rate=config.growth_rate,
+            output_features=config.bottleneck_features,
+            residual=config.residual,
+            norm=norm,
         )
 
-        for idx in range(config.gcn_layers):
-            in_features = initial_features + idx * config.growth_rate
-            self.gcn_layers.append(
-                EdgeGatedGraphConv(
-                    in_features,
-                    in_features,
-                    config.growth_rate,
-                    residual=False,
-                    norm=norm,
-                )
-            )
+        initial_features = config.initial_features
+        self.gcn_block = DenseGCNBlock(
+            n_layers=config.gcn_layers,
+            input_features=initial_features,
+            growth_rate=config.growth_rate,
+            output_features=config.bottleneck_features,
+            residual=config.residual,
+            norm=norm,
+        )
 
         self.readout = AvgPooling()
 
@@ -304,7 +456,7 @@ class DenseALIGNN(nn.Module):
             nn.init.kaiming_normal_(
                 m.weight, mode="fan_out", nonlinearity="relu"
             )
-            nn.init.constant_(m.bias, 0)
+            # nn.init.constant_(m.bias, 0)
 
     def forward(
         self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
@@ -332,41 +484,8 @@ class DenseALIGNN(nn.Module):
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
         y = self.edge_embedding(bondlength)
 
-        # ALIGNN updates: update node, edge, triplet features
-        # DenseNet style updates:
-        # maintain a list of x, y, z features
-        # and concatenate all previous feature maps
-        # to form input for each layer
-        x_identity = x
-        xs = [x]
-        y_identity = y
-        ys = [y]
-        if self.alignn_layers > 0:
-            # z_identity = z
-            zs = [z]
-
-        for alignn_layer in self.alignn_layers:
-            new_x, new_y, new_z = alignn_layer(
-                g, lg, torch.cat(xs, 1), torch.cat(ys, 1), torch.cat(zs, 1)
-            )
-            xs.append(new_x)
-            ys.append(new_y)
-            zs.append(new_z)
-
-        # residual connections around graph dense graph convolution block
-        x = x_identity + F.silu(torch.cat(xs, 1))
-        y = y_identity + F.silu(torch.cat(ys, 1))
-
-        # gated GCN updates: update node, edge features
-        x_identity = x
-        y_identity = y
-        xs, ys = [x], [y]
-        for gcn_layer in self.gcn_layers:
-            new_x, new_y = gcn_layer(g, torch.cat(xs, 1), torch.cat(ys, 1))
-            xs.append(new_x)
-            ys.append(new_y)
-
-        x = x_identity + F.silu(torch.cat(xs, 1))
+        x, y = self.dense_alignn_block(g, lg, x, y, z)
+        x, y = self.dense_gcn_block(g, x, y)
 
         # norm-activation-pool-classify
         h = self.readout(g, x)
