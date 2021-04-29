@@ -9,7 +9,6 @@ from typing import Optional
 import dgl
 import numpy as np
 import pandas as pd
-import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
@@ -150,7 +149,6 @@ def get_train_val_loaders(
     id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
     id_test = ids[-n_test:]
     # id_test = ids[-test_size:]
-
     if standardize:
         data.setup_standardizer(id_train)
 
@@ -196,4 +194,7 @@ def get_train_val_loaders(
         num_workers=workers,
         pin_memory=pin_memory,
     )
+    print("n_train:", len(train_loader.dataset))
+    print("n_val:", len(val_loader.dataset))
+    print("n_test:", len(test_loader.dataset))
     return train_loader, val_loader, test_loader, data.prepare_batch
