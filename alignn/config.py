@@ -52,9 +52,9 @@ class TrainingConfig(BaseSettings):
     n_val: Optional[int] = None
     n_test: Optional[int] = None
     n_train: Optional[int] = None
-    train_ratio: Optional[float] = None
-    val_ratio: Optional[float] = None
-    test_ratio: Optional[float] = None
+    train_ratio: Optional[float] = 0.8
+    val_ratio: Optional[float] = 0.1
+    test_ratio: Optional[float] = 0.1
     epochs: int = 100
     batch_size: int = 32
     weight_decay: float = 0
