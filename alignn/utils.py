@@ -11,4 +11,3 @@ class BaseSettings(PydanticBaseSettings):
         extra = "forbid"
         use_enum_values = True
         env_prefix = "jv_"
-       
