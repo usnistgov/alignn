@@ -8,10 +8,7 @@ then `tensorboard --logdir tb_logs/test` to monitor results...
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Union
-
 import ignite
-
-# import numpy as np
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.stores import EpochOutputStore
@@ -27,16 +24,13 @@ from ignite.engine import (
 from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
-
 from alignn import data, models
 from alignn.config import TrainingConfig
-from alignn.models.alignn import ALIGNN  # , ALIGNNConfig
-from alignn.models.cgcnn import CGCNN  # , CGCNNConfig
-from alignn.models.dense_alignn import DenseALIGNN  # , DenseALIGNNConfig
-from alignn.models.densegcn import DenseGCN  # , DenseGCNConfig
-
-# from alignn.models.gcn import SimpleGCN  # , SimpleGCNConfig
-from alignn.models.icgcnn import iCGCNN  # ICGCNNConfig  # , iCGCNN
+from alignn.models.alignn import ALIGNN
+from alignn.models.cgcnn import CGCNN
+from alignn.models.dense_alignn import DenseALIGNN
+from alignn.models.densegcn import DenseGCN
+from alignn.models.icgcnn import iCGCNN
 
 # torch config
 torch.set_default_dtype(torch.float32)
@@ -109,7 +103,12 @@ def train_dgl(
         line_graph = True
 
     # use input standardization for all real-valued feature sets
-    train_loader, val_loader, prepare_batch = data.get_train_val_loaders(
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        prepare_batch,
+    ) = data.get_train_val_loaders(
         dataset=config.dataset,
         target=config.target,
         n_train=config.n_train,

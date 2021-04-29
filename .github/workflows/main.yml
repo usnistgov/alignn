@@ -24,14 +24,14 @@ jobs:
 
     - name: Lint
       run: |
-        pip install flake8 pytest tqdm pandas pycodestyle pydocstyle numpy dgl==0.5.3 torch==1.7.1 jarvis-tools pytorch-ignite pydantic
+        pip install flake8 pytest pycodestyle pydocstyle
         pycodestyle --ignore E203,W503 --exclude=tests alignn
         pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count alignn
         flake8 --ignore E203,W503 --exclude=tests --statistics --count --exit-zero alignn
     - name: Test with pytest
       run: |
         export DGLBACKEND=pytorch
-        pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage numpy pandas torch==1.7.1 jarvis-tools dgl==0.5.3
+        pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage 
         echo 'pip freeze'
         pip freeze
         coverage run -m pytest

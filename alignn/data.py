@@ -82,9 +82,12 @@ def get_train_val_loaders(
     target: str = "formation_energy_peratom",
     atom_features: str = "atomic_number",
     neighbor_strategy: str = "k-nearest",
-    n_train: int = 32,
-    n_val: int = 32,
-    n_test: int = 32,
+    n_train=None,
+    n_val=None,
+    n_test=None,
+    train_ratio=None,
+    val_ratio=0.1,
+    test_ratio=0.1,
     batch_size: int = 8,
     standardize: bool = False,
     line_graph: bool = False,
@@ -110,31 +113,50 @@ def get_train_val_loaders(
         id_tag=id_tag,
     )
 
+    total_size = len(data.labels)
+    if (
+        train_ratio is None
+        and val_ratio is not None
+        and test_ratio is not None
+    ):
+        if train_ratio is None:
+            assert val_ratio + test_ratio < 1
+            train_ratio = 1 - val_ratio - test_ratio
+            print("Using rest of the dataset except the test and val sets.")
+        else:
+            assert train_ratio + val_ratio + test_ratio <= 1
+    # indices = list(range(total_size))
+    if n_train is None:
+        n_train = int(train_ratio * total_size)
+    if n_test is None:
+        n_test = int(test_ratio * total_size)
+    if n_val is None:
+        n_val = int(val_ratio * total_size)
+    ids = np.arange(total_size)
+
+    random.seed(split_seed)
+    random.shuffle(ids)
+    if n_train + n_val + n_test > total_size:
+        raise ValueError("Check total number of samples.")
+
     # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
     # i.e. shuffle the index in place with standard library random.shuffle
     # first obtain only valid indices
-    (ids,) = torch.where(torch.isfinite(data.labels))
-    random.seed(split_seed)
-    random.shuffle(ids)
 
-    N = len(ids)
-    train_size = round(N * 0.6)
-    val_size = round(N * 0.2)
     # test_size = round(N * 0.2)
 
     # full train/val test split
-    id_train = ids[:train_size]
-    id_val = ids[train_size : train_size + val_size]  # noqa:E203
+    id_train = ids[0:n_train]
+    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
+    id_test = ids[-n_test:]
     # id_test = ids[-test_size:]
-
-    id_train = id_train[:n_train]
-    id_val = id_val[:n_val]
 
     if standardize:
         data.setup_standardizer(id_train)
 
     train_data = Subset(data, id_train)
     val_data = Subset(data, id_val)
+    test_data = Subset(data, id_test)
 
     # id_train = ids[:n_train]
     # id_val = ids[-(n_val + n_test) : -n_test]
@@ -165,4 +187,13 @@ def get_train_val_loaders(
         pin_memory=pin_memory,
     )
 
-    return train_loader, val_loader, data.prepare_batch
+    test_loader = DataLoader(
+        test_data,
+        batch_size=batch_size,
+        shuffle=False,
+        collate_fn=collate_fn,
+        drop_last=True,
+        num_workers=workers,
+        pin_memory=pin_memory,
+    )
+    return train_loader, val_loader, test_loader, data.prepare_batch
