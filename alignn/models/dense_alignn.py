@@ -2,7 +2,7 @@
 
 A prototype crystal line graph network dgl implementation.
 """
-from typing import List, Optional, Tuple, Union
+from typing import Tuple, Union
 
 import dgl
 import dgl.function as fn

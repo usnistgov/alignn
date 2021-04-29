@@ -2,14 +2,15 @@
 
 A prototype crystal line graph network dgl implementation.
 """
-from typing import List, Optional, Tuple, Union
+from typing import Tuple, Union
 
 import dgl
 import dgl.function as fn
 import numpy as np
 import torch
 from dgl.nn import AvgPooling
-from dgl.nn.functional import edge_softmax
+
+# from dgl.nn.functional import edge_softmax
 from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F

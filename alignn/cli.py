@@ -4,7 +4,9 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+
+# from typing import Any, Dict, Optional, Union
+from typing import Optional
 
 import torch
 import typer

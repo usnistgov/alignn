@@ -2,7 +2,9 @@
 
 import random
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
+
+# from typing import Dict, List, Optional, Set, Tuple
 
 import dgl
 import numpy as np
@@ -89,6 +91,7 @@ def get_train_val_loaders(
     split_seed: int = 123,
     workers: int = 0,
     pin_memory: bool = True,
+    id_tag: str = "jid",
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     df = load_dataset(dataset, limit=None)
@@ -104,6 +107,7 @@ def get_train_val_loaders(
         target=target,
         atom_features=atom_features,
         line_graph=line_graph,
+        id_tag=id_tag,
     )
 
     # shuffle consistently with https://github.com/txie-93/cgcnn/data.py

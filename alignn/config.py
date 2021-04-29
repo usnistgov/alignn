@@ -3,11 +3,19 @@
 import subprocess
 from typing import Optional, Union
 
-from pydantic import Field, root_validator, validator
+from pydantic import root_validator
+
+# vfrom pydantic import Field, root_validator, validator
 from pydantic.typing import Literal
 
 from alignn import models
 from alignn.utils import BaseSettings
+from alignn.models.cgcnn import CGCNNConfig
+from alignn.models.icgcnn import ICGCNNConfig
+from alignn.models.gcn import SimpleGCNConfig
+from alignn.models.densegcn import DenseGCNConfig
+from alignn.models.alignn import ALIGNNConfig
+from alignn.models.dense_alignn import DenseALIGNNConfig
 
 VERSION = (
     subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
@@ -36,6 +44,7 @@ class TrainingConfig(BaseSettings):
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "basic"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
+    id_tag: Literal["jid", "id"] = "jid"
 
     # logging configuration
 
@@ -51,16 +60,17 @@ class TrainingConfig(BaseSettings):
     criterion: Literal["mse", "l1", "poisson", "zig"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
-
+    pin_memory: bool = True
+    num_workers: int = 4
     # model configuration
     model: Union[
-        models.CGCNNConfig,
-        models.ICGCNNConfig,
-        models.SimpleGCNConfig,
-        models.DenseGCNConfig,
-        models.ALIGNNConfig,
-        models.DenseALIGNNConfig,
-    ] = models.CGCNNConfig(name="cgcnn")
+        CGCNNConfig,
+        ICGCNNConfig,
+        SimpleGCNConfig,
+        DenseGCNConfig,
+        ALIGNNConfig,
+        DenseALIGNNConfig,
+    ] = CGCNNConfig(name="cgcnn")
 
     @root_validator()
     def set_input_size(cls, values):

@@ -7,15 +7,15 @@ then `tensorboard --logdir tb_logs/test` to monitor results...
 
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, Union
+from typing import Any, Dict, Union
 
 import ignite
-import numpy as np
+
+# import numpy as np
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.stores import EpochOutputStore
 from ignite.contrib.handlers.tensorboard_logger import (
-    OutputHandler,
     global_step_from_engine,
 )
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
@@ -30,6 +30,13 @@ from torch import nn
 
 from alignn import data, models
 from alignn.config import TrainingConfig
+from alignn.models.alignn import ALIGNN  # , ALIGNNConfig
+from alignn.models.cgcnn import CGCNN  # , CGCNNConfig
+from alignn.models.dense_alignn import DenseALIGNN  # , DenseALIGNNConfig
+from alignn.models.densegcn import DenseGCN  # , DenseGCNConfig
+
+# from alignn.models.gcn import SimpleGCN  # , SimpleGCNConfig
+from alignn.models.icgcnn import iCGCNN  # ICGCNNConfig  # , iCGCNN
 
 # torch config
 torch.set_default_dtype(torch.float32)
@@ -76,7 +83,7 @@ def setup_optimizer(params, config: TrainingConfig):
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
-    progress: bool = False,
+    progress: bool = True,
     checkpoint_dir: Path = Path("/tmp/models"),
     store_outputs: bool = True,
     log_tensorboard: bool = False,
@@ -103,6 +110,7 @@ def train_dgl(
 
     # use input standardization for all real-valued feature sets
     train_loader, val_loader, prepare_batch = data.get_train_val_loaders(
+        dataset=config.dataset,
         target=config.target,
         n_train=config.n_train,
         n_val=config.n_val,
@@ -111,17 +119,20 @@ def train_dgl(
         neighbor_strategy=config.neighbor_strategy,
         standardize=config.atom_features != "cgcnn",
         line_graph=line_graph,
+        id_tag=config.id_tag,
+        pin_memory=config.pin_memory,
+        workers=config.num_workers,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
 
     # define network, optimizer, scheduler
     _model = {
-        "cgcnn": models.CGCNN,
-        "icgcnn": models.iCGCNN,
-        "densegcn": models.DenseGCN,
-        "alignn": models.ALIGNN,
-        "dense_alignn": models.DenseALIGNN,
+        "cgcnn": CGCNN,
+        "icgcnn": iCGCNN,
+        "densegcn": DenseGCN,
+        "alignn": ALIGNN,
+        "dense_alignn": DenseALIGNN,
     }
     if model is None:
         net = _model.get(config.model.name)(config.model)
@@ -142,13 +153,13 @@ def train_dgl(
 
     elif config.scheduler == "onecycle":
         steps_per_epoch = len(train_loader)
-        pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
+        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
             epochs=config.epochs,
             steps_per_epoch=steps_per_epoch,
-            pct_start=pct_start,
+            # pct_start=pct_start,
         )
 
     # select configured loss function

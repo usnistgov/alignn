@@ -1,10 +1,10 @@
 """CGCNN: dgl implementation."""
 
-from typing import Optional, Tuple
-
+from typing import Tuple
 import dgl
 import dgl.function as fn
-import numpy as np
+
+# import numpy as np
 import torch
 import torch.nn.functional as F
 from dgl.nn import AvgPooling
