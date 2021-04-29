@@ -8,7 +8,6 @@ from pydantic import root_validator
 # vfrom pydantic import Field, root_validator, validator
 from pydantic.typing import Literal
 
-from alignn import models
 from alignn.utils import BaseSettings
 from alignn.models.cgcnn import CGCNNConfig
 from alignn.models.icgcnn import ICGCNNConfig
