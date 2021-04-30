@@ -21,6 +21,7 @@ from ignite.engine import (
     create_supervised_evaluator,
     create_supervised_trainer,
 )
+import numpy as np
 from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
@@ -77,10 +78,8 @@ def setup_optimizer(params, config: TrainingConfig):
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
-    progress: bool = True,
     checkpoint_dir: Path = Path("/tmp/models"),
-    store_outputs: bool = True,
-    log_tensorboard: bool = False,
+    # log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
 
@@ -88,9 +87,14 @@ def train_dgl(
     if passed as a dict with matching keys, pydantic validation is used
     """
     if type(config) is dict:
-        config = TrainingConfig(**config)
+        try:
+            config = TrainingConfig(**config)
+        except Exception as exp:
+            print("Check", exp)
 
     deterministic = False
+    print("config:")
+    print(config)
     if config.random_seed is not None:
         deterministic = True
         ignite.utils.manual_seed(config.random_seed)
@@ -125,6 +129,7 @@ def train_dgl(
         id_tag=config.id_tag,
         pin_memory=config.pin_memory,
         workers=config.num_workers,
+        save_dataloader=config.save_dataloader,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
@@ -228,7 +233,7 @@ def train_dgl(
     )
     trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
 
-    if progress:
+    if config.progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
 
@@ -237,7 +242,7 @@ def train_dgl(
         "validation": {m: [] for m in metrics.keys()},
     }
 
-    if store_outputs:
+    if config.store_outputs:
         # log_results handler will save epoch output
         # in history["EOS"]
         eos = EpochOutputStore()
@@ -258,12 +263,12 @@ def train_dgl(
             history["train"][metric].append(tmetrics[metric])
             history["validation"][metric].append(vmetrics[metric])
 
-        if store_outputs:
+        if config.store_outputs:
             history["EOS"] = eos.data
             history["trainEOS"] = train_eos.data
 
     # optionally log results to tensorboard
-    if log_tensorboard:
+    if config.log_tensorboard:
 
         tb_logger = TensorboardLogger(log_dir="tb_logs/test")
         for tag, evaluator in [
@@ -281,10 +286,68 @@ def train_dgl(
     # train the model!
     trainer.run(train_loader, max_epochs=config.epochs)
 
-    if log_tensorboard:
+    if config.log_tensorboard:
         test_loss = evaluator.state.metrics["loss"]
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
+    if config.write_predictions:
+        net.eval()
+        f = open("prediction_results_test_set.csv", "w")
+        f.write("id,target,prediction\n")
+        with torch.no_grad():
+            ids = test_loader.dataset.dataset.ids[test_loader.dataset.indices]
+            for dat, id in zip(test_loader, ids):
+                g, lg, target = dat
+                out_data = net([g.to(device), lg.to(device)])
+                out_data = out_data.cpu().numpy().tolist()
+                target = target.cpu().numpy().flatten().tolist()
+                if len(target) == 1:
+                    target = target[0]
+                f.write("%s, %6f, %6f\n" % (id, target, out_data))
+        f.close()
+        if config.store_outputs:
+            x = []
+            y = []
+            for i in history["EOS"]:
+                x.append(i[0].cpu().numpy().tolist())
+                y.append(i[1].cpu().numpy().tolist())
+            x = np.array(x, dtype="float").flatten()
+            y = np.array(y, dtype="float").flatten()
+            f = open("prediction_results_train_set.csv", "w")
+            # TODO: Add IDs
+            f.write("target,prediction\n")
+            for i, j in zip(x, y):
+                f.write("%6f, %6f\n" % (j, i))
+                line = str(i) + "," + str(j) + "\n"
+                f.write(line)
+            f.close()
+
+    # TODO: Fix IDs for train loader
+    """
+    if config.write_train_predictions:
+        net.eval()
+        f = open("train_prediction_results.csv", "w")
+        f.write("id,target,prediction\n")
+        with torch.no_grad():
+            ids = train_loader.dataset.dataset.ids[
+                train_loader.dataset.indices
+            ]
+            print("lens", len(ids), len(train_loader.dataset.dataset))
+            x = []
+            y = []
+
+            for dat, id in zip(train_loader, ids):
+                g, lg, target = dat
+                out_data = net([g.to(device), lg.to(device)])
+                out_data = out_data.cpu().numpy().tolist()
+                target = target.cpu().numpy().flatten().tolist()
+                for i, j in zip(out_data, target):
+                    x.append(i)
+                    y.append(j)
+            for i, j, k in zip(ids, x, y):
+                f.write("%s, %6f, %6f\n" % (i, j, k))
+        f.close()
+    """
 
     return history
 

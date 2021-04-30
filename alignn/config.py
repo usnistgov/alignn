@@ -15,6 +15,7 @@ from alignn.models.gcn import SimpleGCNConfig
 from alignn.models.densegcn import DenseGCNConfig
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.dense_alignn import DenseALIGNNConfig
+from typing import List
 
 VERSION = (
     subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
@@ -41,14 +42,15 @@ class TrainingConfig(BaseSettings):
     # dataset configuration
     dataset: Literal["dft_3d", "dft_2d", "megnet", "qm9"] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
-    atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "basic"
+    atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
     id_tag: Literal["jid", "id"] = "jid"
 
     # logging configuration
 
     # training configuration
-    random_seed: Optional[int] = None
+    random_seed: Optional[int] = 123
+    # target_range: Optional[List] = None
     n_val: Optional[int] = None
     n_test: Optional[int] = None
     n_train: Optional[int] = None
@@ -64,6 +66,11 @@ class TrainingConfig(BaseSettings):
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
     pin_memory: bool = True
+    save_dataloader: bool = False
+    write_predictions: bool = True
+    store_outputs: bool = True
+    progress: bool = True
+    log_tensorboard: bool = False
     num_workers: int = 4
     # model configuration
     model: Union[

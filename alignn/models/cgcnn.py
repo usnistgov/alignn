@@ -20,11 +20,11 @@ class CGCNNConfig(BaseSettings):
 
     name: Literal["cgcnn"]
     conv_layers: int = 3
-    atom_input_features: int = 1
-    edge_features: int = 16
+    atom_input_features: int = 92
+    edge_features: int = 41
     node_features: int = 64
     fc_layers: int = 1
-    fc_features: int = 64
+    fc_features: int = 128
     output_features: int = 1
 
     # if link == log, apply `exp` to final outputs
