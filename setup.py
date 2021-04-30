@@ -17,7 +17,7 @@ setuptools.setup(
     install_requires=[
         "numpy>=1.20.2",
         "scipy>=1.6.3",
-        "jarvis-tools>=2021.4.28",
+        "jarvis-tools>=2021.4.29",
         "torch>=1.7.1",
         "dgl-cu101>=0.6.0",
         "dgl>=0.6.0",

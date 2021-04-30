@@ -31,7 +31,7 @@ config = {
 }
 
 
-def test_cgcnn_ignite():
+def test_models():
     """Test CGCNN end to end training."""
     config["model"]["name"] = "dense_alignn"
     t1 = time.time()
@@ -68,6 +68,36 @@ def test_cgcnn_ignite():
     print()
     print()
 
+    """
+
+    config["model"]["name"] = "simplegcn"
+    config["write_predictions"] = False
+    config["save_dataloader"] = False
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+    """
+
+    config["model"]["name"] = "densegcn"
+    config["write_predictions"] = False
+    config["save_dataloader"] = False
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    """
     x = []
     y = []
     for i in result["EOS"]:
@@ -80,3 +110,7 @@ def test_cgcnn_ignite():
     plt.ylabel("ML")
     plt.savefig("compare.png")
     plt.close()
+    """
+
+
+# test_models()

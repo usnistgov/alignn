@@ -3,6 +3,7 @@
 A prototype crystal line graph network dgl implementation.
 """
 from typing import Tuple, Union
+
 # from typing import List, Optional, Tuple, Union
 import dgl
 import dgl.function as fn
@@ -35,7 +36,7 @@ class DenseALIGNNConfig(BaseSettings):
     # fc_layers: int = 1
     # fc_features: int = 64
     output_features: int = 1
-    norm: Literal["batchnorm", "layernorm"] = "batchnorm"
+    norm: Literal["batchnorm", "layernorm"] = "layernorm"
 
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
