@@ -45,6 +45,7 @@ def load_graphs(
     cutoff: float = 8,
     max_neighbors: int = 12,
     cachedir: Optional[Path] = Path("data"),
+    use_canonize: bool = False,
 ):
     """Construct crystal graphs.
 
@@ -68,6 +69,7 @@ def load_graphs(
             atom_features="atomic_number",
             max_neighbors=max_neighbors,
             compute_line_graph=False,
+            use_canonize=use_canonize,
         )
 
     if cachedir is not None:
@@ -105,6 +107,7 @@ def get_train_val_loaders(
     save_dataloader: bool = True,
     filename: str = "sample",
     id_tag: str = "jid",
+    use_canonize: bool = False,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     train_sample = filename + "_train.data"
@@ -134,6 +137,7 @@ def get_train_val_loaders(
             df,
             name=dataset,
             neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
         )
 
         data = StructureDataset(

@@ -71,6 +71,7 @@ class TrainingConfig(BaseSettings):
     store_outputs: bool = True
     progress: bool = True
     log_tensorboard: bool = False
+    use_canonize: bool = False
     num_workers: int = 4
     # model configuration
     model: Union[

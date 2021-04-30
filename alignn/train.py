@@ -130,6 +130,7 @@ def train_dgl(
         pin_memory=config.pin_memory,
         workers=config.num_workers,
         save_dataloader=config.save_dataloader,
+        use_canonize=config.use_canonize,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
