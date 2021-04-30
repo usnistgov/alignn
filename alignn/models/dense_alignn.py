@@ -4,6 +4,7 @@ A prototype crystal line graph network dgl implementation.
 """
 from typing import Tuple, Union
 
+# from typing import List, Optional, Tuple, Union
 import dgl
 import dgl.function as fn
 import numpy as np
@@ -22,20 +23,20 @@ class DenseALIGNNConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.dense_alignn."""
 
     name: Literal["dense_alignn"]
-    alignn_layers: int = 2
+    alignn_layers: int = 3
     gcn_layers: int = 3
-    atom_input_features: int = 1
-    edge_input_features: int = 40
-    triplet_input_features: int = 180
-    embedding_features: int = 64
-    initial_features: int = 16
-    bottleneck_features: int = 16
+    atom_input_features: int = 92
+    edge_input_features: int = 92
+    triplet_input_features: int = 40
+    embedding_features: int = 128
+    initial_features: int = 128
+    bottleneck_features: int = 128
     residual: bool = True
-    growth_rate: int = 16
-    fc_layers: int = 1
-    fc_features: int = 64
+    growth_rate: int = 128
+    # fc_layers: int = 1
+    # fc_features: int = 64
     output_features: int = 1
-    norm: Literal["batchnorm", "layernorm"] = "batchnorm"
+    norm: Literal["batchnorm", "layernorm"] = "layernorm"
 
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
@@ -390,6 +391,7 @@ class DenseALIGNN(nn.Module):
                 vmin=0,
                 vmax=8.0,
                 bins=config.edge_input_features,
+                lengthscale=0.5,
             ),
             MLPLayer(
                 config.edge_input_features, config.embedding_features, norm
@@ -398,8 +400,8 @@ class DenseALIGNN(nn.Module):
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
-                vmin=-1,
-                vmax=1.0,
+                vmin=-np.pi,
+                vmax=np.pi,
                 bins=config.triplet_input_features,
             ),
             MLPLayer(
@@ -447,7 +449,9 @@ class DenseALIGNN(nn.Module):
         elif config.link == "logit":
             self.link = torch.sigmoid
 
-        self.apply(self.reset_parameters)
+        # Kaiming initialization not working out
+        # stick with default Glorot
+        # self.apply(self.reset_parameters)
 
     @staticmethod
     def reset_parameters(m):

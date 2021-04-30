@@ -6,6 +6,8 @@ from typing import Optional
 
 # from typing import Dict, List, Optional, Set, Tuple
 
+import os
+import torch
 import dgl
 import numpy as np
 import pandas as pd
@@ -19,9 +21,16 @@ from tqdm import tqdm
 tqdm.pandas()
 
 
-def load_dataset(name: str = "dft_3d", limit: Optional[int] = None):
+def load_dataset(
+    name: str = "dft_3d", target=None, limit: Optional[int] = None
+):
     """Load jarvis data."""
     d = jdata(name)
+    data = []
+    for i in d:
+        if i[target] != "na":
+            data.append(i)
+    d = data
     if limit is not None:
         d = d[:limit]
     d = pd.DataFrame(d)
@@ -36,6 +45,7 @@ def load_graphs(
     cutoff: float = 8,
     max_neighbors: int = 12,
     cachedir: Optional[Path] = Path("data"),
+    use_canonize: bool = False,
 ):
     """Construct crystal graphs.
 
@@ -59,6 +69,7 @@ def load_graphs(
             atom_features="atomic_number",
             max_neighbors=max_neighbors,
             compute_line_graph=False,
+            use_canonize=use_canonize,
         )
 
     if cachedir is not None:
@@ -93,108 +104,148 @@ def get_train_val_loaders(
     split_seed: int = 123,
     workers: int = 0,
     pin_memory: bool = True,
+    save_dataloader: bool = True,
+    filename: str = "sample",
     id_tag: str = "jid",
+    use_canonize: bool = False,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
-    df = load_dataset(dataset, limit=None)
-    graphs = load_graphs(
-        df,
-        name=dataset,
-        neighbor_strategy=neighbor_strategy,
-    )
+    train_sample = filename + "_train.data"
+    val_sample = filename + "_val.data"
+    test_sample = filename + "_test.data"
 
-    data = StructureDataset(
-        df,
-        graphs,
-        target=target,
-        atom_features=atom_features,
-        line_graph=line_graph,
-        id_tag=id_tag,
-    )
-
-    total_size = len(data.labels)
     if (
-        train_ratio is None
-        and val_ratio is not None
-        and test_ratio is not None
+        os.path.exists(train_sample)
+        and os.path.exists(val_sample)
+        and os.path.exists(test_sample)
+        and save_dataloader
     ):
-        if train_ratio is None:
-            assert val_ratio + test_ratio < 1
-            train_ratio = 1 - val_ratio - test_ratio
-            print("Using rest of the dataset except the test and val sets.")
-        else:
-            assert train_ratio + val_ratio + test_ratio <= 1
-    # indices = list(range(total_size))
-    if n_train is None:
-        n_train = int(train_ratio * total_size)
-    if n_test is None:
-        n_test = int(test_ratio * total_size)
-    if n_val is None:
-        n_val = int(val_ratio * total_size)
-    ids = np.arange(total_size)
+        print("Loading from saved file...")
+        print("Make sure all the DataLoader params are same.")
+        print("This module is made for debugging only.")
+        train_loader = torch.load(train_sample)
+        val_loader = torch.load(val_sample)
+        test_loader = torch.load(test_sample)
+        # print("train", len(train_loader.dataset))
+        # print("val", len(val_loader.dataset))
+        # print("test", len(test_loader.dataset))
+    else:
+        df = load_dataset(name=dataset, target=target, limit=None)
+        vals = df[target].values
+        print("data range", np.max(vals), np.min(vals))
+        graphs = load_graphs(
+            df,
+            name=dataset,
+            neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
+        )
 
-    random.seed(split_seed)
-    random.shuffle(ids)
-    if n_train + n_val + n_test > total_size:
-        raise ValueError("Check total number of samples.")
+        data = StructureDataset(
+            df,
+            graphs,
+            target=target,
+            atom_features=atom_features,
+            line_graph=line_graph,
+            id_tag=id_tag,
+        )
 
-    # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
-    # i.e. shuffle the index in place with standard library random.shuffle
-    # first obtain only valid indices
+        total_size = len(data.labels)
+        if (
+            train_ratio is None
+            and val_ratio is not None
+            and test_ratio is not None
+        ):
+            if train_ratio is None:
+                assert val_ratio + test_ratio < 1
+                train_ratio = 1 - val_ratio - test_ratio
+                print(
+                    "Using rest of the dataset except the test and val sets."
+                )
+            else:
+                assert train_ratio + val_ratio + test_ratio <= 1
+        # indices = list(range(total_size))
+        if n_train is None:
+            n_train = int(train_ratio * total_size)
+        if n_test is None:
+            n_test = int(test_ratio * total_size)
+        if n_val is None:
+            n_val = int(val_ratio * total_size)
+        ids = np.arange(total_size)
 
-    # test_size = round(N * 0.2)
+        random.seed(split_seed)
+        random.shuffle(ids)
+        if n_train + n_val + n_test > total_size:
+            raise ValueError("Check total number of samples.")
 
-    # full train/val test split
-    id_train = ids[0:n_train]
-    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
-    id_test = ids[-n_test:]
-    # id_test = ids[-test_size:]
-    if standardize:
-        data.setup_standardizer(id_train)
+        # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
+        # i.e. shuffle the index in place with standard library random.shuffle
+        # first obtain only valid indices
 
-    train_data = Subset(data, id_train)
-    val_data = Subset(data, id_val)
-    test_data = Subset(data, id_test)
+        # test_size = round(N * 0.2)
 
-    # id_train = ids[:n_train]
-    # id_val = ids[-(n_val + n_test) : -n_test]
-    # # id_test = ids[:-n_test]
+        # full train/val test split
+        id_train = ids[:n_train]
+        id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
+        id_test = ids[-n_test:]
+        # id_test = ids[-test_size:]
+        # if standardize:
+        #    data.setup_standardizer(id_train)
 
-    collate_fn = data.collate
-    if line_graph:
-        collate_fn = data.collate_line_graph
+        train_data = Subset(data, id_train)
+        val_data = Subset(data, id_val)
+        test_data = Subset(data, id_test)
+        # print ('id_train',id_train)
+        # train_data = data[id_train]
+        # val_data = data[id_val]
+        # test_data = data[id_test]
+        # id_train = ids[:n_train]
+        # id_val = ids[-(n_val + n_test) : -n_test]
+        # # id_test = ids[:-n_test]
 
-    # use a regular pytorch dataloader
-    train_loader = DataLoader(
-        train_data,
-        batch_size=batch_size,
-        shuffle=True,
-        collate_fn=collate_fn,
-        drop_last=True,
-        num_workers=workers,
-        pin_memory=pin_memory,
-    )
+        collate_fn = data.collate
+        if line_graph:
+            collate_fn = data.collate_line_graph
 
-    val_loader = DataLoader(
-        val_data,
-        batch_size=batch_size,
-        shuffle=False,
-        collate_fn=collate_fn,
-        drop_last=True,
-        num_workers=workers,
-        pin_memory=pin_memory,
-    )
+        # use a regular pytorch dataloader
+        train_loader = DataLoader(
+            train_data,
+            batch_size=batch_size,
+            shuffle=True,
+            collate_fn=collate_fn,
+            drop_last=True,
+            num_workers=workers,
+            pin_memory=pin_memory,
+        )
 
-    test_loader = DataLoader(
-        test_data,
-        batch_size=batch_size,
-        shuffle=False,
-        collate_fn=collate_fn,
-        drop_last=True,
-        num_workers=workers,
-        pin_memory=pin_memory,
-    )
+        val_loader = DataLoader(
+            val_data,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=collate_fn,
+            drop_last=True,
+            num_workers=workers,
+            pin_memory=pin_memory,
+        )
+
+        test_loader = DataLoader(
+            test_data,
+            batch_size=1,
+            shuffle=False,
+            collate_fn=collate_fn,
+            drop_last=False,
+            num_workers=workers,
+            pin_memory=pin_memory,
+        )
+        if save_dataloader:
+            torch.save(train_loader, train_sample)
+            torch.save(val_loader, val_sample)
+            torch.save(test_loader, test_sample)
     print("n_train:", len(train_loader.dataset))
     print("n_val:", len(val_loader.dataset))
     print("n_test:", len(test_loader.dataset))
-    return train_loader, val_loader, test_loader, data.prepare_batch
+    return (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_loader.dataset.dataset.prepare_batch,
+    )
