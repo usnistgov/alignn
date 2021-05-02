@@ -15,6 +15,8 @@ from alignn.models.gcn import SimpleGCNConfig
 from alignn.models.densegcn import DenseGCNConfig
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.dense_alignn import DenseALIGNNConfig
+from alignn.models.alignn_cgcnn import ACGCNNConfig
+
 # from typing import List
 
 VERSION = (
@@ -28,6 +30,36 @@ FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "cgcnn": 92}
 TARGET_ENUM = Literal[
     "formation_energy_peratom",
     "optb88vdw_bandgap",
+    "bulk_modulus_kv",
+    "shear_modulus_gv",
+    "mbj_bandgap",
+    "slme",
+    "magmom_oszicar",
+    "spillage",
+    "kpoint_length_unit",
+    "encut",
+    "optb88vdw_total_energy",
+    "epsx",
+    "epsy",
+    "epsz",
+    "mepsx",
+    "mepsy",
+    "mepsz",
+    "max_ir_mode",
+    "min_ir_mode",
+    "n-Seebeck",
+    "p-Seebeck",
+    "n-powerfact",
+    "p-powerfact",
+    "ncond",
+    "pcond",
+    "nkappa",
+    "pkappa",
+    "ehull",
+    "exfoliation_energy",
+    "dfpt_piezo_max_dielectric",
+    "dfpt_piezo_max_eij",
+    "dfpt_piezo_max_dij",
     "gap pbe",
     "e_form",
     "U0",
@@ -49,7 +81,7 @@ class TrainingConfig(BaseSettings):
     # logging configuration
 
     # training configuration
-    random_seed: Optional[int] = 123
+    random_seed: int = 123
     # target_range: Optional[List] = None
     n_val: Optional[int] = None
     n_test: Optional[int] = None
@@ -81,6 +113,7 @@ class TrainingConfig(BaseSettings):
         DenseGCNConfig,
         ALIGNNConfig,
         DenseALIGNNConfig,
+        ACGCNNConfig,
     ] = CGCNNConfig(name="cgcnn")
 
     @root_validator()

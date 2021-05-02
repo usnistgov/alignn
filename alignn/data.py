@@ -16,6 +16,7 @@ from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
+import math
 
 # use pandas progress_apply
 tqdm.pandas()
@@ -28,13 +29,13 @@ def load_dataset(
     d = jdata(name)
     data = []
     for i in d:
-        if i[target] != "na":
+        if i[target] != "na" and not math.isnan(i[target]):
             data.append(i)
     d = data
     if limit is not None:
         d = d[:limit]
     d = pd.DataFrame(d)
-    d = d.replace("na", np.nan)
+    # d = d.replace("na", np.nan)
     return d
 
 
