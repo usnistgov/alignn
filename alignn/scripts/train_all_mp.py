@@ -15,13 +15,14 @@ props = [
 cwd_home = os.getcwd()
 for i in props:
     model_name = "mp_" + i + "_alignn"
+    model_name = model_name.replace(" ", "")
     if not os.path.exists(model_name):
         os.makedirs(model_name)
     os.chdir(model_name)
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(prop="'
+        + 'train_prop_model \ntrain_prop_model(dataset="megnet",prop="'
     )
 
     line = tmp + i + '")\n'

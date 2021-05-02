@@ -62,6 +62,10 @@ TARGET_ENUM = Literal[
     "dfpt_piezo_max_dij",
     "gap pbe",
     "e_form",
+    "mu_b",
+    "bulk modulus",
+    "shear modulus",
+    "elastic anisotropy",
     "U0",
 ]
 
