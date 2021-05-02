@@ -67,6 +67,20 @@ TARGET_ENUM = Literal[
     "shear modulus",
     "elastic anisotropy",
     "U0",
+    "mu",
+    "alpha",
+    "homo",
+    "lumo",
+    "gap",
+    "r2",
+    "zpve",
+    "U",
+    "H",
+    "G",
+    "Cv",
+    "A",
+    "B",
+    "C",
 ]
 
 

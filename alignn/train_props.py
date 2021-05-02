@@ -1,8 +1,10 @@
 """Helper function for high-throughput GNN trainings."""
 import matplotlib.pyplot as plt
+
 # import numpy as np
 import time
 from alignn.train import train_dgl
+
 # from sklearn.metrics import mean_absolute_error
 plt.switch_backend("agg")
 
@@ -62,6 +64,17 @@ def train_prop_model(
             "name": name,
         },
     }
+    if dataset == "megnet":
+        config["id_tag"] = "id"
+        if prop == "e_form" or prop == "gap pbe":
+            config["n_train"] = 60000
+            config["n_val"] = 5000
+            config["n_test"] = 4237
+    if dataset == "qm9":
+        config["id_tag"] = "id"
+        config["n_train"] = 110000
+        config["n_val"] = 10000
+        config["n_test"] = 13885
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
