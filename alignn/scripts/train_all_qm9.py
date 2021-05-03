@@ -45,6 +45,7 @@ for i in props:
         job_line=job_line,
         jobname=model_name,
         directory=directory,
+        cores=None,
         submit_cmd=submit_cmd,
         memory="30G",
         filename=model_name,
