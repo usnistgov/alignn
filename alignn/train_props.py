@@ -58,7 +58,7 @@ def train_prop_model(
         "criterion": "mse",
         "optimizer": "adamw",
         "scheduler": "onecycle",
-        "write_predictions": False,
+        "write_predictions": write_predictions,
         "num_workers": 0,
         "model": {
             "name": name,
