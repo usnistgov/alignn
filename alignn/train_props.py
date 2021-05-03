@@ -70,12 +70,13 @@ def train_prop_model(
             config["n_train"] = 60000
             config["n_val"] = 5000
             config["n_test"] = 4237
-            config["batch_size"] = 64
+            config["batch_size"] = 128
     if dataset == "qm9":
         config["id_tag"] = "id"
         config["n_train"] = 110000
         config["n_val"] = 10000
         config["n_test"] = 13885
+        config["batch_size"] = 128
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
