@@ -298,7 +298,7 @@ def train_dgl(
         f = open("prediction_results_test_set.csv", "w")
         f.write("id,target,prediction\n")
         with torch.no_grad():
-            ids = test_loader.dataset.dataset.ids[test_loader.dataset.indices]
+            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
                 out_data = net([g.to(device), lg.to(device)])

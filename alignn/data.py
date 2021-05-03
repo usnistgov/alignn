@@ -14,7 +14,7 @@ import pandas as pd
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import math
 
@@ -45,7 +45,7 @@ def load_graphs(
     neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
     max_neighbors: int = 12,
-    cachedir: Optional[Path] = Path("data"),
+    cachedir: Optional[Path] = None,
     use_canonize: bool = False,
 ):
     """Construct crystal graphs.
@@ -86,6 +86,87 @@ def load_graphs(
             dgl.save_graphs(str(cachefile), graphs.tolist())
 
     return graphs
+
+
+def get_id_train_val_test(
+    total_size=1000,
+    split_seed=123,
+    train_ratio=None,
+    val_ratio=0.1,
+    test_ratio=0.1,
+    n_train=None,
+    n_test=None,
+    n_val=None,
+):
+    """Get train, val, test IDs."""
+    if (
+        train_ratio is None
+        and val_ratio is not None
+        and test_ratio is not None
+    ):
+        if train_ratio is None:
+            assert val_ratio + test_ratio < 1
+            train_ratio = 1 - val_ratio - test_ratio
+            print("Using rest of the dataset except the test and val sets.")
+        else:
+            assert train_ratio + val_ratio + test_ratio <= 1
+    # indices = list(range(total_size))
+    if n_train is None:
+        n_train = int(train_ratio * total_size)
+    if n_test is None:
+        n_test = int(test_ratio * total_size)
+    if n_val is None:
+        n_val = int(val_ratio * total_size)
+    ids = list(np.arange(total_size))
+
+    random.seed(split_seed)
+    random.shuffle(ids)
+    if n_train + n_val + n_test > total_size:
+        raise ValueError("Check total number of samples.")
+
+    # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
+    # i.e. shuffle the index in place with standard library random.shuffle
+    # first obtain only valid indices
+
+    # test_size = round(N * 0.2)
+
+    # full train/val test split
+    id_train = ids[:n_train]
+    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
+    id_test = ids[-n_test:]
+    return id_train, id_val, id_test
+
+
+def get_torch_dataset(
+    dataset=[],
+    id_tag="jid",
+    target="",
+    neighbor_strategy="",
+    atom_features="",
+    use_canonize="",
+    name="",
+    line_graph="",
+):
+    """Get Torch Dataset."""
+    df = pd.DataFrame(dataset)
+    vals = df[target].values
+    print("data range", np.max(vals), np.min(vals))
+    graphs = load_graphs(
+        df,
+        name=name,
+        neighbor_strategy=neighbor_strategy,
+        use_canonize=use_canonize,
+    )
+
+    data = StructureDataset(
+        df,
+        graphs,
+        target=target,
+        atom_features=atom_features,
+        line_graph=line_graph,
+        id_tag=id_tag,
+    )
+    return data
 
 
 def get_train_val_loaders(
@@ -131,81 +212,65 @@ def get_train_val_loaders(
         # print("val", len(val_loader.dataset))
         # print("test", len(test_loader.dataset))
     else:
-        df = load_dataset(name=dataset, target=target, limit=None)
-        vals = df[target].values
-        print("data range", np.max(vals), np.min(vals))
-        graphs = load_graphs(
-            df,
-            name=dataset,
-            neighbor_strategy=neighbor_strategy,
-            use_canonize=use_canonize,
-        )
 
-        data = StructureDataset(
-            df,
-            graphs,
-            target=target,
-            atom_features=atom_features,
-            line_graph=line_graph,
-            id_tag=id_tag,
-        )
+        d = jdata(dataset)
+        dat = []
+        for i in d:
+            if i[target] != "na" and not math.isnan(i[target]):
+                dat.append(i)
 
-        total_size = len(data.labels)
-        if (
-            train_ratio is None
-            and val_ratio is not None
-            and test_ratio is not None
-        ):
-            if train_ratio is None:
-                assert val_ratio + test_ratio < 1
-                train_ratio = 1 - val_ratio - test_ratio
-                print(
-                    "Using rest of the dataset except the test and val sets."
-                )
-            else:
-                assert train_ratio + val_ratio + test_ratio <= 1
-        # indices = list(range(total_size))
-        if n_train is None:
-            n_train = int(train_ratio * total_size)
-        if n_test is None:
-            n_test = int(test_ratio * total_size)
-        if n_val is None:
-            n_val = int(val_ratio * total_size)
-        ids = np.arange(total_size)
-
-        random.seed(split_seed)
-        random.shuffle(ids)
-        if n_train + n_val + n_test > total_size:
-            raise ValueError("Check total number of samples.")
-
-        # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
-        # i.e. shuffle the index in place with standard library random.shuffle
-        # first obtain only valid indices
-
-        # test_size = round(N * 0.2)
-
-        # full train/val test split
-        id_train = ids[:n_train]
-        id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
-        id_test = ids[-n_test:]
         # id_test = ids[-test_size:]
         # if standardize:
         #    data.setup_standardizer(id_train)
+        id_train, id_val, id_test = get_id_train_val_test(
+            total_size=len(dat),
+            split_seed=split_seed,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            n_train=n_train,
+            n_test=n_test,
+            n_val=n_val,
+        )
 
-        train_data = Subset(data, id_train)
-        val_data = Subset(data, id_val)
-        test_data = Subset(data, id_test)
-        # print ('id_train',id_train)
-        # train_data = data[id_train]
-        # val_data = data[id_val]
-        # test_data = data[id_test]
-        # id_train = ids[:n_train]
-        # id_val = ids[-(n_val + n_test) : -n_test]
-        # # id_test = ids[:-n_test]
+        dataset_train = [dat[x] for x in id_train]
+        dataset_val = [dat[x] for x in id_val]
+        dataset_test = [dat[x] for x in id_test]
 
-        collate_fn = data.collate
+        train_data = get_torch_dataset(
+            dataset=dataset_train,
+            id_tag=id_tag,
+            atom_features=atom_features,
+            target=target,
+            neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
+            name=dataset,
+            line_graph=line_graph,
+        )
+        val_data = get_torch_dataset(
+            dataset=dataset_val,
+            id_tag=id_tag,
+            atom_features=atom_features,
+            target=target,
+            neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
+            name=dataset,
+            line_graph=line_graph,
+        )
+        test_data = get_torch_dataset(
+            dataset=dataset_test,
+            id_tag=id_tag,
+            atom_features=atom_features,
+            target=target,
+            neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
+            name=dataset,
+            line_graph=line_graph,
+        )
+
+        collate_fn = train_data.collate
         if line_graph:
-            collate_fn = data.collate_line_graph
+            collate_fn = train_data.collate_line_graph
 
         # use a regular pytorch dataloader
         train_loader = DataLoader(
@@ -248,5 +313,5 @@ def get_train_val_loaders(
         train_loader,
         val_loader,
         test_loader,
-        train_loader.dataset.dataset.prepare_batch,
+        train_loader.dataset.prepare_batch,
     )

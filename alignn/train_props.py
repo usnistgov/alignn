@@ -59,7 +59,7 @@ def train_prop_model(
         "optimizer": "adamw",
         "scheduler": "onecycle",
         "write_predictions": False,
-        "num_workers": 4,
+        "num_workers": 0,
         "model": {
             "name": name,
         },
@@ -70,6 +70,7 @@ def train_prop_model(
             config["n_train"] = 60000
             config["n_val"] = 5000
             config["n_test"] = 4237
+            config["batch_size"] = 64
     if dataset == "qm9":
         config["id_tag"] = "id"
         config["n_train"] = 110000

@@ -115,14 +115,14 @@ class TrainingConfig(BaseSettings):
     criterion: Literal["mse", "l1", "poisson", "zig"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
-    pin_memory: bool = True
+    pin_memory: bool = False
     save_dataloader: bool = False
     write_predictions: bool = True
     store_outputs: bool = True
     progress: bool = True
     log_tensorboard: bool = False
     use_canonize: bool = False
-    num_workers: int = 4
+    num_workers: int = 0
     # model configuration
     model: Union[
         CGCNNConfig,
