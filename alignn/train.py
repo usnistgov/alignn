@@ -32,6 +32,7 @@ from alignn.models.cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
+from alignn.models.alignn_cgcnn import ACGCNN
 
 # torch config
 torch.set_default_dtype(torch.float32)
@@ -78,7 +79,7 @@ def setup_optimizer(params, config: TrainingConfig):
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
-    checkpoint_dir: Path = Path("/tmp/models"),
+    checkpoint_dir: Path = Path("./"),
     # log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -100,7 +101,7 @@ def train_dgl(
         ignite.utils.manual_seed(config.random_seed)
 
     line_graph = False
-    alignn_models = {"alignn", "dense_alignn"}
+    alignn_models = {"alignn", "dense_alignn", "alignn_cgcnn"}
     if config.model.name == "clgn":
         line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
@@ -142,6 +143,7 @@ def train_dgl(
         "densegcn": DenseGCN,
         "alignn": ALIGNN,
         "dense_alignn": DenseALIGNN,
+        "alignn_cgcnn": ACGCNN,
     }
     if model is None:
         net = _model.get(config.model.name)(config.model)
@@ -296,7 +298,7 @@ def train_dgl(
         f = open("prediction_results_test_set.csv", "w")
         f.write("id,target,prediction\n")
         with torch.no_grad():
-            ids = test_loader.dataset.dataset.ids[test_loader.dataset.indices]
+            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
                 out_data = net([g.to(device), lg.to(device)])
