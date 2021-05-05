@@ -90,6 +90,7 @@ def train_dgl(
     if type(config) is dict:
         try:
             config = TrainingConfig(**config)
+            print(config)
         except Exception as exp:
             print("Check", exp)
 

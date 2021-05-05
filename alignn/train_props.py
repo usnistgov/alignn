@@ -45,7 +45,11 @@ jv_3d_props = [
 
 
 def train_prop_model(
-    prop="", dataset="dft_3d", write_predictions=True, name="alignn"
+    prop="",
+    dataset="dft_3d",
+    write_predictions=True,
+    name="alignn",
+    save_dataloader=True,
 ):
     """Train models for a dataset and a property."""
     config = {
@@ -58,12 +62,17 @@ def train_prop_model(
         "criterion": "mse",
         "optimizer": "adamw",
         "scheduler": "onecycle",
+        "scheduler": "onecycle",
+        "save_dataloader": save_dataloader,
+        "pin_memory": False,
         "write_predictions": write_predictions,
         "num_workers": 0,
         "model": {
             "name": name,
         },
     }
+    if dataset == "jv_3d":
+        config["batch_size"] = 512
     if dataset == "megnet":
         config["id_tag"] = "id"
         if prop == "e_form" or prop == "gap pbe":
