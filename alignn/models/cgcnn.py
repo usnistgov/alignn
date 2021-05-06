@@ -251,10 +251,9 @@ class CGCNN(nn.Module):
         elif config.link == "logit":
             self.link = torch.sigmoid
 
-    def forward(
-        self, g: dgl.DGLGraph, mode=Literal["train", "predict"]
-    ) -> torch.Tensor:
+    def forward(self, g) -> torch.Tensor:
         """CGCNN function mapping graph to outputs."""
+        g, lg = g
         g = g.local_var()
 
         # fixed edge features: RBF-expanded bondlengths

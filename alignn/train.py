@@ -105,6 +105,8 @@ def train_dgl(
     alignn_models = {"alignn", "dense_alignn", "alignn_cgcnn"}
     if config.model.name == "clgn":
         line_graph = True
+    if config.model.name == "cgcnn":
+        line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
         line_graph = True
 
@@ -298,6 +300,8 @@ def train_dgl(
         net.eval()
         f = open("prediction_results_test_set.csv", "w")
         f.write("id,target,prediction\n")
+        targets = []
+        predictions = []
         with torch.no_grad():
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
@@ -308,7 +312,15 @@ def train_dgl(
                 if len(target) == 1:
                     target = target[0]
                 f.write("%s, %6f, %6f\n" % (id, target, out_data))
+                targets.append(target)
+                predictions.append(out_data)
         f.close()
+        from sklearn.metrics import mean_absolute_error
+
+        print(
+            "Test MAE:",
+            mean_absolute_error(np.array(targets), np.array(predictions)),
+        )
         if config.store_outputs:
             x = []
             y = []
