@@ -38,7 +38,7 @@ for i in props:
         directory=directory,
         cores=None,
         submit_cmd=submit_cmd,
-        memory="30G",
+        memory="90G",
         filename=model_name,
         queue="singlegpu,batch,interactive",
         walltime="50:00:00",

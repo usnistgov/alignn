@@ -45,7 +45,11 @@ jv_3d_props = [
 
 
 def train_prop_model(
-    prop="", dataset="dft_3d", write_predictions=True, name="alignn"
+    prop="",
+    dataset="dft_3d",
+    write_predictions=True,
+    name="alignn",
+    save_dataloader=True,
 ):
     """Train models for a dataset and a property."""
     config = {
@@ -58,12 +62,20 @@ def train_prop_model(
         "criterion": "mse",
         "optimizer": "adamw",
         "scheduler": "onecycle",
+        "scheduler": "onecycle",
+        "save_dataloader": save_dataloader,
+        "pin_memory": False,
         "write_predictions": write_predictions,
         "num_workers": 0,
         "model": {
             "name": name,
         },
     }
+    if dataset == "jv_3d":
+        config["batch_size"] = 256
+        # config["save_dataloader"]=True
+        config["num_workers"] = 4
+        config["pin_memory"] = False
     if dataset == "megnet":
         config["id_tag"] = "id"
         if prop == "e_form" or prop == "gap pbe":
@@ -71,12 +83,15 @@ def train_prop_model(
             config["n_val"] = 5000
             config["n_test"] = 4237
             config["batch_size"] = 128
+            config["num_workers"] = 4
     if dataset == "qm9":
         config["id_tag"] = "id"
         config["n_train"] = 110000
         config["n_val"] = 10000
         config["n_test"] = 13885
         config["batch_size"] = 128
+        config["cutoff"] = 5.0
+        config["max_neighbors"] = 9
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()

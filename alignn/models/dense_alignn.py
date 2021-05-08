@@ -26,13 +26,13 @@ class DenseALIGNNConfig(BaseSettings):
     alignn_layers: int = 3
     gcn_layers: int = 3
     atom_input_features: int = 92
-    edge_input_features: int = 92
+    edge_input_features: int = 81
     triplet_input_features: int = 40
-    embedding_features: int = 128
-    initial_features: int = 128
-    bottleneck_features: int = 128
+    embedding_features: int = 92
+    initial_features: int = 92
+    bottleneck_features: int = 92
     residual: bool = True
-    growth_rate: int = 128
+    growth_rate: int = 64
     # fc_layers: int = 1
     # fc_features: int = 64
     output_features: int = 1
@@ -42,6 +42,7 @@ class DenseALIGNNConfig(BaseSettings):
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
+    classification: bool = False
 
     @root_validator()
     def ensure_residual_dimensions_match(cls, values):
@@ -377,7 +378,7 @@ class DenseALIGNN(nn.Module):
         """Initialize class with number of input features, conv layers."""
         super().__init__()
         print(config)
-
+        self.classification = config.classification
         norm = {"batchnorm": nn.BatchNorm1d, "layernorm": nn.LayerNorm}[
             config.norm
         ]
@@ -434,7 +435,13 @@ class DenseALIGNN(nn.Module):
 
         self.readout = AvgPooling()
 
-        self.fc = nn.Linear(config.bottleneck_features, config.output_features)
+        if self.classification:
+            self.fc = nn.Linear(config.bottleneck_features, 2)
+            self.softmax = nn.LogSoftmax(dim=1)
+        else:
+            self.fc = nn.Linear(
+                config.bottleneck_features, config.output_features
+            )
 
         self.link = None
         self.link_name = config.link
@@ -497,5 +504,8 @@ class DenseALIGNN(nn.Module):
 
         if self.link:
             out = self.link(out)
+        if self.classification:
+            # out = torch.round(torch.sigmoid(out))
+            out = self.softmax(out)
 
         return torch.squeeze(out)

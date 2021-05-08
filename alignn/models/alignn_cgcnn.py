@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from dgl.nn import AvgPooling
 from pydantic.typing import Literal
 from torch import nn
+
 # import torch
 from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
@@ -47,6 +48,7 @@ class ACGCNNConfig(BaseSettings):
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
+    classification: bool = False
 
     class Config:
         """Configure model settings behavior."""
@@ -151,7 +153,7 @@ class ACGCNN(nn.Module):
         self.atom_embedding = nn.Linear(
             config.atom_input_features, config.node_features
         )
-
+        self.classification = config.classification
         self.conv_layers1 = nn.ModuleList(
             [
                 ACGCNNConv(config.node_features, config.edge_features)
@@ -183,10 +185,19 @@ class ACGCNN(nn.Module):
                 2.1,
                 dtype=torch.float,
             )
+            if self.classification:
+                raise ValueError(
+                    "Classification not implemented with ZIG loss."
+                )
         else:
             self.zero_inflated = False
-            self.fc_out = nn.Linear(config.fc_features, config.output_features)
-
+            if self.classification:
+                self.fc_out = nn.Linear(config.fc_features, 2)
+                self.softmax = nn.LogSoftmax(dim=1)
+            else:
+                self.fc_out = nn.Linear(
+                    config.fc_features, config.output_features
+                )
         self.link = None
         self.link_name = config.link
         if config.link == "identity":
@@ -248,7 +259,9 @@ class ACGCNN(nn.Module):
             out = self.fc_out(features)
             if self.link:
                 out = self.link(out)
-
+        if self.classification:
+            # out = torch.round(torch.sigmoid(out))
+            out = self.softmax(out)
         return torch.squeeze(out)
 
 

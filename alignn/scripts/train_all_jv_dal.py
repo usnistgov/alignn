@@ -5,35 +5,49 @@ from jarvis.tasks.queue_jobs import Queue
 # d=data('dft_3d')
 
 props = [
-    "mu",
-    "alpha",
-    "homo",
-    "lumo",
-    "gap",
-    "r2",
-    "zpve",
-    "U0",
-    "U",
-    "H",
-    "G",
-    "Cv",
-    "A",
-    "B",
-    "C",
+    "formation_energy_peratom",
+    "optb88vdw_bandgap",
+    "bulk_modulus_kv",
+    "shear_modulus_gv",
+    "mbj_bandgap",
+    "slme",
+    "magmom_oszicar",
+    "spillage",
+    "kpoint_length_unit",
+    "encut",
+    "optb88vdw_total_energy",
+    "epsx",
+    "epsy",
+    "epsz",
+    "mepsx",
+    "mepsy",
+    "mepsz",
+    "max_ir_mode",
+    "min_ir_mode",
+    "n-Seebeck",
+    "p-Seebeck",
+    "n-powerfact",
+    "p-powerfact",
+    "ncond",
+    "pcond",
+    "nkappa",
+    "pkappa",
+    "ehull",
+    "exfoliation_energy",
+    "dfpt_piezo_max_dielectric",
+    "dfpt_piezo_max_eij",
+    "dfpt_piezo_max_dij",
 ]
 cwd_home = os.getcwd()
 for i in props:
-    model_name = "qm9_" + i + "_alignn"
-    model_name = model_name.replace(" ", "")
-    if not os.path.exists(model_name):
-        os.makedirs(model_name)
+    model_name = "jv_" + i + "_dense_alignn"
+    os.makedirs(model_name)
     os.chdir(model_name)
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(dataset="qm9",prop="'
+        + 'train_prop_model \ntrain_prop_model(name="dense_alignn",prop="'
     )
-
     line = tmp + i + '")\n'
     f.write(line)
     f.close()
@@ -45,9 +59,9 @@ for i in props:
         job_line=job_line,
         jobname=model_name,
         directory=directory,
-        cores=None,
         submit_cmd=submit_cmd,
         memory="90G",
+        cores=None,
         filename=model_name,
         queue="singlegpu,batch,interactive",
         walltime="50:00:00",

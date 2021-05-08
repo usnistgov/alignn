@@ -14,14 +14,15 @@ config = {
     "dataset": "dft_2d",
     "target": "formation_energy_peratom",
     # "target": "optb88vdw_bandgap",
-    "n_train": 10,
-    "n_test": 5,
-    "n_val": 5,
+    "n_train": 50,
+    "n_test": 25,
+    "n_val": 25,
+    "num_workers": 0,
     "atom_features": "cgcnn",
     "neighbor_strategy": "k-nearest",
-    "epochs": 3,
+    "epochs": 2,
     "save_dataloader": False,
-    "batch_size": 4,
+    "batch_size": 10,
     "weight_decay": 1e-05,
     "learning_rate": 0.01,
     "criterion": "mse",
@@ -71,6 +72,98 @@ def test_models():
     print()
     print()
 
+    config["model"]["name"] = "densegcn"
+    config["write_predictions"] = False
+    config["save_dataloader"] = False
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    config["model"]["name"] = "icgcnn"
+    config["write_predictions"] = False
+    config["save_dataloader"] = False
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    config["model"]["name"] = "alignn_cgcnn"
+    config["write_predictions"] = False
+    config["save_dataloader"] = False
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    # Classification
+    config["model"]["name"] = "dense_alignn"
+    config["classification_threshold"] = 0.0
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Toal time:", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    config["model"]["name"] = "alignn"
+    config["classification_threshold"] = 0.0
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    config["model"]["name"] = "cgcnn"
+    config["write_predictions"] = False
+    config["save_dataloader"] = False
+    config["classification_threshold"] = 0.0
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    config["model"]["name"] = "alignn_cgcnn"
+    config["write_predictions"] = False
+    config["save_dataloader"] = False
+    config["classification_threshold"] = 0.0
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
     """
 
     config["model"]["name"] = "simplegcn"
@@ -86,20 +179,6 @@ def test_models():
     print()
     print()
     """
-
-    config["model"]["name"] = "densegcn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
     """
     x = []
     y = []

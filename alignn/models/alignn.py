@@ -23,13 +23,13 @@ class ALIGNNConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.alignn."""
 
     name: Literal["alignn"]
-    alignn_layers: int = 3
-    gcn_layers: int = 3
+    alignn_layers: int = 2
+    gcn_layers: int = 2
     atom_input_features: int = 92
-    edge_input_features: int = 92
+    edge_input_features: int = 80
     triplet_input_features: int = 40
-    embedding_features: int = 92
-    hidden_features: int = 92
+    embedding_features: int = 64
+    hidden_features: int = 256
     # fc_layers: int = 1
     # fc_features: int = 64
     output_features: int = 1
@@ -38,6 +38,7 @@ class ALIGNNConfig(BaseSettings):
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
+    classification: bool = False
 
     class Config:
         """Configure model settings behavior."""
@@ -195,6 +196,7 @@ class ALIGNN(nn.Module):
         """Initialize class with number of input features, conv layers."""
         super().__init__()
         print(config)
+        self.classification = config.classification
 
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
@@ -239,8 +241,11 @@ class ALIGNN(nn.Module):
 
         self.readout = AvgPooling()
 
-        self.fc = nn.Linear(config.hidden_features, config.output_features)
-
+        if self.classification:
+            self.fc = nn.Linear(config.hidden_features, 2)
+            self.softmax = nn.LogSoftmax(dim=1)
+        else:
+            self.fc = nn.Linear(config.hidden_features, config.output_features)
         self.link = None
         self.link_name = config.link
         if config.link == "identity":
@@ -295,4 +300,7 @@ class ALIGNN(nn.Module):
         if self.link:
             out = self.link(out)
 
+        if self.classification:
+            # out = torch.round(torch.sigmoid(out))
+            out = self.softmax(out)
         return torch.squeeze(out)
