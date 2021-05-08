@@ -72,14 +72,17 @@ def train_prop_model(
         },
     }
     if dataset == "jv_3d":
-        config["batch_size"] = 512
+        config["batch_size"] = 256
+        # config["save_dataloader"]=True
+        config["num_workers"] = 4
+        config["pin_memory"] = False
     if dataset == "megnet":
         config["id_tag"] = "id"
         if prop == "e_form" or prop == "gap pbe":
             config["n_train"] = 60000
             config["n_val"] = 5000
             config["n_test"] = 4237
-            config["batch_size"] = 128
+            config["batch_size"] = 64
     if dataset == "qm9":
         config["id_tag"] = "id"
         config["n_train"] = 110000

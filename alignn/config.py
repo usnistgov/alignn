@@ -107,10 +107,11 @@ class TrainingConfig(BaseSettings):
     train_ratio: Optional[float] = 0.8
     val_ratio: Optional[float] = 0.1
     test_ratio: Optional[float] = 0.1
-    epochs: int = 100
-    batch_size: int = 32
+    epochs: int = 200
+    batch_size: int = 64
     weight_decay: float = 0
     learning_rate: float = 1e-2
+    filename: str = "sample"
     warmup_steps: int = 2000
     criterion: Literal["mse", "l1", "poisson", "zig"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
@@ -121,8 +122,8 @@ class TrainingConfig(BaseSettings):
     store_outputs: bool = True
     progress: bool = True
     log_tensorboard: bool = False
-    use_canonize: bool = False
-    num_workers: int = 0
+    use_canonize: bool = True
+    num_workers: int = 4
     # model configuration
     model: Union[
         CGCNNConfig,

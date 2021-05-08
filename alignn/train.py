@@ -135,6 +135,7 @@ def train_dgl(
         workers=config.num_workers,
         save_dataloader=config.save_dataloader,
         use_canonize=config.use_canonize,
+        filename=config.filename,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
@@ -174,6 +175,7 @@ def train_dgl(
             epochs=config.epochs,
             steps_per_epoch=steps_per_epoch,
             # pct_start=pct_start,
+            pct_start=0.3,
         )
 
     # select configured loss function
@@ -238,10 +240,10 @@ def train_dgl(
         global_step_transform=lambda *_: trainer.state.epoch,
     )
     trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
-
     if config.progress:
         pbar = ProgressBar()
-        pbar.attach(trainer, output_transform=lambda x: {"loss": x})
+        pbar.attach(trainer, output_transform=lambda x: {"mae": x})
+        # pbar.attach(evaluator,output_transform=lambda x: {"mae": x})
 
     history = {
         "train": {m: [] for m in metrics.keys()},
@@ -272,6 +274,10 @@ def train_dgl(
         if config.store_outputs:
             history["EOS"] = eos.data
             history["trainEOS"] = train_eos.data
+        if config.progress:
+            pbar = ProgressBar()
+            pbar.log_message(f"Val_MAE: {vmetrics['mae']:.4f}")
+            pbar.log_message(f"Train_MAE: {tmetrics['mae']:.4f}")
 
     # optionally log results to tensorboard
     if config.log_tensorboard:

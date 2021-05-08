@@ -208,6 +208,18 @@ def get_train_val_loaders(
         train_loader = torch.load(train_sample)
         val_loader = torch.load(val_sample)
         test_loader = torch.load(test_sample)
+        if train_loader.pin_memory != pin_memory:
+            train_loader.pin_memory = pin_memory
+        if test_loader.pin_memory != pin_memory:
+            test_loader.pin_memory = pin_memory
+        if val_loader.pin_memory != pin_memory:
+            val_loader.pin_memory = pin_memory
+        if train_loader.num_workers != workers:
+            train_loader.num_workers = workers
+        if test_loader.num_workers != workers:
+            test_loader.num_workers = workers
+        if val_loader.num_workers != workers:
+            val_loader.num_workers = workers
         # print("train", len(train_loader.dataset))
         # print("val", len(val_loader.dataset))
         # print("test", len(test_loader.dataset))

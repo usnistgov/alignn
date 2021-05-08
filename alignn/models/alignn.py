@@ -23,13 +23,13 @@ class ALIGNNConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.alignn."""
 
     name: Literal["alignn"]
-    alignn_layers: int = 4
-    gcn_layers: int = 4
+    alignn_layers: int = 2
+    gcn_layers: int = 2
     atom_input_features: int = 92
-    edge_input_features: int = 92
+    edge_input_features: int = 80
     triplet_input_features: int = 40
-    embedding_features: int = 92
-    hidden_features: int = 92
+    embedding_features: int = 64
+    hidden_features: int = 256
     # fc_layers: int = 1
     # fc_features: int = 64
     output_features: int = 1
