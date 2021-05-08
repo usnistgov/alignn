@@ -124,6 +124,9 @@ class TrainingConfig(BaseSettings):
     log_tensorboard: bool = False
     use_canonize: bool = True
     num_workers: int = 4
+    cutoff: float = 8.0
+    max_neighbors: int = 12
+
     # model configuration
     model: Union[
         CGCNNConfig,

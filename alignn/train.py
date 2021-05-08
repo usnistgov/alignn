@@ -136,6 +136,8 @@ def train_dgl(
         save_dataloader=config.save_dataloader,
         use_canonize=config.use_canonize,
         filename=config.filename,
+        cutoff=config.cutoff,
+        max_neighbors=config.max_neighbors,
     )
 
     prepare_batch = partial(prepare_batch, device=device)

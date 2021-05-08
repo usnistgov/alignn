@@ -146,6 +146,8 @@ def get_torch_dataset(
     use_canonize="",
     name="",
     line_graph="",
+    cutoff=8.0,
+    max_neighbors=12,
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
@@ -156,6 +158,8 @@ def get_torch_dataset(
         name=name,
         neighbor_strategy=neighbor_strategy,
         use_canonize=use_canonize,
+        cutoff=cutoff,
+        max_neighbors=max_neighbors,
     )
 
     data = StructureDataset(
@@ -190,6 +194,8 @@ def get_train_val_loaders(
     filename: str = "sample",
     id_tag: str = "jid",
     use_canonize: bool = False,
+    cutoff: float = 8.0,
+    max_neighbors: int = 12,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     train_sample = filename + "_train.data"
@@ -258,6 +264,8 @@ def get_train_val_loaders(
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
         )
         val_data = get_torch_dataset(
             dataset=dataset_val,
@@ -268,6 +276,8 @@ def get_train_val_loaders(
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
         )
         test_data = get_torch_dataset(
             dataset=dataset_test,
@@ -278,6 +288,8 @@ def get_train_val_loaders(
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
         )
 
         collate_fn = train_data.collate
