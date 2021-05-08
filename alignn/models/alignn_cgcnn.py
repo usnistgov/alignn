@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from dgl.nn import AvgPooling
 from pydantic.typing import Literal
 from torch import nn
+
 # import torch
 from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
@@ -47,6 +48,7 @@ class ACGCNNConfig(BaseSettings):
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
+    classification: bool = False
 
     class Config:
         """Configure model settings behavior."""

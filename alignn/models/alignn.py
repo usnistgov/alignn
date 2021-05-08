@@ -38,6 +38,7 @@ class ALIGNNConfig(BaseSettings):
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
+    classification: bool = False
 
     class Config:
         """Configure model settings behavior."""
@@ -195,6 +196,7 @@ class ALIGNN(nn.Module):
         """Initialize class with number of input features, conv layers."""
         super().__init__()
         print(config)
+        self.classification = config.classification
 
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
@@ -239,8 +241,11 @@ class ALIGNN(nn.Module):
 
         self.readout = AvgPooling()
 
-        self.fc = nn.Linear(config.hidden_features, config.output_features)
-
+        if self.classification:
+            self.fc = nn.Linear(config.hidden_features, 2)
+            self.softmax = nn.LogSoftmax(dim=1)
+        else:
+            self.fc = nn.Linear(config.hidden_features, config.output_features)
         self.link = None
         self.link_name = config.link
         if config.link == "identity":
@@ -295,4 +300,7 @@ class ALIGNN(nn.Module):
         if self.link:
             out = self.link(out)
 
+        if self.classification:
+            # out = torch.round(torch.sigmoid(out))
+            out = self.softmax(out)
         return torch.squeeze(out)

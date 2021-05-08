@@ -31,6 +31,7 @@ class CGCNNConfig(BaseSettings):
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
+    classification: bool = False
 
     class Config:
         """Configure model settings behavior."""
@@ -202,7 +203,7 @@ class CGCNN(nn.Module):
     def __init__(self, config: CGCNNConfig = CGCNNConfig(name="cgcnn")):
         """Set up CGCNN modules."""
         super().__init__()
-
+        self.classification = config.classification
         self.rbf = RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_features)
         self.atom_embedding = nn.Linear(
             config.atom_input_features, config.node_features
@@ -233,9 +234,19 @@ class CGCNN(nn.Module):
                 2.1,
                 dtype=torch.float,
             )
+            if self.classification:
+                raise ValueError(
+                    "Classification not implemented for zero_inflated"
+                )
         else:
             self.zero_inflated = False
-            self.fc_out = nn.Linear(config.fc_features, config.output_features)
+            if self.classification:
+                self.fc_out = nn.Linear(config.fc_features, 2)
+                self.softmax = nn.LogSoftmax(dim=1)
+            else:
+                self.fc_out = nn.Linear(
+                    config.fc_features, config.output_features
+                )
 
         self.link = None
         self.link_name = config.link
@@ -293,6 +304,9 @@ class CGCNN(nn.Module):
             out = self.fc_out(features)
             if self.link:
                 out = self.link(out)
+        if self.classification:
+            # out = torch.round(torch.sigmoid(out))
+            out = self.softmax(out)
 
         return torch.squeeze(out)
 

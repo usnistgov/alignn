@@ -21,6 +21,15 @@ from ignite.engine import (
     create_supervised_evaluator,
     create_supervised_trainer,
 )
+from ignite.contrib.metrics import ROC_AUC, RocCurve
+from ignite.metrics import (
+    Accuracy,
+    Precision,
+    Recall,
+    Loss,
+    RunningAverage,
+    ConfusionMatrix,
+)
 import numpy as np
 from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
@@ -33,6 +42,7 @@ from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
 from alignn.models.alignn_cgcnn import ACGCNN
+from jarvis.db.jsonutils import dumpjson
 
 # torch config
 torch.set_default_dtype(torch.float32)
@@ -40,6 +50,22 @@ torch.set_default_dtype(torch.float32)
 device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
+
+
+def activated_output_transform(output):
+    """Exponentiate output."""
+    y_pred, y = output
+    y_pred = torch.exp(y_pred)
+    y_pred = y_pred[:, 1]
+    return y_pred, y
+
+
+def thresholded_output_transform(output):
+    """Round off output."""
+    y_pred, y = output
+    y_pred = torch.round(torch.exp(y_pred))
+    # print ('output',y_pred)
+    return y_pred, y
 
 
 def group_decay(model):
@@ -89,14 +115,18 @@ def train_dgl(
     """
     if type(config) is dict:
         try:
-            config = TrainingConfig(**config)
             print(config)
+            config = TrainingConfig(**config)
         except Exception as exp:
             print("Check", exp)
 
     deterministic = False
+    classification = False
     print("config:")
     print(config)
+    if config.classification_threshold is not None:
+        classification = True
+
     if config.random_seed is not None:
         deterministic = True
         ignite.utils.manual_seed(config.random_seed)
@@ -106,6 +136,8 @@ def train_dgl(
     if config.model.name == "clgn":
         line_graph = True
     if config.model.name == "cgcnn":
+        line_graph = True
+    if config.model.name == "icgcnn":
         line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
         line_graph = True
@@ -138,10 +170,12 @@ def train_dgl(
         filename=config.filename,
         cutoff=config.cutoff,
         max_neighbors=config.max_neighbors,
+        classification_threshold=config.classification_threshold,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
-
+    if classification:
+        config.model.classification = True
     # define network, optimizer, scheduler
     _model = {
         "cgcnn": CGCNN,
@@ -191,6 +225,7 @@ def train_dgl(
 
     # set up training engine and evaluators
     metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
+
     if config.criterion == "zig":
 
         def zig_prediction_transform(x):
@@ -204,6 +239,23 @@ def train_dgl(
             ),
         }
 
+    if classification:
+        criterion = nn.NLLLoss()
+
+        metrics = {
+            "accuracy": Accuracy(
+                output_transform=thresholded_output_transform
+            ),
+            "precision": Precision(
+                output_transform=thresholded_output_transform
+            ),
+            "recall": Recall(output_transform=thresholded_output_transform),
+            "rocauc": ROC_AUC(output_transform=activated_output_transform),
+            "roccurve": RocCurve(output_transform=activated_output_transform),
+            "confmat": ConfusionMatrix(
+                output_transform=thresholded_output_transform, num_classes=2
+            ),
+        }
     trainer = create_supervised_trainer(
         net,
         optimizer,
@@ -244,7 +296,7 @@ def train_dgl(
     trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
     if config.progress:
         pbar = ProgressBar()
-        pbar.attach(trainer, output_transform=lambda x: {"mae": x})
+        pbar.attach(trainer, output_transform=lambda x: {"loss": x})
         # pbar.attach(evaluator,output_transform=lambda x: {"mae": x})
 
     history = {
@@ -270,16 +322,35 @@ def train_dgl(
         tmetrics = train_evaluator.state.metrics
         vmetrics = evaluator.state.metrics
         for metric in metrics.keys():
-            history["train"][metric].append(tmetrics[metric])
-            history["validation"][metric].append(vmetrics[metric])
+            tm = tmetrics[metric]
+            vm = vmetrics[metric]
+            if metric == "roccurve":
+                tm = [k.tolist() for k in tm]
+                vm = [k.tolist() for k in vm]
+            if isinstance(tm, torch.Tensor):
+                tm = tm.cpu().numpy().tolist()
+                vm = vm.cpu().numpy().tolist()
+
+            history["train"][metric].append(tm)
+            history["validation"][metric].append(vm)
+
+        # for metric in metrics.keys():
+        #    history["train"][metric].append(tmetrics[metric])
+        #    history["validation"][metric].append(vmetrics[metric])
 
         if config.store_outputs:
             history["EOS"] = eos.data
             history["trainEOS"] = train_eos.data
+            dumpjson(filename="history_val.json", data=history["validation"])
+            dumpjson(filename="history_train.json", data=history["train"])
         if config.progress:
             pbar = ProgressBar()
-            pbar.log_message(f"Val_MAE: {vmetrics['mae']:.4f}")
-            pbar.log_message(f"Train_MAE: {tmetrics['mae']:.4f}")
+            if not classification:
+                pbar.log_message(f"Val_MAE: {vmetrics['mae']:.4f}")
+                pbar.log_message(f"Train_MAE: {tmetrics['mae']:.4f}")
+            else:
+                pbar.log_message(f"Train ROC AUC: {tmetrics['rocauc']:.4f}")
+                pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
 
     # optionally log results to tensorboard
     if config.log_tensorboard:
@@ -304,7 +375,33 @@ def train_dgl(
         test_loss = evaluator.state.metrics["loss"]
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
-    if config.write_predictions:
+    if config.write_predictions and classification:
+        net.eval()
+        f = open("prediction_results_test_set.csv", "w")
+        f.write("id,target,prediction\n")
+        targets = []
+        predictions = []
+        with torch.no_grad():
+            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+            for dat, id in zip(test_loader, ids):
+                g, lg, target = dat
+                out_data = net([g.to(device), lg.to(device)])
+                # out_data = torch.exp(out_data.cpu())
+                top_p, top_class = torch.topk(torch.exp(out_data), k=1)
+                target = int(target.cpu().numpy().flatten().tolist()[0])
+
+                f.write("%s, %d, %d\n" % (id, (target), (top_class)))
+                targets.append(target)
+                predictions.append(top_class)
+        f.close()
+        from sklearn.metrics import roc_auc_score
+
+        print(
+            "Test ROCAUC:",
+            roc_auc_score(np.array(targets), np.array(predictions)),
+        )
+
+    if config.write_predictions and not classification:
         net.eval()
         f = open("prediction_results_test_set.csv", "w")
         f.write("id,target,prediction\n")
@@ -329,7 +426,7 @@ def train_dgl(
             "Test MAE:",
             mean_absolute_error(np.array(targets), np.array(predictions)),
         )
-        if config.store_outputs:
+        if config.store_outputs and not classification:
             x = []
             y = []
             for i in history["EOS"]:

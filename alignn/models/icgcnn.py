@@ -31,6 +31,7 @@ class ICGCNNConfig(BaseSettings):
     # to constrain predictions to be positive
     logscale: bool = False
     hurdle: bool = False
+    classification: bool = False
 
     class Config:
         """Configure model settings behavior."""
@@ -242,7 +243,7 @@ class iCGCNN(nn.Module):
         self.atom_embedding = nn.Linear(
             config.atom_input_features, config.node_features
         )
-
+        self.classification = config.classification
         self.conv_layers = nn.ModuleList(
             [
                 iCGCNNConv(config.node_features, config.edge_features)
@@ -256,11 +257,17 @@ class iCGCNN(nn.Module):
             nn.Linear(config.node_features, config.fc_features), nn.Softplus()
         )
 
-        self.fc_out = nn.Linear(config.fc_features, config.output_features)
+        if self.classification:
+            self.fc_out = nn.Linear(config.fc_features, 2)
+            self.softmax = nn.LogSoftmax(dim=1)
+        else:
+            self.fc_out = nn.Linear(config.fc_features, config.output_features)
+
         self.logscale = config.logscale
 
-    def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
+    def forward(self, g) -> torch.Tensor:
         """CGCNN function mapping graph to outputs."""
+        g, lg = g
         g = g.local_var()
 
         # fixed edge features: RBF-expanded bondlengths
@@ -285,5 +292,8 @@ class iCGCNN(nn.Module):
 
         if self.logscale:
             out = torch.exp(out)
+        if self.classification:
+            # out = torch.round(torch.sigmoid(out))
+            out = self.softmax(out)
 
         return torch.squeeze(out)

@@ -23,13 +23,27 @@ tqdm.pandas()
 
 
 def load_dataset(
-    name: str = "dft_3d", target=None, limit: Optional[int] = None
+    name: str = "dft_3d",
+    target=None,
+    limit: Optional[int] = None,
+    classification_threshold: Optional[float] = None,
 ):
     """Load jarvis data."""
     d = jdata(name)
     data = []
     for i in d:
         if i[target] != "na" and not math.isnan(i[target]):
+            if classification_threshold is not None:
+                if i[target] <= classification_threshold:
+                    i[target] = 0
+                elif i[target] > classification_threshold:
+                    i[target] = 1
+                else:
+                    raise ValueError(
+                        "Check classification data type.",
+                        i[target],
+                        type(i[target]),
+                    )
             data.append(i)
     d = data
     if limit is not None:
@@ -122,7 +136,12 @@ def get_id_train_val_test(
     random.seed(split_seed)
     random.shuffle(ids)
     if n_train + n_val + n_test > total_size:
-        raise ValueError("Check total number of samples.")
+        raise ValueError(
+            "Check total number of samples.",
+            n_train + n_val + n_test,
+            ">",
+            total_size,
+        )
 
     # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
     # i.e. shuffle the index in place with standard library random.shuffle
@@ -148,6 +167,7 @@ def get_torch_dataset(
     line_graph="",
     cutoff=8.0,
     max_neighbors=12,
+    classification=False,
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
@@ -169,6 +189,7 @@ def get_torch_dataset(
         atom_features=atom_features,
         line_graph=line_graph,
         id_tag=id_tag,
+        classification=classification,
     )
     return data
 
@@ -196,6 +217,7 @@ def get_train_val_loaders(
     use_canonize: bool = False,
     cutoff: float = 8.0,
     max_neighbors: int = 12,
+    classification_threshold: Optional[float] = None,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     train_sample = filename + "_train.data"
@@ -233,9 +255,29 @@ def get_train_val_loaders(
 
         d = jdata(dataset)
         dat = []
+        if classification_threshold is not None:
+            print(
+                "Using ",
+                classification_threshold,
+                " for classifying ",
+                target,
+                " data.",
+            )
+            print("Converting target data into 1 and 0.")
         for i in d:
             if i[target] != "na" and not math.isnan(i[target]):
-                dat.append(i)
+                if classification_threshold is not None:
+                    if i[target] <= classification_threshold:
+                        i[target] = 0
+                    elif i[target] > classification_threshold:
+                        i[target] = 1
+                    else:
+                        raise ValueError(
+                            "Check classification data type.",
+                            i[target],
+                            type(i[target]),
+                        )
+            dat.append(i)
 
         # id_test = ids[-test_size:]
         # if standardize:
@@ -266,6 +308,7 @@ def get_train_val_loaders(
             line_graph=line_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
+            classification=classification_threshold is not None,
         )
         val_data = get_torch_dataset(
             dataset=dataset_val,
@@ -278,6 +321,7 @@ def get_train_val_loaders(
             line_graph=line_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
+            classification=classification_threshold is not None,
         )
         test_data = get_torch_dataset(
             dataset=dataset_test,
@@ -290,6 +334,7 @@ def get_train_val_loaders(
             line_graph=line_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
+            classification=classification_threshold is not None,
         )
 
         collate_fn = train_data.collate

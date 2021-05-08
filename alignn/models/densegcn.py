@@ -22,6 +22,7 @@ class DenseGCNConfig(BaseSettings):
     node_features: int = 32
     growth_rate: int = 32
     output_features: int = 1
+    classification: bool = False
 
     class Config:
         """Configure model settings behavior."""

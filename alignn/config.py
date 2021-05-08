@@ -100,6 +100,7 @@ class TrainingConfig(BaseSettings):
 
     # training configuration
     random_seed: int = 123
+    classification_threshold: Optional[float] = None
     # target_range: Optional[List] = None
     n_val: Optional[int] = None
     n_test: Optional[int] = None
