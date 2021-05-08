@@ -277,7 +277,7 @@ def get_train_val_loaders(
                             i[target],
                             type(i[target]),
                         )
-            dat.append(i)
+                dat.append(i)
 
         # id_test = ids[-test_size:]
         # if standardize:
