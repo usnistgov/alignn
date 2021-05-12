@@ -7,16 +7,16 @@ from jarvis.tasks.queue_jobs import Queue
 props = [
     "formation_energy_peratom",
     "optb88vdw_bandgap",
+    "optb88vdw_total_energy",
     "bulk_modulus_kv",
     "shear_modulus_gv",
     "mbj_bandgap",
     "slme",
     "magmom_oszicar",
+    "epsx",
     "spillage",
     "kpoint_length_unit",
     "encut",
-    "optb88vdw_total_energy",
-    "epsx",
     "epsy",
     "epsz",
     "mepsx",
@@ -28,10 +28,10 @@ props = [
     "p-Seebeck",
     "n-powerfact",
     "p-powerfact",
-    "ncond",
-    "pcond",
-    "nkappa",
-    "pkappa",
+    # "ncond",
+    # "pcond",
+    # "nkappa",
+    # "pkappa",
     "ehull",
     "exfoliation_energy",
     "dfpt_piezo_max_dielectric",
@@ -46,7 +46,7 @@ for i in props:
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(prop="'
+        + 'train_prop_model \ntrain_prop_model(learning_rate=0.001,prop="'
     )
     line = tmp + i + '")\n'
     f.write(line)
@@ -60,11 +60,10 @@ for i in props:
         jobname=model_name,
         directory=directory,
         submit_cmd=submit_cmd,
-        memory="90G",
-        cores=None,
+        memory="30G",
         filename=model_name,
         queue="singlegpu,batch,interactive",
-        walltime="50:00:00",
+        walltime="72:00:00",
         pre_job_lines="#SBATCH --gres=gpu:1\n"
         # pre_job_lines='#SBATCH --gres=gpu:1\n. ~/.bashrc \n'
     )

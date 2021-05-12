@@ -7,14 +7,14 @@ from jarvis.tasks.queue_jobs import Queue
 props = [
     "e_form",
     "gap pbe",
-    "mu_b",
-    "bulk modulus",
-    "shear modulus",
-    "elastic anisotropy",
+    # "mu_b",
+    # "bulk modulus",
+    # "shear modulus",
+    # "elastic anisotropy",
 ]
 cwd_home = os.getcwd()
 for i in props:
-    model_name = "mp_" + i + "_alignn"
+    model_name = "mp_" + i + "_alignnn"
     model_name = model_name.replace(" ", "")
     if not os.path.exists(model_name):
         os.makedirs(model_name)
@@ -22,7 +22,8 @@ for i in props:
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(dataset="megnet",prop="'
+        + "train_prop_model \ntrain_prop_model"
+        + '(learning_rate=0.001,name="alignn",dataset="megnet",prop="'
     )
 
     line = tmp + i + '")\n'
@@ -38,10 +39,10 @@ for i in props:
         directory=directory,
         cores=None,
         submit_cmd=submit_cmd,
-        memory="90G",
+        memory="34G",
         filename=model_name,
-        queue="singlegpu,batch,interactive",
-        walltime="50:00:00",
+        queue="general,singlegpu,batch,interactive",
+        walltime="72:00:00",
         pre_job_lines="#SBATCH --gres=gpu:1\n"
         # pre_job_lines='#SBATCH --gres=gpu:1\n. ~/.bashrc \n'
     )

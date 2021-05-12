@@ -17,6 +17,7 @@ from jarvis.db.figshare import data as jdata
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import math
+from jarvis.db.jsonutils import dumpjson
 
 # use pandas progress_apply
 tqdm.pandas()
@@ -292,7 +293,11 @@ def get_train_val_loaders(
             n_test=n_test,
             n_val=n_val,
         )
-
+        ids_train_val_test = {}
+        ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]
+        ids_train_val_test["id_val"] = [dat[i][id_tag] for i in id_val]
+        ids_train_val_test["id_test"] = [dat[i][id_tag] for i in id_test]
+        dumpjson(data=ids_train_val_test, filename="ids_train_val_tes.json")
         dataset_train = [dat[x] for x in id_train]
         dataset_val = [dat[x] for x in id_val]
         dataset_test = [dat[x] for x in id_test]

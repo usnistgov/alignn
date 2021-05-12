@@ -26,8 +26,6 @@ from ignite.metrics import (
     Accuracy,
     Precision,
     Recall,
-    Loss,
-    RunningAverage,
     ConfusionMatrix,
 )
 import numpy as np
@@ -123,7 +121,9 @@ def train_dgl(
     deterministic = False
     classification = False
     print("config:")
-    print(config)
+    tmp = config.dict()
+    print(tmp)
+    dumpjson(data=tmp, filename="config.json")
     if config.classification_threshold is not None:
         classification = True
 
@@ -213,6 +213,11 @@ def train_dgl(
             # pct_start=pct_start,
             pct_start=0.3,
         )
+    elif config.scheduler == "step":
+        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer,
+        )
 
     # select configured loss function
     criteria = {
@@ -280,20 +285,21 @@ def train_dgl(
         Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
     )
 
-    # model checkpointing
-    to_save = {
-        "model": net,
-        "optimizer": optimizer,
-        "lr_scheduler": scheduler,
-        "trainer": trainer,
-    }
-    handler = Checkpoint(
-        to_save,
-        DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
-        n_saved=2,
-        global_step_transform=lambda *_: trainer.state.epoch,
-    )
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
+    if config.write_checkpoint:
+        # model checkpointing
+        to_save = {
+            "model": net,
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler,
+            "trainer": trainer,
+        }
+        handler = Checkpoint(
+            to_save,
+            DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
+            n_saved=2,
+            global_step_transform=lambda *_: trainer.state.epoch,
+        )
+        trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
     if config.progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
@@ -392,10 +398,14 @@ def train_dgl(
 
                 f.write("%s, %d, %d\n" % (id, (target), (top_class)))
                 targets.append(target)
-                predictions.append(top_class)
+                predictions.append(
+                    top_class.cpu().numpy().flatten().tolist()[0]
+                )
         f.close()
         from sklearn.metrics import roc_auc_score
 
+        print("predictions", predictions)
+        print("targets", targets)
         print(
             "Test ROCAUC:",
             roc_auc_score(np.array(targets), np.array(predictions)),
