@@ -63,7 +63,7 @@ for i in props:
         memory="30G",
         filename=model_name,
         queue="singlegpu,batch,interactive",
-        walltime="7:00:00",
+        walltime="72:00:00",
         pre_job_lines="#SBATCH --gres=gpu:1\n"
         # pre_job_lines='#SBATCH --gres=gpu:1\n. ~/.bashrc \n'
     )
