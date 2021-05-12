@@ -119,6 +119,7 @@ class TrainingConfig(BaseSettings):
     scheduler: Literal["onecycle", "none"] = "onecycle"
     pin_memory: bool = False
     save_dataloader: bool = False
+    write_checkpoint: bool = False
     write_predictions: bool = True
     store_outputs: bool = True
     progress: bool = True
