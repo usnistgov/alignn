@@ -60,6 +60,8 @@ def train_prop_model(
     """Train models for a dataset and a property."""
     if scheduler is None:
         scheduler = "onecycle"
+    if batch_size is None:
+        batch_size = 128
     config = {
         "dataset": dataset,
         "target": prop,

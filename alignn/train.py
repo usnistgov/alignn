@@ -113,7 +113,7 @@ def train_dgl(
     """
     if type(config) is dict:
         try:
-            # print(config)
+            print(config)
             config = TrainingConfig(**config)
         except Exception as exp:
             print("Check", exp)
@@ -121,8 +121,9 @@ def train_dgl(
     deterministic = False
     classification = False
     print("config:")
-    print(config.dict())
-    dumpjson(data=config.dict(), filename="config.json")
+    tmp = config.dict()
+    print(tmp)
+    dumpjson(data=tmp, filename="config.json")
     if config.classification_threshold is not None:
         classification = True
 
