@@ -108,7 +108,8 @@ class TrainingConfig(BaseSettings):
     train_ratio: Optional[float] = 0.8
     val_ratio: Optional[float] = 0.1
     test_ratio: Optional[float] = 0.1
-    epochs: int = 200
+    target_multiplication_factor: Optional[float] = None
+    epochs: int = 300
     batch_size: int = 64
     weight_decay: float = 0
     learning_rate: float = 1e-2
@@ -119,7 +120,7 @@ class TrainingConfig(BaseSettings):
     scheduler: Literal["onecycle", "none"] = "onecycle"
     pin_memory: bool = False
     save_dataloader: bool = False
-    write_checkpoint: bool = False
+    write_checkpoint: bool = True
     write_predictions: bool = True
     store_outputs: bool = True
     progress: bool = True

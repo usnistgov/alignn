@@ -174,6 +174,14 @@ def get_torch_dataset(
     df = pd.DataFrame(dataset)
     vals = df[target].values
     print("data range", np.max(vals), np.min(vals))
+
+    f = open("data_range", "w")
+    line = "Max=" + str(np.max(vals)) + "\n"
+    f.write(line)
+    line = "Min=" + str(np.min(vals)) + "\n"
+    f.write(line)
+    f.close()
+
     graphs = load_graphs(
         df,
         name=name,
@@ -219,6 +227,7 @@ def get_train_val_loaders(
     cutoff: float = 8.0,
     max_neighbors: int = 12,
     classification_threshold: Optional[float] = None,
+    target_multiplication_factor: Optional[float] = None,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     train_sample = filename + "_train.data"
@@ -267,6 +276,8 @@ def get_train_val_loaders(
             print("Converting target data into 1 and 0.")
         for i in d:
             if i[target] != "na" and not math.isnan(i[target]):
+                if target_multiplication_factor is not None:
+                    i[target] = i[target] * target_multiplication_factor
                 if classification_threshold is not None:
                     if i[target] <= classification_threshold:
                         i[target] = 0

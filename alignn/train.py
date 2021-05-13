@@ -171,6 +171,7 @@ def train_dgl(
         cutoff=config.cutoff,
         max_neighbors=config.max_neighbors,
         classification_threshold=config.classification_threshold,
+        target_multiplication_factor=config.target_multiplication_factor,
     )
 
     prepare_batch = partial(prepare_batch, device=device)
