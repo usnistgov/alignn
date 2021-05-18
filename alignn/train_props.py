@@ -119,8 +119,10 @@ def train_prop_model(
         config["n_val"] = 10000
         config["n_test"] = 13885
         config["batch_size"] = batch_size
-        config["cutoff"] = 5.0
-        config["max_neighbors"] = 9
+        # config["cutoff"] = 5.0
+        # config["max_neighbors"] = 9
+        if prop in ["homo", "lumo", "gap", "zpve", "U0", "U", "H", "G"]:
+            config["target_multiplication_factor"] = 27.211386024367243
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()

@@ -104,6 +104,7 @@ def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
     checkpoint_dir: Path = Path("./"),
+    train_val_test_loaders=[],
     # log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -126,7 +127,6 @@ def train_dgl(
     dumpjson(data=tmp, filename="config.json")
     if config.classification_threshold is not None:
         classification = True
-
     if config.random_seed is not None:
         deterministic = True
         ignite.utils.manual_seed(config.random_seed)
@@ -141,38 +141,43 @@ def train_dgl(
         line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
         line_graph = True
-
-    # use input standardization for all real-valued feature sets
-    (
-        train_loader,
-        val_loader,
-        test_loader,
-        prepare_batch,
-    ) = data.get_train_val_loaders(
-        dataset=config.dataset,
-        target=config.target,
-        n_train=config.n_train,
-        n_val=config.n_val,
-        n_test=config.n_test,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio,
-        batch_size=config.batch_size,
-        atom_features=config.atom_features,
-        neighbor_strategy=config.neighbor_strategy,
-        standardize=config.atom_features != "cgcnn",
-        line_graph=line_graph,
-        id_tag=config.id_tag,
-        pin_memory=config.pin_memory,
-        workers=config.num_workers,
-        save_dataloader=config.save_dataloader,
-        use_canonize=config.use_canonize,
-        filename=config.filename,
-        cutoff=config.cutoff,
-        max_neighbors=config.max_neighbors,
-        classification_threshold=config.classification_threshold,
-    )
-
+    if not train_val_test_loaders:
+        # use input standardization for all real-valued feature sets
+        (
+            train_loader,
+            val_loader,
+            test_loader,
+            prepare_batch,
+        ) = data.get_train_val_loaders(
+            dataset=config.dataset,
+            target=config.target,
+            n_train=config.n_train,
+            n_val=config.n_val,
+            n_test=config.n_test,
+            train_ratio=config.train_ratio,
+            val_ratio=config.val_ratio,
+            test_ratio=config.test_ratio,
+            batch_size=config.batch_size,
+            atom_features=config.atom_features,
+            neighbor_strategy=config.neighbor_strategy,
+            standardize=config.atom_features != "cgcnn",
+            line_graph=line_graph,
+            id_tag=config.id_tag,
+            pin_memory=config.pin_memory,
+            workers=config.num_workers,
+            save_dataloader=config.save_dataloader,
+            use_canonize=config.use_canonize,
+            filename=config.filename,
+            cutoff=config.cutoff,
+            max_neighbors=config.max_neighbors,
+            classification_threshold=config.classification_threshold,
+            target_multiplication_factor=config.target_multiplication_factor,
+        )
+    else:
+        train_loader = train_val_test_loaders[0]
+        val_loader = train_val_test_loaders[1]
+        test_loader = train_val_test_loaders[2]
+        prepare_batch = train_val_test_loaders[3]
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True

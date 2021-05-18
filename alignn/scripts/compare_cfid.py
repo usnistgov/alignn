@@ -26,6 +26,9 @@ props = [
     "mepsy",
     "mepsz",
     "max_ir_mode",
+    "avg_elec_mass",
+    "avg_hole_mass",
+    "max_efg",
     "min_ir_mode",
     "n-Seebeck",
     "p-Seebeck",
@@ -102,7 +105,16 @@ def load_dataset(
 
 
 lgbm = lgb.LGBMRegressor(
-    device="gpu",
+    # device="gpu",
+    n_estimators=1740,
+    learning_rate=0.040552334327414057,
+    num_leaves=291,
+    max_depth=16,
+    min_data_in_leaf=14,
+)
+
+lgbm = lgb.LGBMRegressor(
+    # device="gpu",
     n_estimators=1170,
     learning_rate=0.15375236057119931,
     num_leaves=273,
@@ -110,7 +122,7 @@ lgbm = lgb.LGBMRegressor(
 for i in props:
     X_train, y_train, X_test, y_test = load_dataset(name="dft_3d", target=i)
     lgbm = lgb.LGBMRegressor(
-        device="gpu",
+        # device="gpu",
         n_estimators=1170,
         learning_rate=0.15375236057119931,
         num_leaves=273,

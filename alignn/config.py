@@ -62,6 +62,7 @@ TARGET_ENUM = Literal[
     "dfpt_piezo_max_dij",
     "gap pbe",
     "e_form",
+    "e_hull",
     "mu_b",
     "bulk modulus",
     "shear modulus",
@@ -81,6 +82,7 @@ TARGET_ENUM = Literal[
     "A",
     "B",
     "C",
+    "target",
 ]
 
 
@@ -90,7 +92,9 @@ class TrainingConfig(BaseSettings):
     version: str = VERSION
 
     # dataset configuration
-    dataset: Literal["dft_3d", "dft_2d", "megnet", "qm9"] = "dft_3d"
+    dataset: Literal[
+        "dft_3d", "dft_2d", "megnet", "qm9", "user_data"
+    ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
@@ -108,7 +112,8 @@ class TrainingConfig(BaseSettings):
     train_ratio: Optional[float] = 0.8
     val_ratio: Optional[float] = 0.1
     test_ratio: Optional[float] = 0.1
-    epochs: int = 200
+    target_multiplication_factor: Optional[float] = None
+    epochs: int = 300
     batch_size: int = 64
     weight_decay: float = 0
     learning_rate: float = 1e-2
@@ -119,7 +124,7 @@ class TrainingConfig(BaseSettings):
     scheduler: Literal["onecycle", "none"] = "onecycle"
     pin_memory: bool = False
     save_dataloader: bool = False
-    write_checkpoint: bool = False
+    write_checkpoint: bool = True
     write_predictions: bool = True
     store_outputs: bool = True
     progress: bool = True
@@ -138,7 +143,8 @@ class TrainingConfig(BaseSettings):
         ALIGNNConfig,
         DenseALIGNNConfig,
         ACGCNNConfig,
-    ] = CGCNNConfig(name="cgcnn")
+    ] = ALIGNNConfig(name="alignn")
+    # ] = CGCNNConfig(name="cgcnn")
 
     @root_validator()
     def set_input_size(cls, values):
