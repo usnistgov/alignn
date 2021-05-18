@@ -205,8 +205,9 @@ def get_torch_dataset(
 
 def get_train_val_loaders(
     dataset: str = "dft_3d",
+    dataset_array=[],
     target: str = "formation_energy_peratom",
-    atom_features: str = "atomic_number",
+    atom_features: str = "cgcnn",
     neighbor_strategy: str = "k-nearest",
     n_train=None,
     n_val=None,
@@ -214,13 +215,13 @@ def get_train_val_loaders(
     train_ratio=None,
     val_ratio=0.1,
     test_ratio=0.1,
-    batch_size: int = 8,
+    batch_size: int = 5,
     standardize: bool = False,
-    line_graph: bool = False,
+    line_graph: bool = True,
     split_seed: int = 123,
     workers: int = 0,
     pin_memory: bool = True,
-    save_dataloader: bool = True,
+    save_dataloader: bool = False,
     filename: str = "sample",
     id_tag: str = "jid",
     use_canonize: bool = False,
@@ -263,7 +264,11 @@ def get_train_val_loaders(
         # print("test", len(test_loader.dataset))
     else:
 
-        d = jdata(dataset)
+        if not dataset_array:
+            d = jdata(dataset)
+        else:
+            d = dataset_array
+
         dat = []
         if classification_threshold is not None:
             print(
@@ -308,7 +313,7 @@ def get_train_val_loaders(
         ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]
         ids_train_val_test["id_val"] = [dat[i][id_tag] for i in id_val]
         ids_train_val_test["id_test"] = [dat[i][id_tag] for i in id_test]
-        dumpjson(data=ids_train_val_test, filename="ids_train_val_tes.json")
+        dumpjson(data=ids_train_val_test, filename="ids_train_val_test.json")
         dataset_train = [dat[x] for x in id_train]
         dataset_val = [dat[x] for x in id_val]
         dataset_test = [dat[x] for x in id_test]

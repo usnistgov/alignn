@@ -38,12 +38,12 @@ class ACGCNNConfig(BaseSettings):
     name: Literal["alignn_cgcnn"]
     conv_layers: int = 3
     atom_input_features: int = 92
-    edge_features: int = 180
-    node_features: int = 64
+    edge_features: int = 40
+    node_features: int = 92
     fc_layers: int = 1
-    fc_features: int = 128
+    fc_features: int = 256
     output_features: int = 1
-    alignn_layers: int = 1
+    alignn_layers: int = 3
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
@@ -148,7 +148,9 @@ class ACGCNN(nn.Module):
         super().__init__()
 
         self.rbf = RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_features)
-        self.abf = RBFExpansion(vmin=-1, vmax=1, bins=config.edge_features)
+        self.abf = RBFExpansion(
+            vmin=-np.pi / 2, vmax=np.pi / 2, bins=config.edge_features
+        )
         # self.abf = RBFExpansion(vmin=-1, vmax=1, bins=config.edge_features)
         self.atom_embedding = nn.Linear(
             config.atom_input_features, config.node_features

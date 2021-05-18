@@ -62,6 +62,7 @@ TARGET_ENUM = Literal[
     "dfpt_piezo_max_dij",
     "gap pbe",
     "e_form",
+    "e_hull",
     "mu_b",
     "bulk modulus",
     "shear modulus",
@@ -81,6 +82,7 @@ TARGET_ENUM = Literal[
     "A",
     "B",
     "C",
+    "target",
 ]
 
 
@@ -90,7 +92,9 @@ class TrainingConfig(BaseSettings):
     version: str = VERSION
 
     # dataset configuration
-    dataset: Literal["dft_3d", "dft_2d", "megnet", "qm9"] = "dft_3d"
+    dataset: Literal[
+        "dft_3d", "dft_2d", "megnet", "qm9", "user_data"
+    ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
@@ -139,7 +143,8 @@ class TrainingConfig(BaseSettings):
         ALIGNNConfig,
         DenseALIGNNConfig,
         ACGCNNConfig,
-    ] = CGCNNConfig(name="cgcnn")
+    ] = ALIGNNConfig(name="alignn")
+    # ] = CGCNNConfig(name="cgcnn")
 
     @root_validator()
     def set_input_size(cls, values):
