@@ -83,6 +83,12 @@ TARGET_ENUM = Literal[
     "B",
     "C",
     "target",
+    "max_efg",
+    "avg_elec_mass",
+    "avg_hole_mass",
+    "_oqmd_band_gap",
+    "_oqmd_delta_e",
+    "_oqmd_stability",
 ]
 
 
@@ -93,7 +99,12 @@ class TrainingConfig(BaseSettings):
 
     # dataset configuration
     dataset: Literal[
-        "dft_3d", "dft_2d", "megnet", "qm9", "user_data"
+        "dft_3d",
+        "dft_2d",
+        "megnet",
+        "qm9",
+        "user_data",
+        "oqmd_3d_no_cfid",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"

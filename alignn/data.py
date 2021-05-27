@@ -54,6 +54,11 @@ def load_dataset(
     return d
 
 
+def mean_absolute_deviation(data, axis=None):
+    """Get Mean absolute deviation."""
+    return np.mean(np.absolute(data - np.mean(data, axis)), axis)
+
+
 def load_graphs(
     df: pd.DataFrame,
     name: str = "dft_3d",
@@ -174,7 +179,6 @@ def get_torch_dataset(
     df = pd.DataFrame(dataset)
     vals = df[target].values
     print("data range", np.max(vals), np.min(vals))
-
     f = open("data_range", "w")
     line = "Max=" + str(np.max(vals)) + "\n"
     f.write(line)
@@ -279,6 +283,7 @@ def get_train_val_loaders(
                 " data.",
             )
             print("Converting target data into 1 and 0.")
+        all_targets = []
         for i in d:
             if i[target] != "na" and not math.isnan(i[target]):
                 if target_multiplication_factor is not None:
@@ -295,6 +300,7 @@ def get_train_val_loaders(
                             type(i[target]),
                         )
                 dat.append(i)
+                all_targets.append(i[target])
 
         # id_test = ids[-test_size:]
         # if standardize:
@@ -317,6 +323,23 @@ def get_train_val_loaders(
         dataset_train = [dat[x] for x in id_train]
         dataset_val = [dat[x] for x in id_val]
         dataset_test = [dat[x] for x in id_test]
+        if classification_threshold is None:
+            try:
+                from sklearn.metrics import mean_absolute_error
+
+                print("MAX val:", max(all_targets))
+                print("MIN val:", min(all_targets))
+                print("MAD:", mean_absolute_deviation(all_targets))
+                # Random model precited value
+                x_bar = np.mean(np.array([i[target] for i in dataset_train]))
+                baseline_mae = mean_absolute_error(
+                    np.array([i[target] for i in dataset_test]),
+                    np.array([x_bar for i in dataset_test]),
+                )
+                print("Baseline MAE:", baseline_mae)
+            except Exception as exp:
+                print("Data error", exp)
+                pass
 
         train_data = get_torch_dataset(
             dataset=dataset_train,
