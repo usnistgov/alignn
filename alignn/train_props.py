@@ -63,7 +63,7 @@ def train_prop_model(
     if scheduler is None:
         scheduler = "onecycle"
     if batch_size is None:
-        batch_size = 128
+        batch_size = 64
     if n_epochs is None:
         n_epochs = 300
     config = {
@@ -101,6 +101,12 @@ def train_prop_model(
         # config["learning_rate"] = 0.001
         # config["epochs"] = 300
 
+    if dataset == "mp_3d_2020":
+        config["id_tag"] = "id"
+        config["num_workers"] = 0
+    if dataset == "megnet2":
+        config["id_tag"] = "id"
+        config["num_workers"] = 0
     if dataset == "megnet":
         config["id_tag"] = "id"
         if prop == "e_form" or prop == "gap pbe":
@@ -111,8 +117,8 @@ def train_prop_model(
             # config["epochs"] = 300
             config["num_workers"] = 4
     if dataset == "oqmd_3d_no_cfid":
-        config["id_tag"] = "id"
-        config["num_workers"] = 4
+        config["id_tag"] = "_oqmd_entry_id"
+        config["num_workers"] = 0
     if dataset == "qm9":
         config["id_tag"] = "id"
         config["n_train"] = 110000

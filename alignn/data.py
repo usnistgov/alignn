@@ -177,6 +177,7 @@ def get_torch_dataset(
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
+    print("df", df)
     vals = df[target].values
     print("data range", np.max(vals), np.min(vals))
     f = open("data_range", "w")
@@ -285,7 +286,15 @@ def get_train_val_loaders(
             print("Converting target data into 1 and 0.")
         all_targets = []
         for i in d:
-            if i[target] != "na" and not math.isnan(i[target]):
+            if isinstance(i[target], list):
+                all_targets.append(i[target])
+                dat.append(i)
+
+            elif (
+                i[target] is not None
+                and i[target] != "na"
+                and not math.isnan(i[target])
+            ):
                 if target_multiplication_factor is not None:
                     i[target] = i[target] * target_multiplication_factor
                 if classification_threshold is not None:
