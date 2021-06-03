@@ -37,7 +37,8 @@ for i in props:
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(batch_size=64,learning_rate=0.001,n_epochs=100,prop="'
+        + "train_prop_model \ntrain_prop_model(batch_size=64,"
+        + 'learning_rate=0.001,n_epochs=100,prop="'
     )
     line = (
         tmp
