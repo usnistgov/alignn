@@ -41,6 +41,8 @@ from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
 from alignn.models.alignn_cgcnn import ACGCNN
 from jarvis.db.jsonutils import dumpjson
+from sklearn.decomposition import PCA, KernelPCA
+from sklearn.preprocessing import StandardScaler
 
 # torch config
 torch.set_default_dtype(torch.float32)
@@ -170,8 +172,10 @@ def train_dgl(
             filename=config.filename,
             cutoff=config.cutoff,
             max_neighbors=config.max_neighbors,
+            output_features=config.model.output_features,
             classification_threshold=config.classification_threshold,
             target_multiplication_factor=config.target_multiplication_factor,
+            standard_scalar_and_pca=config.standard_scalar_and_pca,
         )
     else:
         train_loader = train_val_test_loaders[0]

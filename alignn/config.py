@@ -148,6 +148,7 @@ class TrainingConfig(BaseSettings):
     store_outputs: bool = True
     progress: bool = True
     log_tensorboard: bool = False
+    standard_scalar_and_pca: bool = False
     use_canonize: bool = True
     num_workers: int = 4
     cutoff: float = 8.0

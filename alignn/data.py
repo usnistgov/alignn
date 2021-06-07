@@ -19,6 +19,9 @@ from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
 
+from sklearn.decomposition import PCA  # ,KernelPCA
+from sklearn.preprocessing import StandardScaler
+
 # use pandas progress_apply
 tqdm.pandas()
 
@@ -234,6 +237,8 @@ def get_train_val_loaders(
     max_neighbors: int = 12,
     classification_threshold: Optional[float] = None,
     target_multiplication_factor: Optional[float] = None,
+    standard_scalar_and_pca=False,
+    output_features=1,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     train_sample = filename + "_train.data"
@@ -273,6 +278,24 @@ def get_train_val_loaders(
             d = jdata(dataset)
         else:
             d = dataset_array
+        if standard_scalar_and_pca:
+            pca = PCA(n_components=output_features, svd_solver="full")
+            sc = StandardScaler()
+
+            y_data = [i[target] for i in d]
+            y_scaled = sc.fit_transform(y_data)
+            y_mean, y_var = sc.mean_, sc.var_
+            print("y_mean", y_mean)
+            print("y_var", y_var)
+
+            pc_y = pca.fit_transform(y_scaled)
+            import pickle as pk
+
+            pk.dump(pc_y, open("pca.pkl", "wb"))
+            pk.dump(sc, open("sc.pkl", "wb"))
+
+            for ii, i in enumerate(pc_y):
+                d[ii][target] = pc_y[ii].tolist()
 
         dat = []
         if classification_threshold is not None:
@@ -286,8 +309,9 @@ def get_train_val_loaders(
             print("Converting target data into 1 and 0.")
         all_targets = []
         for i in d:
-            if isinstance(i[target], list):
-                all_targets.append(i[target])
+            # print ('i[target]',i[target],type(i[target]),i[target].shape,isinstance(i[target], list))
+            if isinstance(i[target], list):  # multioutput target
+                all_targets.append(torch.tensor(i[target]))
                 dat.append(i)
 
             elif (
