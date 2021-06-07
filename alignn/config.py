@@ -112,7 +112,7 @@ class TrainingConfig(BaseSettings):
         "qm9",
         "user_data",
         "oqmd_3d_no_cfid",
-        "jv_3d_edos",
+        "edos_up",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
