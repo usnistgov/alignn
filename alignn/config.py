@@ -63,6 +63,10 @@ TARGET_ENUM = Literal[
     "gap pbe",
     "e_form",
     "e_hull",
+    "energy_per_atom",
+    "formation_energy_per_atom",
+    "band_gap",
+    "e_above_hull",
     "mu_b",
     "bulk modulus",
     "shear modulus",
@@ -83,6 +87,14 @@ TARGET_ENUM = Literal[
     "B",
     "C",
     "target",
+    "max_efg",
+    "avg_elec_mass",
+    "avg_hole_mass",
+    "_oqmd_band_gap",
+    "_oqmd_delta_e",
+    "_oqmd_stability",
+    "edos_up",
+    "pdos_elast",
 ]
 
 
@@ -93,12 +105,21 @@ class TrainingConfig(BaseSettings):
 
     # dataset configuration
     dataset: Literal[
-        "dft_3d", "dft_2d", "megnet", "qm9", "user_data"
+        "dft_3d",
+        "dft_2d",
+        "megnet",
+        "megnet2",
+        "mp_3d_2020",
+        "qm9",
+        "user_data",
+        "oqmd_3d_no_cfid",
+        "edos_up",
+        "edos_pdos",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
     neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
-    id_tag: Literal["jid", "id"] = "jid"
+    id_tag: Literal["jid", "id", "_oqmd_entry_id"] = "jid"
 
     # logging configuration
 
@@ -129,6 +150,7 @@ class TrainingConfig(BaseSettings):
     store_outputs: bool = True
     progress: bool = True
     log_tensorboard: bool = False
+    standard_scalar_and_pca: bool = False
     use_canonize: bool = True
     num_workers: int = 4
     cutoff: float = 8.0

@@ -51,21 +51,25 @@ def train_prop_model(
     name="alignn",
     save_dataloader=False,
     train_ratio=None,
+    classification_threshold=None,
     val_ratio=None,
     test_ratio=None,
-    learning_rate=0.01,
+    learning_rate=0.001,
     batch_size=None,
     scheduler=None,
+    n_epochs=None,
 ):
     """Train models for a dataset and a property."""
     if scheduler is None:
         scheduler = "onecycle"
     if batch_size is None:
-        batch_size = 128
+        batch_size = 64
+    if n_epochs is None:
+        n_epochs = 300
     config = {
         "dataset": dataset,
         "target": prop,
-        "epochs": 300,  # 00,#00,
+        "epochs": n_epochs,  # 00,#00,
         "batch_size": batch_size,  # 0,
         "weight_decay": 1e-05,
         "learning_rate": learning_rate,
@@ -76,6 +80,7 @@ def train_prop_model(
         "pin_memory": False,
         "write_predictions": write_predictions,
         "num_workers": 0,
+        "classification_threshold": classification_threshold,
         "model": {
             "name": name,
         },
@@ -90,30 +95,31 @@ def train_prop_model(
         config["val_ratio"] = val_ratio
         config["test_ratio"] = test_ratio
     if dataset == "jv_3d":
-        if batch_size is None:
-            batch_size = 128
-        config["batch_size"] = batch_size
         # config["save_dataloader"]=True
         config["num_workers"] = 4
         config["pin_memory"] = False
         # config["learning_rate"] = 0.001
         # config["epochs"] = 300
 
+    if dataset == "mp_3d_2020":
+        config["id_tag"] = "id"
+        config["num_workers"] = 0
+    if dataset == "megnet2":
+        config["id_tag"] = "id"
+        config["num_workers"] = 0
     if dataset == "megnet":
-        if batch_size is None:
-            batch_size = 128
         config["id_tag"] = "id"
         if prop == "e_form" or prop == "gap pbe":
             config["n_train"] = 60000
             config["n_val"] = 5000
-            config["n_test"] = 4237
+            config["n_test"] = 4239
             # config["learning_rate"] = 0.01
-            config["batch_size"] = batch_size
             # config["epochs"] = 300
             config["num_workers"] = 4
+    if dataset == "oqmd_3d_no_cfid":
+        config["id_tag"] = "_oqmd_entry_id"
+        config["num_workers"] = 0
     if dataset == "qm9":
-        if batch_size is None:
-            batch_size = 128
         config["id_tag"] = "id"
         config["n_train"] = 110000
         config["n_val"] = 10000

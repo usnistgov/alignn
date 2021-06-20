@@ -1,11 +1,8 @@
 """Training script test suite."""
 import time
-
 import matplotlib.pyplot as plt
 import numpy as np
-
 from alignn.train import train_dgl
-
 plt.switch_backend("agg")
 from sklearn.metrics import mean_absolute_error
 

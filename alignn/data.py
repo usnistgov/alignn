@@ -19,6 +19,11 @@ from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
 
+# from sklearn.pipeline import Pipeline
+import pickle as pk
+from sklearn.decomposition import PCA  # ,KernelPCA
+from sklearn.preprocessing import StandardScaler
+
 # use pandas progress_apply
 tqdm.pandas()
 
@@ -52,6 +57,12 @@ def load_dataset(
     d = pd.DataFrame(d)
     # d = d.replace("na", np.nan)
     return d
+
+
+# np.mean(mean_absolute_deviation(x,axis=0))
+def mean_absolute_deviation(data, axis=None):
+    """Get Mean absolute deviation."""
+    return np.mean(np.absolute(data - np.mean(data, axis)), axis)
 
 
 def load_graphs(
@@ -172,9 +183,9 @@ def get_torch_dataset(
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
+    # print("df", df)
     vals = df[target].values
     print("data range", np.max(vals), np.min(vals))
-
     f = open("data_range", "w")
     line = "Max=" + str(np.max(vals)) + "\n"
     f.write(line)
@@ -229,6 +240,8 @@ def get_train_val_loaders(
     max_neighbors: int = 12,
     classification_threshold: Optional[float] = None,
     target_multiplication_factor: Optional[float] = None,
+    standard_scalar_and_pca=False,
+    output_features=1,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
     train_sample = filename + "_train.data"
@@ -269,6 +282,9 @@ def get_train_val_loaders(
         else:
             d = dataset_array
 
+            # for ii, i in enumerate(pc_y):
+            #    d[ii][target] = pc_y[ii].tolist()
+
         dat = []
         if classification_threshold is not None:
             print(
@@ -279,8 +295,17 @@ def get_train_val_loaders(
                 " data.",
             )
             print("Converting target data into 1 and 0.")
+        all_targets = []
         for i in d:
-            if i[target] != "na" and not math.isnan(i[target]):
+            if isinstance(i[target], list):  # multioutput target
+                all_targets.append(torch.tensor(i[target]))
+                dat.append(i)
+
+            elif (
+                i[target] is not None
+                and i[target] != "na"
+                and not math.isnan(i[target])
+            ):
                 if target_multiplication_factor is not None:
                     i[target] = i[target] * target_multiplication_factor
                 if classification_threshold is not None:
@@ -295,6 +320,7 @@ def get_train_val_loaders(
                             type(i[target]),
                         )
                 dat.append(i)
+                all_targets.append(i[target])
 
         # id_test = ids[-test_size:]
         # if standardize:
@@ -317,6 +343,41 @@ def get_train_val_loaders(
         dataset_train = [dat[x] for x in id_train]
         dataset_val = [dat[x] for x in id_val]
         dataset_test = [dat[x] for x in id_test]
+
+        if standard_scalar_and_pca:
+            y_data = [i[target] for i in dataset_train]
+            # pipe = Pipeline([('scale', StandardScaler())])
+            sc = StandardScaler()
+            sc.fit(y_data)
+            # pc = PCA(n_components=output_features)
+            # pipe = Pipeline(
+            #    [
+            #        ("scale", StandardScaler()),
+            #        ("reduce_dims", PCA(n_components=output_features)),
+            #    ]
+            # )
+            pk.dump(sc, open("sc.pkl", "wb"))
+            pc = PCA(n_components=40)
+            pc.fit(y_data)
+            pk.dump(pc, open("pca.pkl", "wb"))
+
+        if classification_threshold is None:
+            try:
+                from sklearn.metrics import mean_absolute_error
+
+                print("MAX val:", max(all_targets))
+                print("MIN val:", min(all_targets))
+                print("MAD:", mean_absolute_deviation(all_targets))
+                # Random model precited value
+                x_bar = np.mean(np.array([i[target] for i in dataset_train]))
+                baseline_mae = mean_absolute_error(
+                    np.array([i[target] for i in dataset_test]),
+                    np.array([x_bar for i in dataset_test]),
+                )
+                print("Baseline MAE:", baseline_mae)
+            except Exception as exp:
+                print("Data error", exp)
+                pass
 
         train_data = get_torch_dataset(
             dataset=dataset_train,
