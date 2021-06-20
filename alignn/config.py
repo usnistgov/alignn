@@ -94,6 +94,7 @@ TARGET_ENUM = Literal[
     "_oqmd_delta_e",
     "_oqmd_stability",
     "edos_up",
+    "pdos_elast",
 ]
 
 
@@ -113,6 +114,7 @@ class TrainingConfig(BaseSettings):
         "user_data",
         "oqmd_3d_no_cfid",
         "edos_up",
+        "edos_pdos",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"

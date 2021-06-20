@@ -19,6 +19,8 @@ from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
 
+# from sklearn.pipeline import Pipeline
+import pickle as pk
 from sklearn.decomposition import PCA  # ,KernelPCA
 from sklearn.preprocessing import StandardScaler
 
@@ -57,6 +59,7 @@ def load_dataset(
     return d
 
 
+# np.mean(mean_absolute_deviation(x,axis=0))
 def mean_absolute_deviation(data, axis=None):
     """Get Mean absolute deviation."""
     return np.mean(np.absolute(data - np.mean(data, axis)), axis)
@@ -180,7 +183,7 @@ def get_torch_dataset(
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
-    print("df", df)
+    # print("df", df)
     vals = df[target].values
     print("data range", np.max(vals), np.min(vals))
     f = open("data_range", "w")
@@ -278,24 +281,9 @@ def get_train_val_loaders(
             d = jdata(dataset)
         else:
             d = dataset_array
-        if standard_scalar_and_pca:
-            pca = PCA(n_components=output_features, svd_solver="full")
-            sc = StandardScaler()
 
-            y_data = [i[target] for i in d]
-            y_scaled = sc.fit_transform(y_data)
-            y_mean, y_var = sc.mean_, sc.var_
-            print("y_mean", y_mean)
-            print("y_var", y_var)
-
-            pc_y = pca.fit_transform(y_scaled)
-            import pickle as pk
-
-            pk.dump(pc_y, open("pca.pkl", "wb"))
-            pk.dump(sc, open("sc.pkl", "wb"))
-
-            for ii, i in enumerate(pc_y):
-                d[ii][target] = pc_y[ii].tolist()
+            # for ii, i in enumerate(pc_y):
+            #    d[ii][target] = pc_y[ii].tolist()
 
         dat = []
         if classification_threshold is not None:
@@ -309,7 +297,6 @@ def get_train_val_loaders(
             print("Converting target data into 1 and 0.")
         all_targets = []
         for i in d:
-            # print ('i[target]',i[target],type(i[target]),i[target].shape,isinstance(i[target], list))
             if isinstance(i[target], list):  # multioutput target
                 all_targets.append(torch.tensor(i[target]))
                 dat.append(i)
@@ -356,6 +343,24 @@ def get_train_val_loaders(
         dataset_train = [dat[x] for x in id_train]
         dataset_val = [dat[x] for x in id_val]
         dataset_test = [dat[x] for x in id_test]
+
+        if standard_scalar_and_pca:
+            y_data = [i[target] for i in dataset_train]
+            # pipe = Pipeline([('scale', StandardScaler())])
+            sc = StandardScaler()
+            sc.fit(y_data)
+            # pc = PCA(n_components=output_features)
+            # pipe = Pipeline(
+            #    [
+            #        ("scale", StandardScaler()),
+            #        ("reduce_dims", PCA(n_components=output_features)),
+            #    ]
+            # )
+            pk.dump(sc, open("sc.pkl", "wb"))
+            pc = PCA(n_components=40)
+            pc.fit(y_data)
+            pk.dump(pc, open("pca.pkl", "wb"))
+
         if classification_threshold is None:
             try:
                 from sklearn.metrics import mean_absolute_error

@@ -28,6 +28,7 @@ from ignite.metrics import (
     Recall,
     ConfusionMatrix,
 )
+import pickle as pk
 import numpy as np
 from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
@@ -41,8 +42,9 @@ from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
 from alignn.models.alignn_cgcnn import ACGCNN
 from jarvis.db.jsonutils import dumpjson
-from sklearn.decomposition import PCA, KernelPCA
-from sklearn.preprocessing import StandardScaler
+
+# from sklearn.decomposition import PCA, KernelPCA
+# from sklearn.preprocessing import StandardScaler
 
 # torch config
 torch.set_default_dtype(torch.float32)
@@ -57,6 +59,22 @@ def activated_output_transform(output):
     y_pred, y = output
     y_pred = torch.exp(y_pred)
     y_pred = y_pred[:, 1]
+    return y_pred, y
+
+
+def make_standard_scalar_and_pca(output):
+    """Use standard scalar and PCS for multi-output data."""
+    sc = pk.load(open("sc.pkl", "rb"))
+    y_pred, y = output
+    y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
+    y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
+    # pc = pk.load(open("pca.pkl", "rb"))
+    # y_pred = torch.tensor(pc.transform(y_pred), device=device)
+    # y = torch.tensor(pc.transform(y), device=device)
+
+    # y_pred = torch.tensor(pca_sc.inverse_transform(y_pred),device=device)
+    # y = torch.tensor(pca_sc.inverse_transform(y),device=device)
+    # print (y.shape,y_pred.shape)
     return y_pred, y
 
 
@@ -239,6 +257,16 @@ def train_dgl(
 
     # set up training engine and evaluators
     metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
+    if config.model.output_features > 1 and config.standard_scalar_and_pca:
+        # metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
+        metrics = {
+            "loss": Loss(
+                criterion, output_transform=make_standard_scalar_and_pca
+            ),
+            "mae": MeanAbsoluteError(
+                output_transform=make_standard_scalar_and_pca
+            ),
+        }
 
     if config.criterion == "zig":
 
@@ -277,13 +305,22 @@ def train_dgl(
         prepare_batch=prepare_batch,
         device=device,
         deterministic=deterministic,
+        # output_transform=make_standard_scalar_and_pca,
     )
 
     evaluator = create_supervised_evaluator(
-        net, metrics=metrics, prepare_batch=prepare_batch, device=device
+        net,
+        metrics=metrics,
+        prepare_batch=prepare_batch,
+        device=device,
+        # output_transform=make_standard_scalar_and_pca,
     )
     train_evaluator = create_supervised_evaluator(
-        net, metrics=metrics, prepare_batch=prepare_batch, device=device
+        net,
+        metrics=metrics,
+        prepare_batch=prepare_batch,
+        device=device,
+        # output_transform=make_standard_scalar_and_pca,
     )
 
     # ignite event handlers:
@@ -420,7 +457,31 @@ def train_dgl(
             roc_auc_score(np.array(targets), np.array(predictions)),
         )
 
-    if config.write_predictions and not classification:
+    if (
+        config.write_predictions
+        and not classification
+        and config.model.output_features > 1
+    ):
+        net.eval()
+        mem = []
+        with torch.no_grad():
+            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+            for dat, id in zip(test_loader, ids):
+                g, lg, target = dat
+                out_data = net([g.to(device), lg.to(device)])
+                out_data = out_data.cpu().numpy().tolist()
+                target = target.cpu().numpy().flatten().tolist()
+                info = {}
+                info["id"] = id
+                info["target"] = target
+                info["predictions"] = out_data
+                mem.append(info)
+        dumpjson(filename="multi_out_predictions.json", data=mem)
+    if (
+        config.write_predictions
+        and not classification
+        and config.model.output_features == 1
+    ):
         net.eval()
         f = open("prediction_results_test_set.csv", "w")
         f.write("id,target,prediction\n")
