@@ -24,7 +24,7 @@ setuptools.setup(
         "scikit-learn>=0.24.1",
         "matplotlib>=3.4.1",
         "tqdm>=4.60.0",
-        "pandas>=1.2.4",
+        "pandas>=1.2.3",
         "pytorch-ignite==0.5.0.dev20210429",
         "pydantic>=1.8.1",
         "flake8>=3.9.1",
