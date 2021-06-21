@@ -119,14 +119,31 @@ def train_prop_model(
     if dataset == "oqmd_3d_no_cfid":
         config["id_tag"] = "_oqmd_entry_id"
         config["num_workers"] = 0
+    if dataset == "edos_pdos":
+        if prop == "edos_up":
+            config["model"]["output_features"] = 300
+        elif prop == "pdos_elast":
+            config["model"]["output_features"] = 200
+        else:
+            raise ValueError("Target not available.")
+    if dataset == "qm9_dgl":
+        config["id_tag"] = "id"
+        config["n_train"] = 110000
+        config["n_val"] = 10000
+        config["n_test"] = 10831
+        config["batch_size"] = batch_size
+        config["cutoff"] = 5.0
+        config["max_neighbors"] = 9
+
     if dataset == "qm9":
         config["id_tag"] = "id"
         config["n_train"] = 110000
         config["n_val"] = 10000
         config["n_test"] = 13885
         config["batch_size"] = batch_size
-        # config["cutoff"] = 5.0
-        # config["max_neighbors"] = 9
+        config["cutoff"] = 5.0
+        config["max_neighbors"] = 9
+        # config['atom_features']='atomic_number'
         if prop in ["homo", "lumo", "gap", "zpve", "U0", "U", "H", "G"]:
             config["target_multiplication_factor"] = 27.211386024367243
     t1 = time.time()

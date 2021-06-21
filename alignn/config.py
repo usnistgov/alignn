@@ -111,6 +111,7 @@ class TrainingConfig(BaseSettings):
         "megnet2",
         "mp_3d_2020",
         "qm9",
+        "qm9_dgl",
         "user_data",
         "oqmd_3d_no_cfid",
         "edos_up",
