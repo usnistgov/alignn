@@ -21,6 +21,7 @@ props = [
     "B",
     "C",
 ]
+# props=['U0','mu']
 cwd_home = os.getcwd()
 for i in props:
     model_name = "qm9_" + i + "_alignn"
@@ -31,7 +32,7 @@ for i in props:
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(dataset="qm9",prop="'
+        + 'train_prop_model \ntrain_prop_model(dataset="qm9_dgl",prop="'
     )
 
     line = tmp + i + '")\n'
@@ -49,8 +50,8 @@ for i in props:
         submit_cmd=submit_cmd,
         memory="90G",
         filename=model_name,
-        queue="singlegpu,batch,interactive",
-        walltime="50:00:00",
+        queue="singlegpu,general",
+        walltime="150:00:00",
         pre_job_lines="#SBATCH --gres=gpu:1\n"
         # pre_job_lines='#SBATCH --gres=gpu:1\n. ~/.bashrc \n'
     )
