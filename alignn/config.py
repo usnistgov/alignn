@@ -9,7 +9,7 @@ from pydantic import root_validator
 from pydantic.typing import Literal
 
 from alignn.utils import BaseSettings
-from alignn.models.cgcnn import CGCNNConfig
+from alignn.models.modified_cgcnn import CGCNNConfig
 from alignn.models.icgcnn import ICGCNNConfig
 from alignn.models.gcn import SimpleGCNConfig
 from alignn.models.densegcn import DenseGCNConfig

@@ -36,7 +36,7 @@ from torch import nn
 from alignn import data, models
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
-from alignn.models.cgcnn import CGCNN
+from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
@@ -251,7 +251,7 @@ def train_dgl(
         "mse": nn.MSELoss(),
         "l1": nn.L1Loss(),
         "poisson": nn.PoissonNLLLoss(log_input=False, full=True),
-        "zig": models.cgcnn.ZeroInflatedGammaLoss(),
+        "zig": models.modified_cgcnn.ZeroInflatedGammaLoss(),
     }
     criterion = criteria[config.criterion]
 
