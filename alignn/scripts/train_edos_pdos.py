@@ -16,7 +16,8 @@ for i in props:
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(batch_size=64,name="alignn",dataset="edos_pdos",prop="'
+        + "train_prop_model \ntrain_prop_model"
+        + '(batch_size=64,name="alignn",dataset="edos_pdos",prop="'
     )
 
     line = tmp + i + '")\n'
