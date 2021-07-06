@@ -470,6 +470,11 @@ def train_dgl(
                 g, lg, target = dat
                 out_data = net([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
+                if config.standard_scalar_and_pca:
+                    sc = pk.load(open("sc.pkl", "rb"))
+                    out_data = list(
+                        sc.transform(np.array(out_data).reshape(1, -1))[0]
+                    )  # [0][0]
                 target = target.cpu().numpy().flatten().tolist()
                 info = {}
                 info["id"] = id
@@ -493,6 +498,11 @@ def train_dgl(
                 g, lg, target = dat
                 out_data = net([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
+                if config.standard_scalar_and_pca:
+                    sc = pk.load(open("sc.pkl", "rb"))
+                    out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
+                        0
+                    ][0]
                 target = target.cpu().numpy().flatten().tolist()
                 if len(target) == 1:
                     target = target[0]

@@ -5,23 +5,20 @@ from jarvis.tasks.queue_jobs import Queue
 # d=data('dft_3d')
 
 props = [
+    "U0",
     "mu",
     "alpha",
-    "homo",
-    "lumo",
+    "HOMO",
+    "LUMO",
     "gap",
-    "r2",
-    "zpve",
-    "U0",
+    "R2",
+    "ZPVE",
     "U",
     "H",
     "G",
     "Cv",
-    "A",
-    "B",
-    "C",
+    "omega1",
 ]
-# props=['U0','mu']
 cwd_home = os.getcwd()
 for i in props:
     model_name = "qm9_" + i + "_alignn"
@@ -32,7 +29,7 @@ for i in props:
     f = open("train.py", "w")
     tmp = (
         "from alignn.train_props import "
-        + 'train_prop_model \ntrain_prop_model(dataset="qm9_dgl",prop="'
+        + 'train_prop_model \ntrain_prop_model(dataset="qm9_std_jctc",prop="'
     )
 
     line = tmp + i + '")\n'
@@ -48,9 +45,9 @@ for i in props:
         directory=directory,
         cores=None,
         submit_cmd=submit_cmd,
-        memory="90G",
+        memory="94G",
         filename=model_name,
-        queue="singlegpu,general",
+        queue="singlegpu",
         walltime="150:00:00",
         pre_job_lines="#SBATCH --gres=gpu:1\n"
         # pre_job_lines='#SBATCH --gres=gpu:1\n. ~/.bashrc \n'
