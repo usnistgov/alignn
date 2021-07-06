@@ -10,14 +10,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",  # Replace with your own username
-    version="2021.06.20",
+    version="2021.07.05",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
     install_requires=[
-        "numpy>=1.20.2",
+        "numpy>=1.19.5",
         "scipy>=1.6.3",
-        "jarvis-tools>=2021.06.18",
+        "jarvis-tools>=2021.07.05",
         "torch>=1.7.1",
         "dgl-cu101>=0.6.0",
         "dgl>=0.6.0",

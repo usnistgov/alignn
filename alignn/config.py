@@ -72,6 +72,11 @@ TARGET_ENUM = Literal[
     "shear modulus",
     "elastic anisotropy",
     "U0",
+    "HOMO",
+    "LUMO",
+    "R2",
+    "ZPVE",
+    "omega1",
     "mu",
     "alpha",
     "homo",
@@ -86,6 +91,7 @@ TARGET_ENUM = Literal[
     "A",
     "B",
     "C",
+    "all",
     "target",
     "max_efg",
     "avg_elec_mass",
@@ -95,6 +101,9 @@ TARGET_ENUM = Literal[
     "_oqmd_stability",
     "edos_up",
     "pdos_elast",
+    "bandgap",
+    "energy_total",
+    "net_magmom",
 ]
 
 
@@ -112,10 +121,12 @@ class TrainingConfig(BaseSettings):
         "mp_3d_2020",
         "qm9",
         "qm9_dgl",
+        "qm9_std_jctc",
         "user_data",
         "oqmd_3d_no_cfid",
         "edos_up",
         "edos_pdos",
+        "qmof",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"

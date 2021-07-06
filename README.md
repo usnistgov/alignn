@@ -26,5 +26,10 @@ Example
 ```
 python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example_regrssion.json"
 ```
-
+```
+python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example_classification.json"
+```
+```
+python alignn/scripts/train_folder_multi_prop.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example_regrssion.json"
+```
 You can also try multiple example scripts to run multiple dataset training. Look into the 'scripts' folder.

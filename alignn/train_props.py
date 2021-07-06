@@ -8,41 +8,6 @@ from alignn.train import train_dgl
 # from sklearn.metrics import mean_absolute_error
 plt.switch_backend("agg")
 
-jv_3d_props = [
-    "formation_energy_peratom",
-    "optb88vdw_bandgap",
-    "bulk_modulus_kv",
-    "shear_modulus_gv",
-    "mbj_bandgap",
-    "slme",
-    "magmom_oszicar",
-    "spillage",
-    "kpoint_length_unit",
-    "encut",
-    "optb88vdw_total_energy",
-    "epsx",
-    "epsy",
-    "epsz",
-    "mepsx",
-    "mepsy",
-    "mepsz",
-    "max_ir_mode",
-    "min_ir_mode",
-    "n-Seebeck",
-    "p-Seebeck",
-    "n-powerfact",
-    "p-powerfact",
-    "ncond",
-    "pcond",
-    "nkappa",
-    "pkappa",
-    "ehull",
-    "exfoliation_energy",
-    "dfpt_piezo_max_dielectric",
-    "dfpt_piezo_max_eij",
-    "dfpt_piezo_max_dij",
-]
-
 
 def train_prop_model(
     prop="",
@@ -58,6 +23,7 @@ def train_prop_model(
     batch_size=None,
     scheduler=None,
     n_epochs=None,
+    id_tag=None,
 ):
     """Train models for a dataset and a property."""
     if scheduler is None:
@@ -85,6 +51,8 @@ def train_prop_model(
             "name": name,
         },
     }
+    if id_tag is not None:
+        config["id_tag"] = id_tag
     if train_ratio is not None:
         config["train_ratio"] = train_ratio
         if val_ratio is None:
@@ -126,14 +94,28 @@ def train_prop_model(
             config["model"]["output_features"] = 200
         else:
             raise ValueError("Target not available.")
+    if dataset == "qm9_std_jctc":
+        config["id_tag"] = "id"
+        config["n_train"] = 110000
+        config["n_val"] = 10000
+        config["n_test"] = 10829
+
+        # config["batch_size"] = 64
+        config["cutoff"] = 5.0
+        config["standard_scalar_and_pca"] = False
+
     if dataset == "qm9_dgl":
         config["id_tag"] = "id"
         config["n_train"] = 110000
         config["n_val"] = 10000
         config["n_test"] = 10831
-        config["batch_size"] = batch_size
+        config["standard_scalar_and_pca"] = False
+        config["batch_size"] = 64
         config["cutoff"] = 5.0
-        config["max_neighbors"] = 9
+        if config["target"] == "all":
+            config["model"]["output_features"] = 12
+
+        # config["max_neighbors"] = 9
 
     if dataset == "qm9":
         config["id_tag"] = "id"

@@ -21,7 +21,8 @@ from jarvis.db.jsonutils import dumpjson
 
 # from sklearn.pipeline import Pipeline
 import pickle as pk
-from sklearn.decomposition import PCA  # ,KernelPCA
+
+# from sklearn.decomposition import PCA  # ,KernelPCA
 from sklearn.preprocessing import StandardScaler
 
 # use pandas progress_apply
@@ -296,6 +297,29 @@ def get_train_val_loaders(
             )
             print("Converting target data into 1 and 0.")
         all_targets = []
+
+        # TODO:make an all key in qm9_dgl
+        if dataset == "qm9_dgl" and target == "all":
+            print("Making all qm9_dgl")
+            tmp = []
+            for ii in d:
+                ii["all"] = [
+                    ii["mu"],
+                    ii["alpha"],
+                    ii["homo"],
+                    ii["lumo"],
+                    ii["gap"],
+                    ii["r2"],
+                    ii["zpve"],
+                    ii["U0"],
+                    ii["U"],
+                    ii["H"],
+                    ii["G"],
+                    ii["Cv"],
+                ]
+                tmp.append(ii)
+            print("Made all qm9_dgl")
+            d = tmp
         for i in d:
             if isinstance(i[target], list):  # multioutput target
                 all_targets.append(torch.tensor(i[target]))
@@ -347,8 +371,20 @@ def get_train_val_loaders(
         if standard_scalar_and_pca:
             y_data = [i[target] for i in dataset_train]
             # pipe = Pipeline([('scale', StandardScaler())])
+            if not isinstance(y_data[0], list):
+                print("Running StandardScalar")
+                y_data = np.array(y_data).reshape(-1, 1)
             sc = StandardScaler()
+
             sc.fit(y_data)
+            print("Mean", sc.mean_)
+            print("Variance", sc.var_)
+            try:
+                print("New max", max(y_data))
+                print("New min", min(y_data))
+            except Exception as exp:
+                print(exp)
+                pass
             # pc = PCA(n_components=output_features)
             # pipe = Pipeline(
             #    [
@@ -357,9 +393,9 @@ def get_train_val_loaders(
             #    ]
             # )
             pk.dump(sc, open("sc.pkl", "wb"))
-            pc = PCA(n_components=40)
-            pc.fit(y_data)
-            pk.dump(pc, open("pca.pkl", "wb"))
+            # pc = PCA(n_components=10)
+            # pc.fit(y_data)
+            # pk.dump(pc, open("pca.pkl", "wb"))
 
         if classification_threshold is None:
             try:
