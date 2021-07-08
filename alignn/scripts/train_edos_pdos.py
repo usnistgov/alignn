@@ -1,3 +1,4 @@
+"""Module to train electron/phonon DOS."""
 import os
 from jarvis.tasks.queue_jobs import Queue
 
