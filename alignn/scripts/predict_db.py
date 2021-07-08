@@ -1,3 +1,4 @@
+"""Module to predict for a DB of Atoms."""
 import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
@@ -25,6 +26,7 @@ def predict_for_db(
     filename="predictions.csv",
     id_tag="id",
 ):
+    """Predict using ALIGNN for a DB."""
     db = data(name)
     filename = name + "_" + prop + "_v1_" + filename
     f = open(filename, "w")

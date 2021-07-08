@@ -1,3 +1,4 @@
+"""Module to compare JARVIS-CFID results."""
 # from jarvis.ai.pkgs.utils import get_ml_data
 # from jarvis.ai.pkgs.utils import regr_scores
 from jarvis.db.figshare import data as jdata

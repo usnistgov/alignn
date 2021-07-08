@@ -22,7 +22,6 @@ def plot_learning_curve(
     results_dir: Union[str, Path], key: str = "mae", plot_train: bool = False
 ):
     """Plot learning curves based on json history files."""
-
     if isinstance(results_dir, str):
         results_dir = Path(results_dir)
 

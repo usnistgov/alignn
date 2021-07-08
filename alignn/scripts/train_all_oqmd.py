@@ -1,3 +1,4 @@
+"""Module to train OQMD datase."""
 # from alignn.train_props import train_prop_model
 import os
 from jarvis.tasks.queue_jobs import Queue
