@@ -1,3 +1,4 @@
+"""Module to visualize networkx graph."""
 from jarvis.db.figshare import get_jid_data
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph

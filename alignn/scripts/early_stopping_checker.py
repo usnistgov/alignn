@@ -1,3 +1,4 @@
+"""Module to analyze early stopping."""
 from jarvis.db.jsonutils import loadjson
 import glob
 
@@ -27,6 +28,7 @@ def check_early_stoppping_reached(
 
 
 def check_all_folders(path="."):
+    """Check results for all sub folders of a dataset run."""
     for i in glob.glob(path + "/*/history_val.json"):
         print(i)
         (

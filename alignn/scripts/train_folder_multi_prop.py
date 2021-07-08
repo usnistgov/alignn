@@ -1,3 +1,4 @@
+"""Module to train multi-properties from a folder."""
 import csv
 import os
 import sys
@@ -29,6 +30,7 @@ parser.add_argument(
 def train_for_folder_multi_prop(
     root_dir="examples/sample_data_multi_prop", config_name="config.json"
 ):
+    """Train for a multi-prop model from folder."""
     # config_dat=os.path.join(root_dir,config_name)
     id_prop_dat = os.path.join(root_dir, "id_multi_prop.csv")
     config = loadjson(config_name)

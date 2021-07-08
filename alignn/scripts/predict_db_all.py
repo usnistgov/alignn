@@ -1,3 +1,4 @@
+"""Module to predict for all DB's form. enp and gap."""
 import torch
 # from jarvis.core.atoms import Atoms
 # from jarvis.core.graphs import Graph
