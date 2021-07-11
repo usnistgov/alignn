@@ -3,9 +3,10 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 from alignn.train import train_dgl
+
 plt.switch_backend("agg")
 from sklearn.metrics import mean_absolute_error
-
+import os
 
 config = {
     "dataset": "dft_2d",
@@ -30,6 +31,15 @@ config = {
         "name": "alignn",
     },
 }
+
+
+def test_runtime_training():
+    cmd1 = 'python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json"'
+    os.system(cmd1)
+    cmd2 = 'python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data" --classification_threshold 0.01 --config "alignn/examples/sample_data/config_example.json"'
+    os.system(cmd2)
+    cmd3 = 'python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
+    os.system(cmd3)
 
 
 def test_models():
@@ -192,4 +202,5 @@ def test_models():
     """
 
 
+# test_runtime_training()
 # test_models()

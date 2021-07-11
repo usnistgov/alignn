@@ -22,7 +22,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--config_name",
-    default="config_example_regrssion.json",
+    default="alignn/examples/sample_data/config_example.json",
     help="Name of the config file",
 )
 
@@ -32,11 +32,19 @@ parser.add_argument(
     help="Whether to randomly shuffle samples",
 )
 
+parser.add_argument(
+    "--classification_threshold",
+    default=None,
+    help="Threshold for converting into 0/1 class"
+    + ", use only for classification tasks",
+)
+
 
 def train_for_folder(
     root_dir="examples/sample_data",
     config_name="config.json",
     keep_data_order=False,
+    classification_threshold=None,
 ):
     """Train for a folder."""
     # config_dat=os.path.join(root_dir,config_name)
@@ -49,11 +57,16 @@ def train_for_folder(
             print("Check", exp)
 
     config.keep_data_order = keep_data_order
+    if classification_threshold is not None:
+        config.classification_threshold = float(classification_threshold)
     with open(id_prop_dat, "r") as f:
         reader = csv.reader(f)
         data = [row for row in reader]
 
     dataset = []
+    n_outputs = []
+    multioutput = False
+    lists_length_equal = True
     for i in data:
         info = {}
         poscar_name = i[0]
@@ -61,8 +74,31 @@ def train_for_folder(
         atoms = Atoms.from_poscar(poscar_path)
         info["atoms"] = atoms.to_dict()
         info["jid"] = poscar_name
-        info["target"] = float(i[1])
+
+        tmp = [float(j) for j in i[1:]]  # float(i[1])
+        if len(tmp) == 1:
+            tmp = tmp[0]
+        else:
+            multioutput = True
+        info["target"] = tmp  # float(i[1])
+        n_outputs.append(info["target"])
         dataset.append(info)
+    if multioutput:
+        lists_length_equal = False not in [
+            len(i) == len(n_outputs[0]) for i in n_outputs
+        ]
+
+    # print ('n_outputs',n_outputs[0])
+    if multioutput and classification_threshold is not None:
+        raise ValueError("Classification for multi-output not implemented.")
+    if multioutput and lists_length_equal:
+        config.model.output_features = len(n_outputs[0])
+    else:
+        # TODO: Pad with NaN
+        if not lists_length_equal:
+            raise ValueError("Make sure the outputs are of same size.")
+        else:
+            config.model.output_features = 1
     (
         train_loader,
         val_loader,
@@ -111,4 +147,5 @@ if __name__ == "__main__":
         root_dir=args.root_dir,
         config_name=args.config_name,
         keep_data_order=args.keep_data_order,
+        classification_threshold=args.classification_threshold,
     )
