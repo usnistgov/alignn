@@ -24,6 +24,7 @@ def train_prop_model(
     scheduler=None,
     n_epochs=None,
     id_tag=None,
+    num_workers=None,
 ):
     """Train models for a dataset and a property."""
     if scheduler is None:
@@ -32,6 +33,8 @@ def train_prop_model(
         batch_size = 64
     if n_epochs is None:
         n_epochs = 300
+    if num_workers is None:
+        num_workers = 0
     config = {
         "dataset": dataset,
         "target": prop,
@@ -45,7 +48,7 @@ def train_prop_model(
         "save_dataloader": save_dataloader,
         "pin_memory": False,
         "write_predictions": write_predictions,
-        "num_workers": 0,
+        "num_workers": num_workers,
         "classification_threshold": classification_threshold,
         "model": {
             "name": name,
@@ -117,6 +120,8 @@ def train_prop_model(
 
         # config["max_neighbors"] = 9
 
+    if dataset == "hpov":
+        config["id_tag"] = "id"
     if dataset == "qm9":
         config["id_tag"] = "id"
         config["n_train"] = 110000

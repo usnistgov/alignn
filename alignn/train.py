@@ -194,6 +194,7 @@ def train_dgl(
             classification_threshold=config.classification_threshold,
             target_multiplication_factor=config.target_multiplication_factor,
             standard_scalar_and_pca=config.standard_scalar_and_pca,
+            keep_data_order=config.keep_data_order,
         )
     else:
         train_loader = train_val_test_loaders[0]

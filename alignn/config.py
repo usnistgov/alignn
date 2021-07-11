@@ -104,6 +104,13 @@ TARGET_ENUM = Literal[
     "bandgap",
     "energy_total",
     "net_magmom",
+    "b3lyp_homo",
+    "b3lyp_lumo",
+    "b3lyp_gap",
+    "b3lyp_scharber_pce",
+    "b3lyp_scharber_voc",
+    "b3lyp_scharber_jsc",
+    "log_kd_ki",
 ]
 
 
@@ -127,6 +134,8 @@ class TrainingConfig(BaseSettings):
         "edos_up",
         "edos_pdos",
         "qmof",
+        "hpov",
+        "pdbbind",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
@@ -167,6 +176,7 @@ class TrainingConfig(BaseSettings):
     num_workers: int = 4
     cutoff: float = 8.0
     max_neighbors: int = 12
+    keep_data_order: bool = False
 
     # model configuration
     model: Union[

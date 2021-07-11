@@ -25,9 +25,17 @@ parser.add_argument(
     help="Name of the config file",
 )
 
+parser.add_argument(
+    "--keep_data_order",
+    default=False,
+    help="Whether to randomly shuffle samples",
+)
+
 
 def train_for_folder(
-    root_dir="examples/sample_data", config_name="config.json"
+    root_dir="examples/sample_data",
+    config_name="config.json",
+    keep_data_order=False,
 ):
     # config_dat=os.path.join(root_dir,config_name)
     id_prop_dat = os.path.join(root_dir, "id_prop.csv")
@@ -38,6 +46,7 @@ def train_for_folder(
         except Exception as exp:
             print("Check", exp)
 
+    config.keep_data_order = keep_data_order
     with open(id_prop_dat, "r") as f:
         reader = csv.reader(f)
         data = [row for row in reader]
@@ -96,4 +105,8 @@ def train_for_folder(
 
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
-    train_for_folder(root_dir=args.root_dir, config_name=args.config_name)
+    train_for_folder(
+        root_dir=args.root_dir,
+        config_name=args.config_name,
+        keep_data_order=args.keep_data_order,
+    )
