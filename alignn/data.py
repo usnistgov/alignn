@@ -124,6 +124,7 @@ def get_id_train_val_test(
     n_train=None,
     n_test=None,
     n_val=None,
+    keep_data_order=False,
 ):
     """Get train, val, test IDs."""
     if (
@@ -145,9 +146,9 @@ def get_id_train_val_test(
     if n_val is None:
         n_val = int(val_ratio * total_size)
     ids = list(np.arange(total_size))
-
-    random.seed(split_seed)
-    random.shuffle(ids)
+    if not keep_data_order:
+        random.seed(split_seed)
+        random.shuffle(ids)
     if n_train + n_val + n_test > total_size:
         raise ValueError(
             "Check total number of samples.",
@@ -242,6 +243,7 @@ def get_train_val_loaders(
     classification_threshold: Optional[float] = None,
     target_multiplication_factor: Optional[float] = None,
     standard_scalar_and_pca=False,
+    keep_data_order=False,
     output_features=1,
 ):
     """Help function to set up Jarvis train and val dataloaders."""
@@ -358,6 +360,7 @@ def get_train_val_loaders(
             n_train=n_train,
             n_test=n_test,
             n_val=n_val,
+            keep_data_order=keep_data_order,
         )
         ids_train_val_test = {}
         ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]

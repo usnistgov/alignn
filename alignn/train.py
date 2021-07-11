@@ -42,6 +42,8 @@ from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
 from alignn.models.alignn_cgcnn import ACGCNN
 from jarvis.db.jsonutils import dumpjson
+import json
+import pprint
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -143,8 +145,10 @@ def train_dgl(
     classification = False
     print("config:")
     tmp = config.dict()
-    print(tmp)
-    dumpjson(data=tmp, filename="config.json")
+    f = open("config.json", "w")
+    f.write(json.dumps(tmp, indent=4))
+    f.close()
+    pprint.pprint(tmp, sort_dicts=False)
     if config.classification_threshold is not None:
         classification = True
     if config.random_seed is not None:
@@ -194,6 +198,7 @@ def train_dgl(
             classification_threshold=config.classification_threshold,
             target_multiplication_factor=config.target_multiplication_factor,
             standard_scalar_and_pca=config.standard_scalar_and_pca,
+            keep_data_order=config.keep_data_order,
         )
     else:
         train_loader = train_val_test_loaders[0]
