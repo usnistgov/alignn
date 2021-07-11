@@ -1,3 +1,5 @@
+"""Module to generate example dataset."""
+
 from jarvis.db.figshare import data as jdata
 from jarvis.core.atoms import Atoms
 

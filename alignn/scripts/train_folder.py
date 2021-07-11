@@ -1,3 +1,4 @@
+"""Module to train for a folder with formatted dataset."""
 import csv
 import os
 import sys
@@ -37,6 +38,7 @@ def train_for_folder(
     config_name="config.json",
     keep_data_order=False,
 ):
+    """Train for a folder."""
     # config_dat=os.path.join(root_dir,config_name)
     id_prop_dat = os.path.join(root_dir, "id_prop.csv")
     config = loadjson(config_name)

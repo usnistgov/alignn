@@ -1,3 +1,4 @@
+"""Module to predict using a trained model."""
 import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
