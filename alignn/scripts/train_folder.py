@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--root_dir",
     default="./",
-    help="Folder with id_props.csv, poscars and config*.json",
+    help="Folder with id_props.csv, poscars",
 )
 parser.add_argument(
     "--config_name",
@@ -29,13 +29,13 @@ parser.add_argument(
 parser.add_argument(
     "--keep_data_order",
     default=False,
-    help="Whether to randomly shuffle samples",
+    help="Whether to randomly shuffle samples, True/False",
 )
 
 parser.add_argument(
     "--classification_threshold",
     default=None,
-    help="Threshold for converting into 0/1 class"
+    help="Floating point threshold for converting into 0/1 class"
     + ", use only for classification tasks",
 )
 
