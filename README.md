@@ -38,6 +38,12 @@ Here is an example of training OptB88vdw bandgaps of 50 materials from JARVIS-DF
 
 The dataset in split in 80:10:10 as training-validation-test set (controlled by `train_ratio, val_ratio, test_ratio`) . To change the split proportion and other parameters, change the `config_example.json` file. If, users want to train on certain sets and val/test on another dataset, set `n_train`, `n_val`, `n_test` manually in the `config_example.json` and also set `keep_data_order` as True there so that random shuffle is disabled.  
 
+A brief help guide can be obtained as:
+
+```
+python alignn/scripts/train_folder.py -h
+```
+
 Now, the model is trained.
 
 ```
@@ -57,5 +63,5 @@ An example is given below for training formation energy per atom, bandgap and to
 python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"
 ```
 
-Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the 'alignn/scripts' folder. 
+Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the 'alignn/scripts' folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.  
 These scripts automatically download datasets from `jarvis.db.fighshare` module in `jarvis-tools` package and train several models. Make sure you specify your specific queuing system details in the scripts. 
