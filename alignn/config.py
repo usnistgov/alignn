@@ -177,7 +177,7 @@ class TrainingConfig(BaseSettings):
     cutoff: float = 8.0
     max_neighbors: int = 12
     keep_data_order: bool = False
-
+    distributed: bool = False
     # model configuration
     model: Union[
         CGCNNConfig,

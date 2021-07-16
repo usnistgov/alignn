@@ -223,6 +223,27 @@ def train_dgl(
         net = model
 
     net.to(device)
+    if config.distributed:
+        import torch.distributed as dist
+        import os
+
+        def setup(rank, world_size):
+            os.environ["MASTER_ADDR"] = "localhost"
+            os.environ["MASTER_PORT"] = "12355"
+
+            # initialize the process group
+            dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+        def cleanup():
+            dist.destroy_process_group()
+
+        setup(2, 2)
+        # local_rank = 0
+        # net=torch.nn.parallel.DataParallel(net
+        # ,device_ids=[local_rank, ],output_device=local_rank)
+        net = torch.nn.parallel.DistributedDataParallel(
+            net
+        )  # ,device_ids=[local_rank, ],output_device=local_rank)
 
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
