@@ -136,6 +136,7 @@ class TrainingConfig(BaseSettings):
         "qmof",
         "hpov",
         "pdbbind",
+        "pdbbind_core",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
@@ -178,6 +179,7 @@ class TrainingConfig(BaseSettings):
     max_neighbors: int = 12
     keep_data_order: bool = False
     distributed: bool = False
+    n_early_stopping: Optional[int] = None  # typically 50
     # model configuration
     model: Union[
         CGCNNConfig,

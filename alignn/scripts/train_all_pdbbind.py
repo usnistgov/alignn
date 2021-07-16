@@ -9,7 +9,7 @@ props = [
 ]
 cwd_home = os.getcwd()
 for i in props:
-    model_name = "pdbbind_" + i + "_alignn"
+    model_name = "pdbbind_core_bs1_" + i + "_alignn"
     model_name = model_name.replace(" ", "")
     if not os.path.exists(model_name):
         os.makedirs(model_name)
@@ -18,7 +18,7 @@ for i in props:
     tmp = (
         "from alignn.train_props import "
         + 'train_prop_model \ntrain_prop_model(id_tag="id",'
-        + 'num_workers=0,batch_size=1,dataset="pdbbind",prop="'
+        + 'num_workers=4,batch_size=1,dataset="pdbbind_core",prop="'
     )
 
     line = tmp + i + '")\n'

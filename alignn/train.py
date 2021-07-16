@@ -12,6 +12,7 @@ import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.stores import EpochOutputStore
+from ignite.handlers import EarlyStopping
 from ignite.contrib.handlers.tensorboard_logger import (
     global_step_from_engine,
 )
@@ -341,6 +342,7 @@ def train_dgl(
         device=device,
         # output_transform=make_standard_scalar_and_pca,
     )
+
     train_evaluator = create_supervised_evaluator(
         net,
         metrics=metrics,
@@ -430,6 +432,22 @@ def train_dgl(
                 pbar.log_message(f"Train ROC AUC: {tmetrics['rocauc']:.4f}")
                 pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
 
+    if config.n_early_stopping is not None:
+        if classification:
+            my_metrics = "accuracy"
+        else:
+            my_metrics = "mae"
+
+        def default_score_fn(engine):
+            score = engine.state.metrics[my_metrics]
+            return score
+
+        es_handler = EarlyStopping(
+            patience=config.n_early_stopping,
+            score_function=default_score_fn,
+            trainer=trainer,
+        )
+        evaluator.add_event_handler(Events.EPOCH_COMPLETED, es_handler)
     # optionally log results to tensorboard
     if config.log_tensorboard:
 
@@ -584,8 +602,8 @@ def train_dgl(
             for i, j, k in zip(ids, x, y):
                 f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
-    """
 
+    """
     return history
 
 
