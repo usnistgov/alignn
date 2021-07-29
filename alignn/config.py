@@ -111,6 +111,12 @@ TARGET_ENUM = Literal[
     "b3lyp_scharber_voc",
     "b3lyp_scharber_jsc",
     "log_kd_ki",
+    "max_co2_adsp",
+    "lcd",
+    "pld",
+    "void_fraction",
+    "surface_area_m2g",
+    "surface_area_m2cm3",
 ]
 
 
@@ -134,6 +140,7 @@ class TrainingConfig(BaseSettings):
         "edos_up",
         "edos_pdos",
         "qmof",
+        "hmof",
         "hpov",
         "pdbbind",
         "pdbbind_core",
