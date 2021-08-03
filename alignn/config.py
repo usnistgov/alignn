@@ -2,12 +2,11 @@
 
 import subprocess
 from typing import Optional, Union
-
+import os
 from pydantic import root_validator
 
 # vfrom pydantic import Field, root_validator, validator
 from pydantic.typing import Literal
-
 from alignn.utils import BaseSettings
 from alignn.models.modified_cgcnn import CGCNNConfig
 from alignn.models.icgcnn import ICGCNNConfig
@@ -187,6 +186,7 @@ class TrainingConfig(BaseSettings):
     keep_data_order: bool = False
     distributed: bool = False
     n_early_stopping: Optional[int] = None  # typically 50
+    output_dir: str = os.path.abspath(".")  # typically 50
     # model configuration
     model: Union[
         CGCNNConfig,

@@ -39,12 +39,19 @@ parser.add_argument(
     + ", use only for classification tasks",
 )
 
+parser.add_argument(
+    "--output_dir",
+    default="./",
+    help="Folder to save outputs",
+)
+
 
 def train_for_folder(
     root_dir="examples/sample_data",
     config_name="config.json",
     keep_data_order=False,
     classification_threshold=None,
+    output_dir=None,
 ):
     """Train for a folder."""
     # config_dat=os.path.join(root_dir,config_name)
@@ -59,6 +66,8 @@ def train_for_folder(
     config.keep_data_order = keep_data_order
     if classification_threshold is not None:
         config.classification_threshold = float(classification_threshold)
+    if output_dir is not None:
+        config.output_dir = output_dir
     with open(id_prop_dat, "r") as f:
         reader = csv.reader(f)
         data = [row for row in reader]
@@ -125,9 +134,14 @@ def train_for_folder(
         filename=config.filename,
         cutoff=config.cutoff,
         max_neighbors=config.max_neighbors,
+        output_features=config.model.output_features,
         classification_threshold=config.classification_threshold,
         target_multiplication_factor=config.target_multiplication_factor,
+        standard_scalar_and_pca=config.standard_scalar_and_pca,
+        keep_data_order=config.keep_data_order,
+        output_dir=config.output_dir,
     )
+
     train_dgl(
         config,
         train_val_test_loaders=[
@@ -148,4 +162,5 @@ if __name__ == "__main__":
         config_name=args.config_name,
         keep_data_order=args.keep_data_order,
         classification_threshold=args.classification_threshold,
+        output_dir=args.output_dir,
     )
