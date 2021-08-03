@@ -6,12 +6,14 @@ then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 
 from functools import partial
-from pathlib import Path
+
+# from pathlib import Path
 from typing import Any, Dict, Union
 import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.stores import EpochOutputStore
+from ignite.handlers import EarlyStopping
 from ignite.contrib.handlers.tensorboard_logger import (
     global_step_from_engine,
 )
@@ -33,7 +35,8 @@ import numpy as np
 from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
-from alignn import data, models
+from alignn import models
+from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
 from alignn.models.modified_cgcnn import CGCNN
@@ -44,6 +47,8 @@ from alignn.models.alignn_cgcnn import ACGCNN
 from jarvis.db.jsonutils import dumpjson
 import json
 import pprint
+
+import os
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -66,7 +71,7 @@ def activated_output_transform(output):
 
 def make_standard_scalar_and_pca(output):
     """Use standard scalar and PCS for multi-output data."""
-    sc = pk.load(open("sc.pkl", "rb"))
+    sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
     y_pred, y = output
     y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
     y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
@@ -125,7 +130,7 @@ def setup_optimizer(params, config: TrainingConfig):
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
-    checkpoint_dir: Path = Path("./"),
+    # checkpoint_dir: Path = Path("./"),
     train_val_test_loaders=[],
     # log_tensorboard: bool = False,
 ):
@@ -140,14 +145,20 @@ def train_dgl(
             config = TrainingConfig(**config)
         except Exception as exp:
             print("Check", exp)
+    import os
 
+    if not os.path.exists(config.output_dir):
+        os.makedirs(config.output_dir)
+    checkpoint_dir = os.path.join(config.output_dir)
     deterministic = False
     classification = False
     print("config:")
     tmp = config.dict()
-    f = open("config.json", "w")
+    f = open(os.path.join(config.output_dir, "config.json"), "w")
     f.write(json.dumps(tmp, indent=4))
     f.close()
+    global tmp_output_dir
+    tmp_output_dir = config.output_dir
     pprint.pprint(tmp, sort_dicts=False)
     if config.classification_threshold is not None:
         classification = True
@@ -165,6 +176,7 @@ def train_dgl(
         line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
         line_graph = True
+    # print ('output_dir train', config.output_dir)
     if not train_val_test_loaders:
         # use input standardization for all real-valued feature sets
         (
@@ -172,7 +184,8 @@ def train_dgl(
             val_loader,
             test_loader,
             prepare_batch,
-        ) = data.get_train_val_loaders(
+        ) = get_train_val_loaders(
+            # ) = data.get_train_val_loaders(
             dataset=config.dataset,
             target=config.target,
             n_train=config.n_train,
@@ -199,6 +212,7 @@ def train_dgl(
             target_multiplication_factor=config.target_multiplication_factor,
             standard_scalar_and_pca=config.standard_scalar_and_pca,
             keep_data_order=config.keep_data_order,
+            output_dir=config.output_dir,
         )
     else:
         train_loader = train_val_test_loaders[0]
@@ -223,6 +237,27 @@ def train_dgl(
         net = model
 
     net.to(device)
+    if config.distributed:
+        import torch.distributed as dist
+        import os
+
+        def setup(rank, world_size):
+            os.environ["MASTER_ADDR"] = "localhost"
+            os.environ["MASTER_PORT"] = "12355"
+
+            # initialize the process group
+            dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+        def cleanup():
+            dist.destroy_process_group()
+
+        setup(2, 2)
+        # local_rank = 0
+        # net=torch.nn.parallel.DataParallel(net
+        # ,device_ids=[local_rank, ],output_device=local_rank)
+        net = torch.nn.parallel.DistributedDataParallel(
+            net
+        )  # ,device_ids=[local_rank, ],output_device=local_rank)
 
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
@@ -320,6 +355,7 @@ def train_dgl(
         device=device,
         # output_transform=make_standard_scalar_and_pca,
     )
+
     train_evaluator = create_supervised_evaluator(
         net,
         metrics=metrics,
@@ -398,8 +434,14 @@ def train_dgl(
         if config.store_outputs:
             history["EOS"] = eos.data
             history["trainEOS"] = train_eos.data
-            dumpjson(filename="history_val.json", data=history["validation"])
-            dumpjson(filename="history_train.json", data=history["train"])
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_val.json"),
+                data=history["validation"],
+            )
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_train.json"),
+                data=history["train"],
+            )
         if config.progress:
             pbar = ProgressBar()
             if not classification:
@@ -409,10 +451,28 @@ def train_dgl(
                 pbar.log_message(f"Train ROC AUC: {tmetrics['rocauc']:.4f}")
                 pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
 
+    if config.n_early_stopping is not None:
+        if classification:
+            my_metrics = "accuracy"
+        else:
+            my_metrics = "mae"
+
+        def default_score_fn(engine):
+            score = engine.state.metrics[my_metrics]
+            return score
+
+        es_handler = EarlyStopping(
+            patience=config.n_early_stopping,
+            score_function=default_score_fn,
+            trainer=trainer,
+        )
+        evaluator.add_event_handler(Events.EPOCH_COMPLETED, es_handler)
     # optionally log results to tensorboard
     if config.log_tensorboard:
 
-        tb_logger = TensorboardLogger(log_dir="tb_logs/test")
+        tb_logger = TensorboardLogger(
+            log_dir=os.path.join(config.output_dir, "tb_logs", "test")
+        )
         for tag, evaluator in [
             ("training", train_evaluator),
             ("validation", evaluator),
@@ -434,7 +494,10 @@ def train_dgl(
         tb_logger.close()
     if config.write_predictions and classification:
         net.eval()
-        f = open("prediction_results_test_set.csv", "w")
+        f = open(
+            os.path.join(config.output_dir, "prediction_results_test_set.csv"),
+            "w",
+        )
         f.write("id,target,prediction\n")
         targets = []
         predictions = []
@@ -486,14 +549,22 @@ def train_dgl(
                 info["target"] = target
                 info["predictions"] = out_data
                 mem.append(info)
-        dumpjson(filename="multi_out_predictions.json", data=mem)
+        dumpjson(
+            filename=os.path.join(
+                config.output_dir, "multi_out_predictions.json"
+            ),
+            data=mem,
+        )
     if (
         config.write_predictions
         and not classification
         and config.model.output_features == 1
     ):
         net.eval()
-        f = open("prediction_results_test_set.csv", "w")
+        f = open(
+            os.path.join(config.output_dir, "prediction_results_test_set.csv"),
+            "w",
+        )
         f.write("id,target,prediction\n")
         targets = []
         predictions = []
@@ -504,7 +575,9 @@ def train_dgl(
                 out_data = net([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
-                    sc = pk.load(open("sc.pkl", "rb"))
+                    sc = pk.load(
+                        open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                    )
                     out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
                         0
                     ][0]
@@ -529,7 +602,12 @@ def train_dgl(
                 y.append(i[1].cpu().numpy().tolist())
             x = np.array(x, dtype="float").flatten()
             y = np.array(y, dtype="float").flatten()
-            f = open("prediction_results_train_set.csv", "w")
+            f = open(
+                os.path.join(
+                    config.output_dir, "prediction_results_train_set.csv"
+                ),
+                "w",
+            )
             # TODO: Add IDs
             f.write("target,prediction\n")
             for i, j in zip(x, y):
@@ -563,8 +641,8 @@ def train_dgl(
             for i, j, k in zip(ids, x, y):
                 f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
-    """
 
+    """
     return history
 
 

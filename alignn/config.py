@@ -2,12 +2,11 @@
 
 import subprocess
 from typing import Optional, Union
-
+import os
 from pydantic import root_validator
 
 # vfrom pydantic import Field, root_validator, validator
 from pydantic.typing import Literal
-
 from alignn.utils import BaseSettings
 from alignn.models.modified_cgcnn import CGCNNConfig
 from alignn.models.icgcnn import ICGCNNConfig
@@ -111,6 +110,12 @@ TARGET_ENUM = Literal[
     "b3lyp_scharber_voc",
     "b3lyp_scharber_jsc",
     "log_kd_ki",
+    "max_co2_adsp",
+    "lcd",
+    "pld",
+    "void_fraction",
+    "surface_area_m2g",
+    "surface_area_m2cm3",
 ]
 
 
@@ -134,8 +139,10 @@ class TrainingConfig(BaseSettings):
         "edos_up",
         "edos_pdos",
         "qmof",
+        "hmof",
         "hpov",
         "pdbbind",
+        "pdbbind_core",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
@@ -177,7 +184,9 @@ class TrainingConfig(BaseSettings):
     cutoff: float = 8.0
     max_neighbors: int = 12
     keep_data_order: bool = False
-
+    distributed: bool = False
+    n_early_stopping: Optional[int] = None  # typically 50
+    output_dir: str = os.path.abspath(".")  # typically 50
     # model configuration
     model: Union[
         CGCNNConfig,

@@ -65,3 +65,8 @@ python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data_mu
 
 Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the 'alignn/scripts' folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.  
 These scripts automatically download datasets from `jarvis.db.fighshare` module in `jarvis-tools` package and train several models. Make sure you specify your specific queuing system details in the scripts. 
+
+Notes: 
+1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111.
+2) The undirected graph and its line graph is constructured in `jarvis-tools` package using `jarvis.core.graphs`
+

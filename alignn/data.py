@@ -182,13 +182,15 @@ def get_torch_dataset(
     cutoff=8.0,
     max_neighbors=12,
     classification=False,
+    output_dir=".",
+    tmp_name="dataset",
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
     # print("df", df)
     vals = df[target].values
     print("data range", np.max(vals), np.min(vals))
-    f = open("data_range", "w")
+    f = open(os.path.join(output_dir, tmp_name + "_data_range"), "w")
     line = "Max=" + str(np.max(vals)) + "\n"
     f.write(line)
     line = "Min=" + str(np.min(vals)) + "\n"
@@ -245,12 +247,15 @@ def get_train_val_loaders(
     standard_scalar_and_pca=False,
     keep_data_order=False,
     output_features=1,
+    output_dir=None,
 ):
-    """Help function to set up Jarvis train and val dataloaders."""
+    """Help function to set up JARVIS train and val dataloaders."""
     train_sample = filename + "_train.data"
     val_sample = filename + "_val.data"
     test_sample = filename + "_test.data"
-
+    # print ('output_dir data',output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     if (
         os.path.exists(train_sample)
         and os.path.exists(val_sample)
@@ -366,7 +371,10 @@ def get_train_val_loaders(
         ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]
         ids_train_val_test["id_val"] = [dat[i][id_tag] for i in id_val]
         ids_train_val_test["id_test"] = [dat[i][id_tag] for i in id_test]
-        dumpjson(data=ids_train_val_test, filename="ids_train_val_test.json")
+        dumpjson(
+            data=ids_train_val_test,
+            filename=os.path.join(output_dir, "ids_train_val_test.json"),
+        )
         dataset_train = [dat[x] for x in id_train]
         dataset_val = [dat[x] for x in id_val]
         dataset_test = [dat[x] for x in id_test]
@@ -395,7 +403,7 @@ def get_train_val_loaders(
             #        ("reduce_dims", PCA(n_components=output_features)),
             #    ]
             # )
-            pk.dump(sc, open("sc.pkl", "wb"))
+            pk.dump(sc, open(os.path.join(output_dir, "sc.pkl"), "wb"))
             # pc = PCA(n_components=10)
             # pc.fit(y_data)
             # pk.dump(pc, open("pca.pkl", "wb"))
@@ -407,6 +415,20 @@ def get_train_val_loaders(
                 print("MAX val:", max(all_targets))
                 print("MIN val:", min(all_targets))
                 print("MAD:", mean_absolute_deviation(all_targets))
+                try:
+                    f = open(os.path.join(output_dir, "mad"), "w")
+                    line = "MAX val:" + str(max(all_targets)) + "\n"
+                    line += "MIN val:" + str(min(all_targets)) + "\n"
+                    line += (
+                        "MAD val:"
+                        + str(mean_absolute_deviation(all_targets))
+                        + "\n"
+                    )
+                    f.write(line)
+                    f.close()
+                except Exception as exp:
+                    print("Cannot write mad", exp)
+                    pass
                 # Random model precited value
                 x_bar = np.mean(np.array([i[target] for i in dataset_train]))
                 baseline_mae = mean_absolute_error(
@@ -430,6 +452,8 @@ def get_train_val_loaders(
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
+            output_dir=output_dir,
+            tmp_name="train_data",
         )
         val_data = get_torch_dataset(
             dataset=dataset_val,
@@ -443,6 +467,8 @@ def get_train_val_loaders(
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
+            output_dir=output_dir,
+            tmp_name="val_data",
         )
         test_data = get_torch_dataset(
             dataset=dataset_test,
@@ -456,6 +482,8 @@ def get_train_val_loaders(
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
+            output_dir=output_dir,
+            tmp_name="test_data",
         )
 
         collate_fn = train_data.collate
