@@ -1,6 +1,10 @@
 ![alt text](https://github.com/usnistgov/alignn/actions/workflows/main.yml/badge.svg)
 # ALIGNN
-Atomistic Line Graph Neural Network (https://arxiv.org/abs/2106.01829)
+The Atomistic Line Graph Neural Network (https://arxiv.org/abs/2106.01829) introduces a new graph convolution layer that explicitly models both two and three body interactions in atomistic systems.
+This is achieved by composing two edge-gated graph convolution layers, the first applied to the atomistic line graph (representing triplet interactions) and the second applied to the atomistic bond graph (representing pair interactions).
+
+h<sub>i</sub> e<sub>ij</sub> t<sub>ijk</sub>
+
 
 ![ALIGNN layer schematic](tex/alignn2.png)
 
