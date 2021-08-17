@@ -4,8 +4,11 @@ The Atomistic Line Graph Neural Network (https://arxiv.org/abs/2106.01829) intro
 This is achieved by composing two edge-gated graph convolution layers, the first applied to the atomistic line graph *L(g)* (representing triplet interactions) and the second applied to the atomistic bond graph *g* (representing pair interactions).
 
 
-The atomistic graph *g* consists of a node for each atom *i* (with atom features *h<sub>i</sub>*).
-h<sub>i</sub> e<sub>ij</sub> t<sub>ijk</sub>
+The atomistic graph *g* consists of a node for each atom *i* (with atom/node representations *h<sub>i</sub>*), and one edge for each atom pair within a cutoff radius (with bond/pair representations *e<sub>ij</sub>*).
+
+The atomistic line graph *L(g)* represents relationships between atom triplets: it has nodes corresponding to bonds (sharing representations *e<sub>ij</sub>* with those in *g*) and edges corresponding to bond angles (with angle/triplet representations *t<sub>ijk</sub>*).
+
+The line graph convolution updates the triplet representations and the pair representations; the direct graph convolution further updates the pair representations and the atom representations.
 
 
 ![ALIGNN layer schematic](tex/alignn2.png)
