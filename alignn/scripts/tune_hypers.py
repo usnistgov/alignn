@@ -14,18 +14,28 @@ config = {
     "random_seed": 123,
     # "target": "formation_energy_per_atom",
     "target": "optb88vdw_bandgap",
-    "epochs": 10,
-    "n_train": 32,
-    "n_val": 32,
+    "epochs": 100,
     "n_test": 32,
-    "batch_size": 32,
-    "num_workers": 1,
+    "num_workers": 4,
+    "pin_memory": True,
     "output_dir": "test",
     "progress": True,
     "write_checkpoint": True,
     "write_predictions": False,
     "tune": True,
     "learning_rate": tune.loguniform(1e-4, 1e-1),
+    "weight_decay": tune.loguniform(1e-7, 1e-3),
+    "batch_size": tune.choice([16, 32, 64, 128, 256]),
+    "model": {
+        "name": "alignn",
+        "alignn_layers": tune.randint(0, 4),
+        "gcn_layers": tune.randint(0, 4),
+        "edge_input_features": tune.qlograndint(8, 128, 8),
+        "triplet_input_features": tune.qlograndint(8, 128, 8),
+        "embedding_features": tune.qlograndint(16, 128, 16),
+        "hidden_features": tune.qlograndint(16, 256, 16),
+        "link": tune.choice(["identity", "log"]),
+    },
 }
 
 
@@ -35,7 +45,8 @@ if __name__ == "__main__":
 
     analysis = tune.run(
         train_dgl,
-        num_samples=2,
+        num_samples=10,
+        resources_per_trial={"cpu": 4, "gpu": 1},
         scheduler=ASHAScheduler(metric="mae", mode="min", grace_period=5),
         config=config,
         local_dir="./ray_results",
