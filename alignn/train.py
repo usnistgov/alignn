@@ -4,52 +4,58 @@ from the repository root, run
 `PYTHONPATH=$PYTHONPATH:. python alignn/train.py`
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
-
+import json
+import os
+import pickle as pk
+import pprint
 from functools import partial
 
 # from pathlib import Path
 from typing import Any, Dict, Union
+
 import ignite
+import numpy as np
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from ignite.contrib.handlers.stores import EpochOutputStore
-from ignite.handlers import EarlyStopping
-from ignite.contrib.handlers.tensorboard_logger import (
-    global_step_from_engine,
-)
+from ignite.contrib.handlers.tensorboard_logger import global_step_from_engine
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
+from ignite.contrib.metrics import ROC_AUC, RocCurve
 from ignite.engine import (
     Events,
     create_supervised_evaluator,
     create_supervised_trainer,
 )
-from ignite.contrib.metrics import ROC_AUC, RocCurve
+from ignite.handlers import (
+    Checkpoint,
+    DiskSaver,
+    EarlyStopping,
+    TerminateOnNan,
+)
 from ignite.metrics import (
     Accuracy,
+    ConfusionMatrix,
+    Loss,
+    MeanAbsoluteError,
     Precision,
     Recall,
-    ConfusionMatrix,
 )
-import pickle as pk
-import numpy as np
-from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
-from ignite.metrics import Loss, MeanAbsoluteError
+from jarvis.db.jsonutils import dumpjson
+from sklearn.metrics import mean_absolute_error, roc_auc_score
 from torch import nn
+
 from alignn import models
-from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
+from alignn.data import get_train_val_loaders
 from alignn.models.alignn import ALIGNN
+
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
 from alignn.models.modified_cgcnn import CGCNN
+from alignn.models.alignn_cgcnn import ACGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
-from alignn.models.alignn_cgcnn import ACGCNN
-from jarvis.db.jsonutils import dumpjson
-import json
-import pprint
-
-import os
+from alignn.models.modified_cgcnn import CGCNN
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -130,43 +136,48 @@ def setup_optimizer(params, config: TrainingConfig):
 
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
-    model: nn.Module = None,
     # checkpoint_dir: Path = Path("./"),
     train_val_test_loaders=[],
-    # log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
 
     `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
-    print(config)
-    if type(config) is dict:
+
+    if isinstance(config, dict):
         try:
             print(config)
             config = TrainingConfig(**config)
         except Exception as exp:
             print("Check", exp)
-    import os
 
-    if not os.path.exists(config.output_dir):
-        os.makedirs(config.output_dir)
+    os.makedirs(config.output_dir, exist_ok=True)
     checkpoint_dir = os.path.join(config.output_dir)
-    deterministic = False
-    classification = False
+
+    if config.tune:
+        from ray import tune
+
     print("config:")
-    tmp = config.dict()
-    f = open(os.path.join(config.output_dir, "config.json"), "w")
-    f.write(json.dumps(tmp, indent=4))
-    f.close()
+    _config = config.dict()
+    pprint.pprint(_config, sort_dicts=False)
+
+    with open(os.path.join(config.output_dir, "config.json"), "w") as f:
+        f.write(json.dumps(_config, indent=4))
+
     global tmp_output_dir
     tmp_output_dir = config.output_dir
-    pprint.pprint(tmp, sort_dicts=False)
+
     if config.classification_threshold is not None:
         classification = True
+    else:
+        classification = False
+
     if config.random_seed is not None:
         deterministic = True
         ignite.utils.manual_seed(config.random_seed)
+    else:
+        deterministic = False
 
     line_graph = False
     alignn_models = {
@@ -192,7 +203,6 @@ def train_dgl(
             test_loader,
             prepare_batch,
         ) = get_train_val_loaders(
-            # ) = data.get_train_val_loaders(
             dataset=config.dataset,
             target=config.target,
             n_train=config.n_train,
@@ -222,13 +232,19 @@ def train_dgl(
             output_dir=config.output_dir,
         )
     else:
-        train_loader = train_val_test_loaders[0]
-        val_loader = train_val_test_loaders[1]
-        test_loader = train_val_test_loaders[2]
-        prepare_batch = train_val_test_loaders[3]
+        # dataloaders explicitly passed as list
+        (
+            train_loader,
+            val_loader,
+            test_loader,
+            prepare_batch,
+        ) = train_val_test_loaders
+
     prepare_batch = partial(prepare_batch, device=device)
+
     if classification:
         config.model.classification = True
+
     # define network, optimizer, scheduler
     _model = {
         "cgcnn": CGCNN,
@@ -239,15 +255,11 @@ def train_dgl(
         "alignn_cgcnn": ACGCNN,
         "alignn_layernorm": ALIGNN_LN,
     }
-    if model is None:
-        net = _model.get(config.model.name)(config.model)
-    else:
-        net = model
+    model = _model.get(config.model.name)(config.model)
+    model.to(device)
 
-    net.to(device)
     if config.distributed:
         import torch.distributed as dist
-        import os
 
         def setup(rank, world_size):
             os.environ["MASTER_ADDR"] = "localhost"
@@ -260,15 +272,10 @@ def train_dgl(
             dist.destroy_process_group()
 
         setup(2, 2)
-        # local_rank = 0
-        # net=torch.nn.parallel.DataParallel(net
-        # ,device_ids=[local_rank, ],output_device=local_rank)
-        net = torch.nn.parallel.DistributedDataParallel(
-            net
-        )  # ,device_ids=[local_rank, ],output_device=local_rank)
+        model = torch.nn.parallel.DistributedDataParallel(model)
 
     # group parameters to skip weight decay for bias and batchnorm
-    params = group_decay(net)
+    params = group_decay(model)
     optimizer = setup_optimizer(params, config)
 
     if config.scheduler == "none":
@@ -347,7 +354,7 @@ def train_dgl(
             ),
         }
     trainer = create_supervised_trainer(
-        net,
+        model,
         optimizer,
         criterion,
         prepare_batch=prepare_batch,
@@ -357,7 +364,7 @@ def train_dgl(
     )
 
     evaluator = create_supervised_evaluator(
-        net,
+        model,
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
@@ -365,7 +372,7 @@ def train_dgl(
     )
 
     train_evaluator = create_supervised_evaluator(
-        net,
+        model,
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
@@ -383,7 +390,7 @@ def train_dgl(
     if config.write_checkpoint:
         # model checkpointing
         to_save = {
-            "model": net,
+            "model": model,
             "optimizer": optimizer,
             "lr_scheduler": scheduler,
             "trainer": trainer,
@@ -395,6 +402,7 @@ def train_dgl(
             global_step_transform=lambda *_: trainer.state.epoch,
         )
         trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
+
     if config.progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
@@ -419,6 +427,10 @@ def train_dgl(
         """Print training and validation metrics to console."""
         train_evaluator.run(train_loader)
         evaluator.run(val_loader)
+
+        if config.tune:
+            # report validation set metrics to ray tune
+            tune.report(**evaluator.state.metrics)
 
         tmetrics = train_evaluator.state.metrics
         vmetrics = evaluator.state.metrics
@@ -450,14 +462,14 @@ def train_dgl(
                 filename=os.path.join(config.output_dir, "history_train.json"),
                 data=history["train"],
             )
-        if config.progress:
-            pbar = ProgressBar()
-            if not classification:
-                pbar.log_message(f"Val_MAE: {vmetrics['mae']:.4f}")
-                pbar.log_message(f"Train_MAE: {tmetrics['mae']:.4f}")
-            else:
-                pbar.log_message(f"Train ROC AUC: {tmetrics['rocauc']:.4f}")
-                pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
+        # if config.progress:
+        #     pbar = ProgressBar()
+        #     if not classification:
+        #         pbar.log_message(f"Val_MAE: {vmetrics['mae']:.4f}")
+        #         pbar.log_message(f"Train_MAE: {tmetrics['mae']:.4f}")
+        #     else:
+        #         pbar.log_message(f"Train ROC AUC: {tmetrics['rocauc']:.4f}")
+        #         pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
 
     if config.n_early_stopping is not None:
         if classification:
@@ -500,31 +512,30 @@ def train_dgl(
         test_loss = evaluator.state.metrics["loss"]
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
+
     if config.write_predictions and classification:
-        net.eval()
-        f = open(
+        model.eval()
+        with open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
             "w",
-        )
-        f.write("id,target,prediction\n")
-        targets = []
-        predictions = []
-        with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
-                # out_data = torch.exp(out_data.cpu())
-                top_p, top_class = torch.topk(torch.exp(out_data), k=1)
-                target = int(target.cpu().numpy().flatten().tolist()[0])
+        ) as f:
+            print("id, target, prediction", file=f)
+            targets = []
+            predictions = []
+            with torch.no_grad():
+                ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+                for dat, id in zip(test_loader, ids):
+                    g, lg, target = dat
+                    out_data = model([g.to(device), lg.to(device)])
 
-                f.write("%s, %d, %d\n" % (id, (target), (top_class)))
-                targets.append(target)
-                predictions.append(
-                    top_class.cpu().numpy().flatten().tolist()[0]
-                )
-        f.close()
-        from sklearn.metrics import roc_auc_score
+                    top_p, top_class = torch.topk(torch.exp(out_data), k=1)
+                    target = int(target.cpu().numpy().flatten().tolist()[0])
+
+                    f.write("%s, %d, %d\n" % (id, (target), (top_class)))
+                    targets.append(target)
+                    predictions.append(
+                        top_class.cpu().numpy().flatten().tolist()[0]
+                    )
 
         print("predictions", predictions)
         print("targets", targets)
@@ -538,13 +549,13 @@ def train_dgl(
         and not classification
         and config.model.output_features > 1
     ):
-        net.eval()
+        model.eval()
         mem = []
         with torch.no_grad():
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                out_data = model([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(open("sc.pkl", "rb"))
@@ -568,7 +579,7 @@ def train_dgl(
         and not classification
         and config.model.output_features == 1
     ):
-        net.eval()
+        model.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
             "w",
@@ -580,7 +591,7 @@ def train_dgl(
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                out_data = model([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
@@ -596,7 +607,6 @@ def train_dgl(
                 targets.append(target)
                 predictions.append(out_data)
         f.close()
-        from sklearn.metrics import mean_absolute_error
 
         print(
             "Test MAE:",
@@ -627,7 +637,7 @@ def train_dgl(
     # TODO: Fix IDs for train loader
     """
     if config.write_train_predictions:
-        net.eval()
+        model.eval()
         f = open("train_prediction_results.csv", "w")
         f.write("id,target,prediction\n")
         with torch.no_grad():
@@ -640,7 +650,7 @@ def train_dgl(
 
             for dat, id in zip(train_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                out_data = model([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 target = target.cpu().numpy().flatten().tolist()
                 for i, j in zip(out_data, target):
@@ -651,11 +661,17 @@ def train_dgl(
         f.close()
 
     """
-    return history
+    if not config.tune:
+        return history
 
 
 if __name__ == "__main__":
     config = TrainingConfig(
-        random_seed=123, epochs=10, n_train=32, n_val=32, batch_size=16
+        random_seed=123,
+        epochs=10,
+        n_train=32,
+        n_val=32,
+        batch_size=16,
+        output_dir="test",
     )
-    history = train_dgl(config, progress=True)
+    history = train_dgl(config)
