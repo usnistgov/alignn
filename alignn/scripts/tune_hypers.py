@@ -4,6 +4,8 @@ set up random hyperparameter search
 with Asynchronous Hyperband trial scheduler.
 """
 
+import os
+
 import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
@@ -42,6 +44,7 @@ config = {
 if __name__ == "__main__":
 
     # ray.init(local_mode=True)
+    ray.init(dashboard_port=os.environ["UID"])
 
     analysis = tune.run(
         train_dgl,
