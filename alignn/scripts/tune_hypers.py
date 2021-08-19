@@ -35,7 +35,7 @@ config = {
         "edge_input_features": tune.qlograndint(8, 128, 8),
         "triplet_input_features": tune.qlograndint(8, 128, 8),
         "embedding_features": tune.qlograndint(16, 128, 16),
-        "hidden_features": tune.qlograndint(16, 256, 16),
+        "hidden_features": tune.choice([16, 32, 64, 128, 256, 512]),
         "link": tune.choice(["identity", "log"]),
     },
 }

@@ -671,6 +671,7 @@ if __name__ == "__main__":
         epochs=10,
         n_train=32,
         n_val=32,
+        n_test=32,
         batch_size=16,
         output_dir="test",
     )

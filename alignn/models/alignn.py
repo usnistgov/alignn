@@ -144,36 +144,73 @@ class EdgeGatedGraphConv(nn.Module):
         return x, y
 
 
+class BottleneckLayer(nn.Module):
+    """MLP reduction bottleneck."""
+
+    def __init__(self, in_features: int, reduction: float = 0.5):
+        """Set up MLP bottleneck.
+
+        in_features should be divisible by reduction^2
+        """
+        super().__init__()
+
+        intermediate_features = int(in_features * reduction)
+        bottleneck_features = int(intermediate_features * reduction)
+
+        self.layers = nn.Sequential(
+            MLPLayer(in_features, intermediate_features),
+            MLPLayer(intermediate_features, bottleneck_features),
+        )
+
+    def forward(self, x):
+        """Run the bottleneck layer."""
+        return self.layers(x)
+
+
 class ALIGNNConv(nn.Module):
     """Line graph update."""
 
     def __init__(
-        self,
-        in_features: int,
-        out_features: int,
+        self, in_features: int, out_features: int, reduction: float = 0.5
     ):
         """Set up ALIGNN parameters."""
         super().__init__()
 
+        self.bottleneck_size = int(in_features * reduction * reduction)
+
+        self.node_bottleneck = BottleneckLayer(in_features, reduction=0.5)
+        self.pair_bottleneck = BottleneckLayer(in_features, reduction=0.5)
+        self.triplet_bottleneck = BottleneckLayer(in_features, reduction=0.5)
+
+        self.node_expand = MLPLayer(self.bottleneck_size, out_features)
+        self.pair_expand = MLPLayer(self.bottleneck_size, out_features)
+        self.triplet_expand = MLPLayer(self.bottleneck_size, out_features)
+
         # y: in_features
         # z: in_features
         self.edge_update = EdgeGatedGraphConv(
-            in_features, in_features, out_features
+            self.bottleneck_size,
+            self.bottleneck_size,
+            self.bottleneck_size,
+            residual=False,
         )
 
         # x: in_features
         # y: out_features
         self.node_update = EdgeGatedGraphConv(
-            in_features, out_features, out_features
+            self.bottleneck_size,
+            self.bottleneck_size,
+            self.bottleneck_size,
+            residual=False,
         )
 
     def forward(
         self,
         g: dgl.DGLGraph,
         lg: dgl.DGLGraph,
-        x: torch.Tensor,
-        y: torch.Tensor,
-        z: torch.Tensor,
+        x_in: torch.Tensor,
+        y_in: torch.Tensor,
+        z_in: torch.Tensor,
     ):
         """Node and Edge updates for ALIGNN layer.
 
@@ -185,10 +222,20 @@ class ALIGNNConv(nn.Module):
         lg = lg.local_var()
 
         # Edge-gated graph convolution update on crystal graph
-        m, z = self.edge_update(lg, y, z)
+        m, z = self.edge_update(
+            lg, self.pair_bottleneck(y_in), self.triplet_bottleneck(z_in)
+        )
 
         # Edge-gated graph convolution update on crystal graph
-        x, y = self.node_update(g, x, m)
+        x, y = self.node_update(g, self.node_bottleneck(x_in), m)
+
+        x = self.node_expand(x)
+        y = self.pair_expand(y)
+        z = self.triplet_expand(z)
+
+        x += x_in
+        y += y_in
+        z += z_in
 
         return x, y, z
 
