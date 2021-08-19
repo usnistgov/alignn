@@ -57,7 +57,11 @@ class EdgeGatedGraphConv(nn.Module):
     """
 
     def __init__(
-        self, input_features: int, output_features: int, residual: bool = True
+        self,
+        node_input_features: int,
+        edge_input_features: int,
+        output_features: int,
+        residual: bool = True,
     ):
         """Initialize parameters for ALIGNN update."""
         super().__init__()
@@ -67,13 +71,23 @@ class EdgeGatedGraphConv(nn.Module):
         # m_ij = σ(z_ij W_f + b_f) ⊙ g_s(z_ij W_s + b_s)
         # coalesce parameters for W_f and W_s
         # but -- split them up along feature dimension
-        self.src_gate = nn.Linear(input_features, output_features)
-        self.dst_gate = nn.Linear(input_features, output_features)
-        self.edge_gate = nn.Linear(input_features, output_features)
+        self.src_gate = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
+        self.dst_gate = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
+        self.edge_gate = nn.Linear(
+            edge_input_features, output_features, bias=False
+        )
         self.bn_edges = nn.BatchNorm1d(output_features)
 
-        self.src_update = nn.Linear(input_features, output_features)
-        self.dst_update = nn.Linear(input_features, output_features)
+        self.src_update = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
+        self.dst_update = nn.Linear(
+            node_input_features, output_features, bias=False
+        )
         self.bn_nodes = nn.BatchNorm1d(output_features)
 
     def forward(
@@ -140,8 +154,18 @@ class ALIGNNConv(nn.Module):
     ):
         """Set up ALIGNN parameters."""
         super().__init__()
-        self.node_update = EdgeGatedGraphConv(in_features, out_features)
-        self.edge_update = EdgeGatedGraphConv(out_features, out_features)
+
+        # y: in_features
+        # z: in_features
+        self.edge_update = EdgeGatedGraphConv(
+            in_features, in_features, out_features
+        )
+
+        # x: in_features
+        # y: out_features
+        self.node_update = EdgeGatedGraphConv(
+            in_features, out_features, out_features
+        )
 
     def forward(
         self,
@@ -159,11 +183,12 @@ class ALIGNNConv(nn.Module):
         """
         g = g.local_var()
         lg = lg.local_var()
-        # Edge-gated graph convolution update on crystal graph
-        x, m = self.node_update(g, x, y)
 
         # Edge-gated graph convolution update on crystal graph
-        y, z = self.edge_update(lg, m, z)
+        m, z = self.edge_update(lg, y, z)
+
+        # Edge-gated graph convolution update on crystal graph
+        x, y = self.node_update(g, x, m)
 
         return x, y, z
 
@@ -233,7 +258,9 @@ class ALIGNN(nn.Module):
         self.gcn_layers = nn.ModuleList(
             [
                 EdgeGatedGraphConv(
-                    config.hidden_features, config.hidden_features
+                    config.hidden_features,
+                    config.hidden_features,
+                    config.hidden_features,
                 )
                 for idx in range(config.gcn_layers)
             ]
