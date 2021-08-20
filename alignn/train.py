@@ -77,9 +77,9 @@ def activated_output_transform(output):
     return y_pred, y
 
 
-def make_standard_scalar_and_pca(output):
+def make_standard_scalar_and_pca(output, datafile="sc.pkl"):
     """Use standard scalar and PCS for multi-output data."""
-    sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
+    sc = pk.load(open(datafile, "rb"))
     y_pred, y = output
     y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
     y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
@@ -154,20 +154,15 @@ def train_dgl(
             print("Check", exp)
 
     os.makedirs(config.output_dir, exist_ok=True)
-    checkpoint_dir = os.path.join(config.output_dir)
 
     if config.tune:
         from ray import tune
 
     print("config:")
-    _config = config.dict()
-    pprint.pprint(_config, sort_dicts=False)
+    pprint.pprint(config.dict(), sort_dicts=False)
 
-    with open(os.path.join(config.output_dir, "config.json"), "w") as f:
-        f.write(json.dumps(_config, indent=4))
-
-    global tmp_output_dir
-    tmp_output_dir = config.output_dir
+    with open(config.output_dir / "fullconfig.json", "w") as f:
+        json.dump(json.loads(config.json()), f, indent=2)
 
     if config.classification_threshold is not None:
         classification = True
@@ -315,13 +310,13 @@ def train_dgl(
     metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
     if config.model.output_features > 1 and config.standard_scalar_and_pca:
         # metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
+        scaler_transform = partial(
+            make_standard_scalar_and_pca,
+            datafile=os.path.join(config.output_dir, "sc.pkl"),
+        )
         metrics = {
-            "loss": Loss(
-                criterion, output_transform=make_standard_scalar_and_pca
-            ),
-            "mae": MeanAbsoluteError(
-                output_transform=make_standard_scalar_and_pca
-            ),
+            "loss": Loss(criterion, output_transform=scaler_transform),
+            "mae": MeanAbsoluteError(output_transform=scaler_transform),
         }
 
     if config.criterion == "zig":
@@ -408,7 +403,7 @@ def train_dgl(
         }
         handler = Checkpoint(
             to_save,
-            DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
+            DiskSaver(config.output_dir, create_dir=True, require_empty=False),
             n_saved=2,
             global_step_transform=lambda *_: trainer.state.epoch,
         )
@@ -607,7 +602,7 @@ def train_dgl(
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
-                        open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                        open(os.path.join(config.output_dir, "sc.pkl"), "rb")
                     )
                     out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
                         0

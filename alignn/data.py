@@ -7,7 +7,7 @@ import os
 import pickle as pk
 import random
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import dgl
 import numpy as np
@@ -19,12 +19,10 @@ from jarvis.db.figshare import data as jdata
 from jarvis.db.jsonutils import dumpjson
 
 # from sklearn.decomposition import PCA  # ,KernelPCA
+from sklearn.metrics import mean_absolute_error
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-# from typing import Dict, List, Optional, Set, Tuple
-
 
 # use pandas progress_apply
 tqdm.pandas()
@@ -89,7 +87,7 @@ def load_graphs(
     neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
     max_neighbors: int = 12,
-    cachedir: Optional[Path] = None,
+    cachedir: Optional[Path] = Path("data/graphs"),
     use_canonize: bool = False,
 ):
     """Construct crystal graphs.
@@ -117,9 +115,11 @@ def load_graphs(
             use_canonize=use_canonize,
         )
 
+    n_samples, _ = df.shape
+
     if cachedir is not None:
         cachedir.mkdir(parents=True, exist_ok=True)
-        cachefile = cachedir / f"{name}-{neighbor_strategy}.bin"
+        cachefile = cachedir / f"{name}-{n_samples}_{neighbor_strategy}.bin"
     else:
         cachefile = None
 
@@ -144,7 +144,7 @@ def get_id_train_val_test(
     n_val=None,
     keep_data_order=False,
 ):
-    """Get train, val, test IDs."""
+    """Get train, val, test array indices."""
     if (
         train_ratio is None
         and val_ratio is not None
@@ -189,16 +189,12 @@ def get_id_train_val_test(
 
 
 def get_torch_dataset(
-    dataset=[],
-    id_tag="jid",
-    target="",
-    neighbor_strategy="",
-    atom_features="",
-    use_canonize="",
-    name="",
-    line_graph="",
-    cutoff=8.0,
-    max_neighbors=12,
+    dataset: pd.DataFrame,
+    graphs: Sequence[dgl.DGLGraph],
+    atom_features: str = "cgcnn",
+    target: str = "formation_energy_peratom",
+    id_tag: str = "jid",
+    line_graph: bool = True,
     classification=False,
     output_dir=".",
     tmp_name="dataset",
@@ -214,15 +210,6 @@ def get_torch_dataset(
     line = "Min=" + str(np.min(vals)) + "\n"
     f.write(line)
     f.close()
-
-    graphs = load_graphs(
-        df,
-        name=name,
-        neighbor_strategy=neighbor_strategy,
-        use_canonize=use_canonize,
-        cutoff=cutoff,
-        max_neighbors=max_neighbors,
-    )
 
     data = StructureDataset(
         df,
@@ -298,7 +285,6 @@ def get_train_val_loaders(
     output_dir=None,
 ):
     """Help function to set up JARVIS train and val dataloaders."""
-
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -310,71 +296,48 @@ def get_train_val_loaders(
             return dataloaders
 
     if not dataset_array:
-        d = jdata(dataset)
+        cachefile = Path(f"data/{dataset}.pkl")
+        if cachefile.exists():
+            d = pd.read_pickle(cachefile)
+        else:
+            d = pd.DataFrame(jdata(dataset))
+            d = d.replace("na", np.nan)
+            d.to_pickle(cachefile)
     else:
-        d = dataset_array
+        d = pd.DataFrame(dataset_array)
+        d = d.replace("na", np.nan)
 
-    dat = []
+    d = d.iloc[:100]
+
+    # load graphs with just atomic number attributes
+    # load atom feature vectors at StructureDataset construction
+    graphs = load_graphs(
+        d,
+        name=dataset,
+        neighbor_strategy=neighbor_strategy,
+        use_canonize=use_canonize,
+        cutoff=cutoff,
+        max_neighbors=max_neighbors,
+    )
+
+    if dataset == "qm9_dgl" and target == "all":
+        target = QM9_TARGETS
+    else:
+        d = d[~d[target].isna()]
+
+    # mutate target values in place
+    if target_multiplication_factor:
+        d[target] *= target_multiplication_factor
+
     if classification_threshold is not None:
         print(f"Using {classification_threshold} for classifying {target}")
-        print("Converting target data into 1 and 0.")
-
-    all_targets = []
-
-    # TODO:make an all key in qm9_dgl
-    if dataset == "qm9_dgl" and target == "all":
-        print("Making all qm9_dgl")
-
-        tmp = []
-        for ii in d:
-            ii["all"] = [
-                ii["mu"],
-                ii["alpha"],
-                ii["homo"],
-                ii["lumo"],
-                ii["gap"],
-                ii["r2"],
-                ii["zpve"],
-                ii["U0"],
-                ii["U"],
-                ii["H"],
-                ii["G"],
-                ii["Cv"],
-            ]
-            tmp.append(ii)
-        print("Made all qm9_dgl")
-        d = tmp
-    for i in d:
-        if isinstance(i[target], list):  # multioutput target
-            all_targets.append(torch.tensor(i[target]))
-            dat.append(i)
-
-        elif (
-            i[target] is not None
-            and i[target] != "na"
-            and not math.isnan(i[target])
-        ):
-            if target_multiplication_factor is not None:
-                i[target] = i[target] * target_multiplication_factor
-            if classification_threshold is not None:
-                if i[target] <= classification_threshold:
-                    i[target] = 0
-                elif i[target] > classification_threshold:
-                    i[target] = 1
-                else:
-                    raise ValueError(
-                        "Check classification data type.",
-                        i[target],
-                        type(i[target]),
-                    )
-            dat.append(i)
-            all_targets.append(i[target])
+        d[target] = d[target] > classification_threshold
 
     # id_test = ids[-test_size:]
     # if standardize:
     #    data.setup_standardizer(id_train)
     id_train, id_val, id_test = get_id_train_val_test(
-        total_size=len(dat),
+        total_size=len(d),
         split_seed=split_seed,
         train_ratio=train_ratio,
         val_ratio=val_ratio,
@@ -384,35 +347,39 @@ def get_train_val_loaders(
         n_val=n_val,
         keep_data_order=keep_data_order,
     )
-    ids_train_val_test = {}
-    ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]
-    ids_train_val_test["id_val"] = [dat[i][id_tag] for i in id_val]
-    ids_train_val_test["id_test"] = [dat[i][id_tag] for i in id_test]
+
+    # save DFT ids
+    ids_train_val_test = {
+        "id_train": d[id_tag].iloc[id_train].tolist(),
+        "id_val": d[id_tag].iloc[id_val].tolist(),
+        "id_test": d[id_tag].iloc[id_test].tolist(),
+    }
     dumpjson(
         data=ids_train_val_test,
         filename=os.path.join(output_dir, "ids_train_val_test.json"),
     )
-    dataset_train = [dat[x] for x in id_train]
-    dataset_val = [dat[x] for x in id_val]
-    dataset_test = [dat[x] for x in id_test]
+
+    # load graphs and dataframe separately,
+    # then just slice them both the same way.
 
     if standard_scalar_and_pca:
-        y_data = [i[target] for i in dataset_train]
-        # pipe = Pipeline([('scale', StandardScaler())])
-        if not isinstance(y_data[0], list):
-            print("Running StandardScalar")
-            y_data = np.array(y_data).reshape(-1, 1)
         sc = StandardScaler()
 
-        sc.fit(y_data)
-        print("Mean", sc.mean_)
-        print("Variance", sc.var_)
-        try:
-            print("New max", max(y_data))
-            print("New min", min(y_data))
-        except Exception as exp:
-            print(exp)
-            pass
+        Y_train = d[target].iloc[id_train]
+
+        if Y_train.ndim == 1:
+            sc.fit(Y_train.values.reshape(-1, 1))
+            Y_std = sc.transform(d[target].reshape(-1, 1))
+            d[target] = Y_std.squeeze()
+        else:
+            sc.fit(Y_train)
+            d[target] = sc.transform(d[target])
+
+        print(f"Mean: {sc.mean_}")
+        print(f"Variance: {sc.var_}")
+
+        pk.dump(sc, open(os.path.join(output_dir, "sc.pkl"), "wb"))
+
         # pc = PCA(n_components=output_features)
         # pipe = Pipeline(
         #    [
@@ -420,87 +387,67 @@ def get_train_val_loaders(
         #        ("reduce_dims", PCA(n_components=output_features)),
         #    ]
         # )
-        pk.dump(sc, open(os.path.join(output_dir, "sc.pkl"), "wb"))
+
         # pc = PCA(n_components=10)
         # pc.fit(y_data)
         # pk.dump(pc, open("pca.pkl", "wb"))
 
     if classification_threshold is None:
+
         try:
-            from sklearn.metrics import mean_absolute_error
-
-            print("MAX val:", max(all_targets))
-            print("MIN val:", min(all_targets))
-            print("MAD:", mean_absolute_deviation(all_targets))
-            try:
-                f = open(os.path.join(output_dir, "mad"), "w")
-                line = "MAX val:" + str(max(all_targets)) + "\n"
-                line += "MIN val:" + str(min(all_targets)) + "\n"
-                line += (
-                    "MAD val:"
-                    + str(mean_absolute_deviation(all_targets))
-                    + "\n"
-                )
-                f.write(line)
-                f.close()
-            except Exception as exp:
-                print("Cannot write mad", exp)
-                pass
-            # Random model precited value
-            x_bar = np.mean(np.array([i[target] for i in dataset_train]))
-            baseline_mae = mean_absolute_error(
-                np.array([i[target] for i in dataset_test]),
-                np.array([x_bar for i in dataset_test]),
-            )
-            print("Baseline MAE:", baseline_mae)
+            mad = mean_absolute_deviation(d[target])
         except Exception as exp:
-            print("Data error", exp)
-            pass
+            print("Cannot write mad", exp)
+            mad = None
 
-    train_data = get_torch_dataset(
-        dataset=dataset_train,
-        id_tag=id_tag,
-        atom_features=atom_features,
+        print("MAX val:", d[target].max())
+        print("MIN val:", d[target].min())
+        print("MAD:", mad)
+
+        with open(os.path.join(output_dir, "mad"), "w") as f:
+            print(f"MAX val: {d[target].max()}", file=f)
+            print(f"MIN val: {d[target].min()}", file=f)
+            print(f"MAD val: {mad}", file=f)
+
+        # Random model precited value
+        x_bar = d[target].iloc[id_train].mean()
+        baseline_mae = mean_absolute_error(
+            d[target].iloc[id_test], x_bar * np.ones(len(id_test))
+        )
+        print("Baseline MAE:", baseline_mae)
+
+    classification = classification_threshold is not None
+
+    # make sure to reset pandas index on subsets or
+    # pytorch will fail when converting target columns to tensor
+    train_data = StructureDataset(
+        d.iloc[id_train].reset_index(),
+        [graphs[id] for id in id_train],
         target=target,
-        neighbor_strategy=neighbor_strategy,
-        use_canonize=use_canonize,
-        name=dataset,
+        atom_features=atom_features,
         line_graph=line_graph,
-        cutoff=cutoff,
-        max_neighbors=max_neighbors,
-        classification=classification_threshold is not None,
-        output_dir=output_dir,
-        tmp_name="train_data",
+        id_tag=id_tag,
+        classification=classification,
     )
-    val_data = get_torch_dataset(
-        dataset=dataset_val,
-        id_tag=id_tag,
-        atom_features=atom_features,
+
+    val_data = StructureDataset(
+        d.iloc[id_val].reset_index(),
+        [graphs[id] for id in id_val],
         target=target,
-        neighbor_strategy=neighbor_strategy,
-        use_canonize=use_canonize,
-        name=dataset,
+        atom_features=atom_features,
         line_graph=line_graph,
-        cutoff=cutoff,
-        max_neighbors=max_neighbors,
-        classification=classification_threshold is not None,
-        output_dir=output_dir,
-        tmp_name="val_data",
+        id_tag=id_tag,
+        classification=classification,
     )
-    test_data = get_torch_dataset(
-        dataset=dataset_test,
-        id_tag=id_tag,
-        atom_features=atom_features,
+
+    test_data = StructureDataset(
+        d.iloc[id_test].reset_index(),
+        [graphs[id] for id in id_test],
         target=target,
-        neighbor_strategy=neighbor_strategy,
-        use_canonize=use_canonize,
-        name=dataset,
+        atom_features=atom_features,
         line_graph=line_graph,
-        cutoff=cutoff,
-        max_neighbors=max_neighbors,
-        classification=classification_threshold is not None,
-        output_dir=output_dir,
-        tmp_name="test_data",
+        id_tag=id_tag,
+        classification=classification,
     )
 
     collate_fn = train_data.collate
@@ -523,14 +470,14 @@ def get_train_val_loaders(
         batch_size=batch_size,
         shuffle=False,
         collate_fn=collate_fn,
-        drop_last=True,
+        drop_last=False,
         num_workers=workers,
         pin_memory=pin_memory,
     )
 
     test_loader = DataLoader(
         test_data,
-        batch_size=1,
+        batch_size=batch_size,
         shuffle=False,
         collate_fn=collate_fn,
         drop_last=False,

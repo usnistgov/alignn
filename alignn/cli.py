@@ -43,17 +43,17 @@ def cli(
             config = json.load(f)
             config = TrainingConfig(**config)
 
+    # override args from commandline
+    config.progress = progress
+    config.store_outputs = store_outputs
+    config.log_tensorboard = tensorboard
+    config.output_dir = checkpoint_dir
+
     if profile:
         profile_dgl(config)
         return
 
-    hist = train_dgl(
-        config,
-        progress=progress,
-        checkpoint_dir=checkpoint_dir,
-        store_outputs=store_outputs,
-        log_tensorboard=tensorboard,
-    )
+    hist = train_dgl(config)
 
     # print(model_dir)
     # with open(model_dir / "metrics.json", "w") as f:
