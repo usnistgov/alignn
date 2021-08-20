@@ -307,8 +307,6 @@ def get_train_val_loaders(
         d = pd.DataFrame(dataset_array)
         d = d.replace("na", np.nan)
 
-    d = d.iloc[:100]
-
     # load graphs with just atomic number attributes
     # load atom feature vectors at StructureDataset construction
     graphs = load_graphs(
