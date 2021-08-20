@@ -80,7 +80,7 @@ class EdgeGatedGraphConv(nn.Module):
         self.edge_gate = nn.Linear(
             edge_input_features, output_features, bias=False
         )
-        self.bn_edges = nn.BatchNorm1d(output_features)
+        self.bn_edges = nn.LayerNorm(output_features)
 
         self.src_update = nn.Linear(
             node_input_features, output_features, bias=False
@@ -88,7 +88,7 @@ class EdgeGatedGraphConv(nn.Module):
         self.dst_update = nn.Linear(
             node_input_features, output_features, bias=False
         )
-        self.bn_nodes = nn.BatchNorm1d(output_features)
+        self.bn_nodes = nn.LayerNorm(output_features)
 
     def forward(
         self,
@@ -248,7 +248,7 @@ class MLPLayer(nn.Module):
         super().__init__()
         self.layer = nn.Sequential(
             nn.Linear(in_features, out_features),
-            nn.BatchNorm1d(out_features),
+            nn.LayerNorm(out_features),
             nn.SiLU(),
         )
 
