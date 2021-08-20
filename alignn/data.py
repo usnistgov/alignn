@@ -1,32 +1,49 @@
 """Jarvis-dgl data loaders and DGLGraph utilities."""
 
+import math
+import os
+
+# from sklearn.pipeline import Pipeline
+import pickle as pk
 import random
 from pathlib import Path
 from typing import Optional
 
-# from typing import Dict, List, Optional, Set, Tuple
-
-import os
-import torch
 import dgl
 import numpy as np
 import pandas as pd
+import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-import math
 from jarvis.db.jsonutils import dumpjson
-
-# from sklearn.pipeline import Pipeline
-import pickle as pk
 
 # from sklearn.decomposition import PCA  # ,KernelPCA
 from sklearn.preprocessing import StandardScaler
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+# from typing import Dict, List, Optional, Set, Tuple
+
 
 # use pandas progress_apply
 tqdm.pandas()
+
+
+QM9_TARGETS = [
+    "mu",
+    "alpha",
+    "homo",
+    "lumo",
+    "gap",
+    "r2",
+    "zpve",
+    "U0",
+    "U",
+    "H",
+    "G",
+    "Cv",
+]
 
 
 def load_dataset(
@@ -101,6 +118,7 @@ def load_graphs(
         )
 
     if cachedir is not None:
+        cachedir.mkdir(parents=True, exist_ok=True)
         cachefile = cachedir / f"{name}-{neighbor_strategy}.bin"
     else:
         cachefile = None
@@ -218,6 +236,36 @@ def get_torch_dataset(
     return data
 
 
+def load_cached_dataloaders(basename, pin_memory=False, workers=0):
+    """Load cached pytorch dataloaders and set options that may change."""
+    train_sample = Path(f"{basename}_train.data")
+    val_sample = Path(f"{basename}_val.data")
+    test_sample = Path(f"{basename}_test.data")
+
+    if train_sample.exists() and val_sample.exists() and test_sample.exists():
+        print("Loading from saved file...")
+        print("Make sure all the DataLoader params are same.")
+        print("This module is made for debugging only.")
+        train_loader = torch.load(train_sample)
+        val_loader = torch.load(val_sample)
+        test_loader = torch.load(test_sample)
+
+        train_loader.pin_memory = pin_memory
+        val_loader.pin_memory = pin_memory
+        test_loader.pin_memory = pin_memory
+
+        train_loader.num_workers = workers
+        val_loader.num_workers = workers
+        test_loader.num_workers = workers
+
+        return (
+            train_loader,
+            val_loader,
+            test_loader,
+            train_loader.dataset.prepare_batch,
+        )
+
+
 def get_train_val_loaders(
     dataset: str = "dft_3d",
     dataset_array=[],
@@ -250,283 +298,255 @@ def get_train_val_loaders(
     output_dir=None,
 ):
     """Help function to set up JARVIS train and val dataloaders."""
-    train_sample = filename + "_train.data"
-    val_sample = filename + "_val.data"
-    test_sample = filename + "_test.data"
-    # print ('output_dir data',output_dir)
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    if (
-        os.path.exists(train_sample)
-        and os.path.exists(val_sample)
-        and os.path.exists(test_sample)
-        and save_dataloader
-    ):
-        print("Loading from saved file...")
-        print("Make sure all the DataLoader params are same.")
-        print("This module is made for debugging only.")
-        train_loader = torch.load(train_sample)
-        val_loader = torch.load(val_sample)
-        test_loader = torch.load(test_sample)
-        if train_loader.pin_memory != pin_memory:
-            train_loader.pin_memory = pin_memory
-        if test_loader.pin_memory != pin_memory:
-            test_loader.pin_memory = pin_memory
-        if val_loader.pin_memory != pin_memory:
-            val_loader.pin_memory = pin_memory
-        if train_loader.num_workers != workers:
-            train_loader.num_workers = workers
-        if test_loader.num_workers != workers:
-            test_loader.num_workers = workers
-        if val_loader.num_workers != workers:
-            val_loader.num_workers = workers
-        # print("train", len(train_loader.dataset))
-        # print("val", len(val_loader.dataset))
-        # print("test", len(test_loader.dataset))
+
+    if save_dataloader:
+        dataloaders = load_cached_dataloaders(
+            filename, pin_memory=pin_memory, workers=workers
+        )
+        if dataloaders is not None:
+            return dataloaders
+
+    if not dataset_array:
+        d = jdata(dataset)
     else:
+        d = dataset_array
 
-        if not dataset_array:
-            d = jdata(dataset)
-        else:
-            d = dataset_array
+    dat = []
+    if classification_threshold is not None:
+        print(f"Using {classification_threshold} for classifying {target}")
+        print("Converting target data into 1 and 0.")
 
-            # for ii, i in enumerate(pc_y):
-            #    d[ii][target] = pc_y[ii].tolist()
+    all_targets = []
 
-        dat = []
-        if classification_threshold is not None:
-            print(
-                "Using ",
-                classification_threshold,
-                " for classifying ",
-                target,
-                " data.",
-            )
-            print("Converting target data into 1 and 0.")
-        all_targets = []
+    # TODO:make an all key in qm9_dgl
+    if dataset == "qm9_dgl" and target == "all":
+        print("Making all qm9_dgl")
 
-        # TODO:make an all key in qm9_dgl
-        if dataset == "qm9_dgl" and target == "all":
-            print("Making all qm9_dgl")
-            tmp = []
-            for ii in d:
-                ii["all"] = [
-                    ii["mu"],
-                    ii["alpha"],
-                    ii["homo"],
-                    ii["lumo"],
-                    ii["gap"],
-                    ii["r2"],
-                    ii["zpve"],
-                    ii["U0"],
-                    ii["U"],
-                    ii["H"],
-                    ii["G"],
-                    ii["Cv"],
-                ]
-                tmp.append(ii)
-            print("Made all qm9_dgl")
-            d = tmp
-        for i in d:
-            if isinstance(i[target], list):  # multioutput target
-                all_targets.append(torch.tensor(i[target]))
-                dat.append(i)
+        tmp = []
+        for ii in d:
+            ii["all"] = [
+                ii["mu"],
+                ii["alpha"],
+                ii["homo"],
+                ii["lumo"],
+                ii["gap"],
+                ii["r2"],
+                ii["zpve"],
+                ii["U0"],
+                ii["U"],
+                ii["H"],
+                ii["G"],
+                ii["Cv"],
+            ]
+            tmp.append(ii)
+        print("Made all qm9_dgl")
+        d = tmp
+    for i in d:
+        if isinstance(i[target], list):  # multioutput target
+            all_targets.append(torch.tensor(i[target]))
+            dat.append(i)
 
-            elif (
-                i[target] is not None
-                and i[target] != "na"
-                and not math.isnan(i[target])
-            ):
-                if target_multiplication_factor is not None:
-                    i[target] = i[target] * target_multiplication_factor
-                if classification_threshold is not None:
-                    if i[target] <= classification_threshold:
-                        i[target] = 0
-                    elif i[target] > classification_threshold:
-                        i[target] = 1
-                    else:
-                        raise ValueError(
-                            "Check classification data type.",
-                            i[target],
-                            type(i[target]),
-                        )
-                dat.append(i)
-                all_targets.append(i[target])
-
-        # id_test = ids[-test_size:]
-        # if standardize:
-        #    data.setup_standardizer(id_train)
-        id_train, id_val, id_test = get_id_train_val_test(
-            total_size=len(dat),
-            split_seed=split_seed,
-            train_ratio=train_ratio,
-            val_ratio=val_ratio,
-            test_ratio=test_ratio,
-            n_train=n_train,
-            n_test=n_test,
-            n_val=n_val,
-            keep_data_order=keep_data_order,
-        )
-        ids_train_val_test = {}
-        ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]
-        ids_train_val_test["id_val"] = [dat[i][id_tag] for i in id_val]
-        ids_train_val_test["id_test"] = [dat[i][id_tag] for i in id_test]
-        dumpjson(
-            data=ids_train_val_test,
-            filename=os.path.join(output_dir, "ids_train_val_test.json"),
-        )
-        dataset_train = [dat[x] for x in id_train]
-        dataset_val = [dat[x] for x in id_val]
-        dataset_test = [dat[x] for x in id_test]
-
-        if standard_scalar_and_pca:
-            y_data = [i[target] for i in dataset_train]
-            # pipe = Pipeline([('scale', StandardScaler())])
-            if not isinstance(y_data[0], list):
-                print("Running StandardScalar")
-                y_data = np.array(y_data).reshape(-1, 1)
-            sc = StandardScaler()
-
-            sc.fit(y_data)
-            print("Mean", sc.mean_)
-            print("Variance", sc.var_)
-            try:
-                print("New max", max(y_data))
-                print("New min", min(y_data))
-            except Exception as exp:
-                print(exp)
-                pass
-            # pc = PCA(n_components=output_features)
-            # pipe = Pipeline(
-            #    [
-            #        ("scale", StandardScaler()),
-            #        ("reduce_dims", PCA(n_components=output_features)),
-            #    ]
-            # )
-            pk.dump(sc, open(os.path.join(output_dir, "sc.pkl"), "wb"))
-            # pc = PCA(n_components=10)
-            # pc.fit(y_data)
-            # pk.dump(pc, open("pca.pkl", "wb"))
-
-        if classification_threshold is None:
-            try:
-                from sklearn.metrics import mean_absolute_error
-
-                print("MAX val:", max(all_targets))
-                print("MIN val:", min(all_targets))
-                print("MAD:", mean_absolute_deviation(all_targets))
-                try:
-                    f = open(os.path.join(output_dir, "mad"), "w")
-                    line = "MAX val:" + str(max(all_targets)) + "\n"
-                    line += "MIN val:" + str(min(all_targets)) + "\n"
-                    line += (
-                        "MAD val:"
-                        + str(mean_absolute_deviation(all_targets))
-                        + "\n"
+        elif (
+            i[target] is not None
+            and i[target] != "na"
+            and not math.isnan(i[target])
+        ):
+            if target_multiplication_factor is not None:
+                i[target] = i[target] * target_multiplication_factor
+            if classification_threshold is not None:
+                if i[target] <= classification_threshold:
+                    i[target] = 0
+                elif i[target] > classification_threshold:
+                    i[target] = 1
+                else:
+                    raise ValueError(
+                        "Check classification data type.",
+                        i[target],
+                        type(i[target]),
                     )
-                    f.write(line)
-                    f.close()
-                except Exception as exp:
-                    print("Cannot write mad", exp)
-                    pass
-                # Random model precited value
-                x_bar = np.mean(np.array([i[target] for i in dataset_train]))
-                baseline_mae = mean_absolute_error(
-                    np.array([i[target] for i in dataset_test]),
-                    np.array([x_bar for i in dataset_test]),
+            dat.append(i)
+            all_targets.append(i[target])
+
+    # id_test = ids[-test_size:]
+    # if standardize:
+    #    data.setup_standardizer(id_train)
+    id_train, id_val, id_test = get_id_train_val_test(
+        total_size=len(dat),
+        split_seed=split_seed,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        test_ratio=test_ratio,
+        n_train=n_train,
+        n_test=n_test,
+        n_val=n_val,
+        keep_data_order=keep_data_order,
+    )
+    ids_train_val_test = {}
+    ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]
+    ids_train_val_test["id_val"] = [dat[i][id_tag] for i in id_val]
+    ids_train_val_test["id_test"] = [dat[i][id_tag] for i in id_test]
+    dumpjson(
+        data=ids_train_val_test,
+        filename=os.path.join(output_dir, "ids_train_val_test.json"),
+    )
+    dataset_train = [dat[x] for x in id_train]
+    dataset_val = [dat[x] for x in id_val]
+    dataset_test = [dat[x] for x in id_test]
+
+    if standard_scalar_and_pca:
+        y_data = [i[target] for i in dataset_train]
+        # pipe = Pipeline([('scale', StandardScaler())])
+        if not isinstance(y_data[0], list):
+            print("Running StandardScalar")
+            y_data = np.array(y_data).reshape(-1, 1)
+        sc = StandardScaler()
+
+        sc.fit(y_data)
+        print("Mean", sc.mean_)
+        print("Variance", sc.var_)
+        try:
+            print("New max", max(y_data))
+            print("New min", min(y_data))
+        except Exception as exp:
+            print(exp)
+            pass
+        # pc = PCA(n_components=output_features)
+        # pipe = Pipeline(
+        #    [
+        #        ("scale", StandardScaler()),
+        #        ("reduce_dims", PCA(n_components=output_features)),
+        #    ]
+        # )
+        pk.dump(sc, open(os.path.join(output_dir, "sc.pkl"), "wb"))
+        # pc = PCA(n_components=10)
+        # pc.fit(y_data)
+        # pk.dump(pc, open("pca.pkl", "wb"))
+
+    if classification_threshold is None:
+        try:
+            from sklearn.metrics import mean_absolute_error
+
+            print("MAX val:", max(all_targets))
+            print("MIN val:", min(all_targets))
+            print("MAD:", mean_absolute_deviation(all_targets))
+            try:
+                f = open(os.path.join(output_dir, "mad"), "w")
+                line = "MAX val:" + str(max(all_targets)) + "\n"
+                line += "MIN val:" + str(min(all_targets)) + "\n"
+                line += (
+                    "MAD val:"
+                    + str(mean_absolute_deviation(all_targets))
+                    + "\n"
                 )
-                print("Baseline MAE:", baseline_mae)
+                f.write(line)
+                f.close()
             except Exception as exp:
-                print("Data error", exp)
+                print("Cannot write mad", exp)
                 pass
+            # Random model precited value
+            x_bar = np.mean(np.array([i[target] for i in dataset_train]))
+            baseline_mae = mean_absolute_error(
+                np.array([i[target] for i in dataset_test]),
+                np.array([x_bar for i in dataset_test]),
+            )
+            print("Baseline MAE:", baseline_mae)
+        except Exception as exp:
+            print("Data error", exp)
+            pass
 
-        train_data = get_torch_dataset(
-            dataset=dataset_train,
-            id_tag=id_tag,
-            atom_features=atom_features,
-            target=target,
-            neighbor_strategy=neighbor_strategy,
-            use_canonize=use_canonize,
-            name=dataset,
-            line_graph=line_graph,
-            cutoff=cutoff,
-            max_neighbors=max_neighbors,
-            classification=classification_threshold is not None,
-            output_dir=output_dir,
-            tmp_name="train_data",
-        )
-        val_data = get_torch_dataset(
-            dataset=dataset_val,
-            id_tag=id_tag,
-            atom_features=atom_features,
-            target=target,
-            neighbor_strategy=neighbor_strategy,
-            use_canonize=use_canonize,
-            name=dataset,
-            line_graph=line_graph,
-            cutoff=cutoff,
-            max_neighbors=max_neighbors,
-            classification=classification_threshold is not None,
-            output_dir=output_dir,
-            tmp_name="val_data",
-        )
-        test_data = get_torch_dataset(
-            dataset=dataset_test,
-            id_tag=id_tag,
-            atom_features=atom_features,
-            target=target,
-            neighbor_strategy=neighbor_strategy,
-            use_canonize=use_canonize,
-            name=dataset,
-            line_graph=line_graph,
-            cutoff=cutoff,
-            max_neighbors=max_neighbors,
-            classification=classification_threshold is not None,
-            output_dir=output_dir,
-            tmp_name="test_data",
-        )
+    train_data = get_torch_dataset(
+        dataset=dataset_train,
+        id_tag=id_tag,
+        atom_features=atom_features,
+        target=target,
+        neighbor_strategy=neighbor_strategy,
+        use_canonize=use_canonize,
+        name=dataset,
+        line_graph=line_graph,
+        cutoff=cutoff,
+        max_neighbors=max_neighbors,
+        classification=classification_threshold is not None,
+        output_dir=output_dir,
+        tmp_name="train_data",
+    )
+    val_data = get_torch_dataset(
+        dataset=dataset_val,
+        id_tag=id_tag,
+        atom_features=atom_features,
+        target=target,
+        neighbor_strategy=neighbor_strategy,
+        use_canonize=use_canonize,
+        name=dataset,
+        line_graph=line_graph,
+        cutoff=cutoff,
+        max_neighbors=max_neighbors,
+        classification=classification_threshold is not None,
+        output_dir=output_dir,
+        tmp_name="val_data",
+    )
+    test_data = get_torch_dataset(
+        dataset=dataset_test,
+        id_tag=id_tag,
+        atom_features=atom_features,
+        target=target,
+        neighbor_strategy=neighbor_strategy,
+        use_canonize=use_canonize,
+        name=dataset,
+        line_graph=line_graph,
+        cutoff=cutoff,
+        max_neighbors=max_neighbors,
+        classification=classification_threshold is not None,
+        output_dir=output_dir,
+        tmp_name="test_data",
+    )
 
-        collate_fn = train_data.collate
-        if line_graph:
-            collate_fn = train_data.collate_line_graph
+    collate_fn = train_data.collate
+    if line_graph:
+        collate_fn = train_data.collate_line_graph
 
-        # use a regular pytorch dataloader
-        train_loader = DataLoader(
-            train_data,
-            batch_size=batch_size,
-            shuffle=True,
-            collate_fn=collate_fn,
-            drop_last=True,
-            num_workers=workers,
-            pin_memory=pin_memory,
-        )
+    # use a regular pytorch dataloader
+    train_loader = DataLoader(
+        train_data,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=collate_fn,
+        drop_last=True,
+        num_workers=workers,
+        pin_memory=pin_memory,
+    )
 
-        val_loader = DataLoader(
-            val_data,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=collate_fn,
-            drop_last=True,
-            num_workers=workers,
-            pin_memory=pin_memory,
-        )
+    val_loader = DataLoader(
+        val_data,
+        batch_size=batch_size,
+        shuffle=False,
+        collate_fn=collate_fn,
+        drop_last=True,
+        num_workers=workers,
+        pin_memory=pin_memory,
+    )
 
-        test_loader = DataLoader(
-            test_data,
-            batch_size=1,
-            shuffle=False,
-            collate_fn=collate_fn,
-            drop_last=False,
-            num_workers=workers,
-            pin_memory=pin_memory,
-        )
-        if save_dataloader:
-            torch.save(train_loader, train_sample)
-            torch.save(val_loader, val_sample)
-            torch.save(test_loader, test_sample)
+    test_loader = DataLoader(
+        test_data,
+        batch_size=1,
+        shuffle=False,
+        collate_fn=collate_fn,
+        drop_last=False,
+        num_workers=workers,
+        pin_memory=pin_memory,
+    )
+
+    if save_dataloader:
+        torch.save(train_loader, f"{filename}_train.data")
+        torch.save(val_loader, f"{filename}_val.data")
+        torch.save(test_loader, f"{filename}_val.data")
+
     print("n_train:", len(train_loader.dataset))
     print("n_val:", len(val_loader.dataset))
     print("n_test:", len(test_loader.dataset))
+
     return (
         train_loader,
         val_loader,
