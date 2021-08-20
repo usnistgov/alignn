@@ -31,6 +31,7 @@ from ignite.handlers import (
     DiskSaver,
     EarlyStopping,
     TerminateOnNan,
+    Timer,
 )
 from ignite.metrics import (
     Accuracy,
@@ -387,6 +388,16 @@ def train_dgl(
         Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
     )
 
+    # training timer
+    train_timer = Timer(average=True)
+    train_timer.attach(
+        trainer,
+        start=Events.EPOCH_STARTED,
+        resume=Events.EPOCH_STARTED,
+        pause=Events.EPOCH_COMPLETED,
+        step=Events.EPOCH_COMPLETED,
+    )
+
     if config.write_checkpoint:
         # model checkpointing
         to_save = {
@@ -412,6 +423,7 @@ def train_dgl(
         "train": {m: [] for m in metrics.keys()},
         "validation": {m: [] for m in metrics.keys()},
     }
+    history["train"]["epoch_time"] = []
 
     if config.store_outputs:
         # log_results handler will save epoch output
@@ -430,7 +442,9 @@ def train_dgl(
 
         if config.tune:
             # report validation set metrics to ray tune
-            tune.report(**evaluator.state.metrics)
+            tune_metrics = evaluator.state.metrics
+            tune_metrics["epoch_time"] = train_timer.value()
+            tune.report(**tune_metrics)
 
         tmetrics = train_evaluator.state.metrics
         vmetrics = evaluator.state.metrics
@@ -447,9 +461,7 @@ def train_dgl(
             history["train"][metric].append(tm)
             history["validation"][metric].append(vm)
 
-        # for metric in metrics.keys():
-        #    history["train"][metric].append(tmetrics[metric])
-        #    history["validation"][metric].append(vmetrics[metric])
+        history["train"]["epoch_time"].append(train_timer.value())
 
         if config.store_outputs:
             history["EOS"] = eos.data
