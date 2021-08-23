@@ -21,6 +21,7 @@ config = {
     "num_workers": 4,
     "pin_memory": True,
     "output_dir": "test",
+    "cache_dir": "/wrk/bld/alignn/data",
     "progress": True,
     "write_checkpoint": True,
     "write_predictions": False,

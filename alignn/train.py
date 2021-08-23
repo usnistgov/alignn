@@ -226,6 +226,7 @@ def train_dgl(
             standard_scalar_and_pca=config.standard_scalar_and_pca,
             keep_data_order=config.keep_data_order,
             output_dir=config.output_dir,
+            cache_dir=config.cache_dir,
         )
     else:
         # dataloaders explicitly passed as list

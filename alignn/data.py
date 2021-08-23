@@ -87,7 +87,7 @@ def load_graphs(
     neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
     max_neighbors: int = 12,
-    cachedir: Optional[Path] = Path("data/graphs"),
+    cache_dir: Optional[Path] = Path("data/graphs"),
     use_canonize: bool = False,
 ):
     """Construct crystal graphs.
@@ -117,9 +117,9 @@ def load_graphs(
 
     n_samples, _ = df.shape
 
-    if cachedir is not None:
-        cachedir.mkdir(parents=True, exist_ok=True)
-        cachefile = cachedir / f"{name}-{n_samples}_{neighbor_strategy}.bin"
+    if cache_dir is not None:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cachefile = cache_dir / f"{name}-{n_samples}_{neighbor_strategy}.bin"
     else:
         cachefile = None
 
@@ -283,6 +283,7 @@ def get_train_val_loaders(
     keep_data_order=False,
     output_features=1,
     output_dir=None,
+    cache_dir=None,
 ):
     """Help function to set up JARVIS train and val dataloaders."""
     if not os.path.exists(output_dir):
@@ -296,19 +297,30 @@ def get_train_val_loaders(
             return dataloaders
 
     if not dataset_array:
-        cachefile = Path(f"data/{dataset}.pkl")
-        if cachefile.exists():
-            d = pd.read_pickle(cachefile)
-        else:
-            d = pd.DataFrame(jdata(dataset))
-            d = d.replace("na", np.nan)
-            d.to_pickle(cachefile)
+        try:
+            cachefile = Path(cache_dir) / f"{dataset}.pkl"
+
+            if cachefile.exists():
+                d = pd.read_pickle(cachefile)
+            else:
+                d = pd.DataFrame(jdata(dataset))
+                d = d.replace("na", np.nan)
+                d.to_pickle(cachefile)
+
+        except (TypeError, FileNotFoundError):
+            # cache_dir not set -> TypeError
+            # cachefile not writeable -> FileNotFoundError
+            pass
     else:
         d = pd.DataFrame(dataset_array)
         d = d.replace("na", np.nan)
 
     # load graphs with just atomic number attributes
     # load atom feature vectors at StructureDataset construction
+    graph_cache = None
+    if cache_dir is not None:
+        graph_cache = Path(cache_dir) / "graphs"
+
     graphs = load_graphs(
         d,
         name=dataset,
@@ -316,6 +328,7 @@ def get_train_val_loaders(
         use_canonize=use_canonize,
         cutoff=cutoff,
         max_neighbors=max_neighbors,
+        cache_dir=graph_cache,
     )
 
     if dataset == "qm9_dgl" and target == "all":

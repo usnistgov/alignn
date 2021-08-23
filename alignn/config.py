@@ -171,6 +171,7 @@ class TrainingConfig(BaseSettings):
     progress: bool = True
     log_tensorboard: bool = False
     output_dir: Path = Path(".").absolute()
+    cache_dir: Optional[Path] = Path("./data").absolute()
 
     # training configuration
     random_seed: int = 123
