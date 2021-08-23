@@ -49,9 +49,9 @@ if __name__ == "__main__":
 
     analysis = tune.run(
         train_dgl,
-        num_samples=10,
+        num_samples=100,
         resources_per_trial={"cpu": 4, "gpu": 1},
-        scheduler=ASHAScheduler(metric="mae", mode="min", grace_period=5),
+        scheduler=ASHAScheduler(metric="mae", mode="min", grace_period=35),
         config=config,
         local_dir="./ray_results",
     )
