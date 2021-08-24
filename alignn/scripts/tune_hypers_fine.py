@@ -29,7 +29,7 @@ config = {
     "write_checkpoint": True,
     "write_predictions": False,
     "tune": True,
-    "learning_rate": tune.loguniform(1e-4, 1e-2),
+    "learning_rate": tune.loguniform(3e-4, 1e-2),
     "weight_decay": tune.loguniform(1e-7, 1e-4),
     "batch_size": 256,
     "model": {
@@ -38,7 +38,7 @@ config = {
         "gcn_layers": 2,
         "edge_input_features": 32,
         "triplet_input_features": 32,
-        "embedding_features": 32,
+        "embedding_features": tune.choice([32, 64, 128]),
         "hidden_features": tune.choice([128, 256, 512, 1024]),
         "link": "identity",
     },
