@@ -38,8 +38,8 @@ config = {
         "gcn_layers": 2,
         "edge_input_features": 32,
         "triplet_input_features": 32,
-        "embedding_features": tune.choice([32, 64, 128]),
-        "hidden_features": tune.choice([128, 256, 512, 1024]),
+        "embedding_features": tune.choice([32, 64]),
+        "hidden_features": tune.choice([200, 256, 400]),
         "link": "identity",
     },
 }
@@ -54,7 +54,9 @@ if __name__ == "__main__":
         train_dgl,
         num_samples=100,
         resources_per_trial={"cpu": 4, "gpu": 1},
-        scheduler=ASHAScheduler(metric="mae", mode="min", grace_period=15),
+        metric="mae",
+        mode="min",
+        # scheduler=ASHAScheduler(metric="mae", mode="min", grace_period=15),
         config=config,
         local_dir="./ray_results",
     )
