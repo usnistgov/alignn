@@ -24,6 +24,8 @@ class ALIGNNConfig(BaseSettings):
 
     name: Literal["alignn"]
     alignn_layers: int = 4
+    alignn_order: Literal["triplet-pair", "pair-triplet"] = "triplet-pair"
+    squeeze_ratio: float = 0.5
     gcn_layers: int = 4
     atom_input_features: int = 92
     edge_input_features: int = 80
@@ -171,36 +173,57 @@ class ALIGNNConv(nn.Module):
     """Line graph update."""
 
     def __init__(
-        self, in_features: int, out_features: int, reduction: float = 0.5
+        self,
+        in_features: int,
+        out_features: int,
+        order: Literal["triplet-pair", "pair-triplet"] = "triplet-pair",
+        reduction: float = 0.5,
     ):
-        """Set up ALIGNN parameters."""
+        """Set up ALIGNN parameters.
+
+        `reduction` sets amount of compression in squeeze-expand component.
+        currently supports reduction=0.5 (4x compression, 2 layers of 50%)
+        setting reduction=1.0 fully disables this feature.
+        """
         super().__init__()
 
-        self.bottleneck_size = int(in_features * reduction * reduction)
+        gcn_size = in_features
+        self.order = order
+        self.squeeze_expand = False
 
-        self.node_bottleneck = BottleneckLayer(in_features, reduction=0.5)
-        self.pair_bottleneck = BottleneckLayer(in_features, reduction=0.5)
-        self.triplet_bottleneck = BottleneckLayer(in_features, reduction=0.5)
+        # allow only 4x reduction or skip it...
+        assert reduction in (0.5, 1.0)
 
-        self.node_expand = MLPLayer(self.bottleneck_size, out_features)
-        self.pair_expand = MLPLayer(self.bottleneck_size, out_features)
-        self.triplet_expand = MLPLayer(self.bottleneck_size, out_features)
+        if reduction < 1.0:
+            self.squeeze_expand = True
+            self.bottleneck_size = int(in_features * reduction * reduction)
+            gcn_size = self.bottleneck_size
+
+            self.node_bottleneck = BottleneckLayer(in_features, reduction=0.5)
+            self.pair_bottleneck = BottleneckLayer(in_features, reduction=0.5)
+            self.triplet_bottleneck = BottleneckLayer(
+                in_features, reduction=0.5
+            )
+
+            self.node_expand = MLPLayer(self.bottleneck_size, out_features)
+            self.pair_expand = MLPLayer(self.bottleneck_size, out_features)
+            self.triplet_expand = MLPLayer(self.bottleneck_size, out_features)
 
         # y: in_features
         # z: in_features
         self.edge_update = EdgeGatedGraphConv(
-            self.bottleneck_size,
-            self.bottleneck_size,
-            self.bottleneck_size,
+            gcn_size,
+            gcn_size,
+            gcn_size,
             residual=False,
         )
 
         # x: in_features
         # y: out_features
         self.node_update = EdgeGatedGraphConv(
-            self.bottleneck_size,
-            self.bottleneck_size,
-            self.bottleneck_size,
+            gcn_size,
+            gcn_size,
+            gcn_size,
             residual=False,
         )
 
@@ -208,9 +231,9 @@ class ALIGNNConv(nn.Module):
         self,
         g: dgl.DGLGraph,
         lg: dgl.DGLGraph,
-        x_in: torch.Tensor,
-        y_in: torch.Tensor,
-        z_in: torch.Tensor,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        z: torch.Tensor,
     ):
         """Node and Edge updates for ALIGNN layer.
 
@@ -221,18 +244,28 @@ class ALIGNNConv(nn.Module):
         g = g.local_var()
         lg = lg.local_var()
 
-        # Edge-gated graph convolution update on crystal graph
-        m, z = self.edge_update(
-            lg, self.pair_bottleneck(y_in), self.triplet_bottleneck(z_in)
-        )
+        # save inputs for residual connection
+        x_in, y_in, z_in = x, y, z
 
-        # Edge-gated graph convolution update on crystal graph
-        x, y = self.node_update(g, self.node_bottleneck(x_in), m)
+        if self.squeeze_expand:
+            x = self.node_bottleneck(x)
+            y = self.pair_bottleneck(y)
+            z = self.triplet_bottleneck(z)
 
-        x = self.node_expand(x)
-        y = self.pair_expand(y)
-        z = self.triplet_expand(z)
+        if self.order == "triplet-pair":
+            m, z = self.edge_update(lg, y, z)
+            x, y = self.node_update(g, x, m)
 
+        elif self.order == "pair-triplet":
+            x, m = self.node_update(g, x, y)
+            y, z = self.edge_update(lg, m, z)
+
+        if self.squeeze_expand:
+            x = self.node_expand(x)
+            y = self.pair_expand(y)
+            z = self.triplet_expand(z)
+
+        # residual connection
         x += x_in
         y += y_in
         z += z_in
@@ -298,6 +331,8 @@ class ALIGNN(nn.Module):
                 ALIGNNConv(
                     config.hidden_features,
                     config.hidden_features,
+                    order=config.alignn_order,
+                    reduction=config.squeeze_ratio,
                 )
                 for idx in range(config.alignn_layers)
             ]
