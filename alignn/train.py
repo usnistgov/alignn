@@ -377,6 +377,13 @@ def train_dgl(
         # output_transform=make_standard_scalar_and_pca,
     )
 
+    test_evaluator = create_supervised_evaluator(
+        model,
+        metrics=metrics,
+        prepare_batch=prepare_batch,
+        device=device,
+    )
+
     # ignite event handlers:
     trainer.add_event_handler(Events.EPOCH_COMPLETED, TerminateOnNan())
 
@@ -429,6 +436,14 @@ def train_dgl(
         eos.attach(evaluator)
         train_eos = EpochOutputStore()
         train_eos.attach(train_evaluator)
+
+    @trainer.on(Events.COMPLETED)
+    def log_test_results(engine):
+        """Log test set performance."""
+        test_evaluator.run(test_loader)
+        torch.save(
+            test_evaluator.state.metrics, config.output_dir / "test_metrics.pt"
+        )
 
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -671,6 +686,7 @@ def train_dgl(
 
     """
     if not config.tune:
+        torch.save(history, config.output_dir / "metrics.pt")
         return history
 
 
