@@ -19,6 +19,7 @@ config = {
     "n_train": tune.grid_search([1024, 2048, 4096, 8192, 16384, 32768, 44578]),
     "n_val": 5500,
     "n_test": 5500,
+    "shuffle_train_val": True,
     "num_workers": 8,
     "pin_memory": True,
     "output_dir": "test",
