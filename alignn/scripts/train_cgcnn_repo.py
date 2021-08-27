@@ -3,7 +3,8 @@ import os
 from jarvis.db.figshare import data
 from jarvis.core.atoms import Atoms
 import time
-
+import warnings
+warnings.filterwarnings('ignore')
 
 # id_tag='jid'
 # dataset_name='dft_2d'
@@ -30,7 +31,8 @@ def cgcnn_pred(id_tag="jid", dataset_name="dft_2d", prop="optb88vdw_bandgap"):
         "wget https://raw.githubusercontent.com/txie-93/cgcnn"
         + "/master/data/sample-regression/atom_init.json"
     )
-    os.system(cmd)
+    if not os.path.exists('atom_init.json'):
+        os.system(cmd)
 
     f = open("id_prop.csv", "w")
     for i in dataset:
@@ -44,7 +46,7 @@ def cgcnn_pred(id_tag="jid", dataset_name="dft_2d", prop="optb88vdw_bandgap"):
     f.close()
     os.chdir(cgcnn_folder)
     cmd = (
-        "python main.py --train-ratio .8 --val-ratio .1 --test-ratio .1 "
+        "python main.py --train-ratio .8 --val-ratio .1 --test-ratio .1 "+"--batch-size 256 --lr 0.01 --workers 2 --epoch 300 "
         + local_name
     )
     os.system(cmd)
@@ -52,5 +54,6 @@ def cgcnn_pred(id_tag="jid", dataset_name="dft_2d", prop="optb88vdw_bandgap"):
     t2 = time.time()
     print("Time:", t2 - t1)
 
-
-cgcnn_pred(prop="formation_energy_peratom")
+if __name__ == '__main__':
+   #cgcnn_pred(prop="formation_energy_peratom",dataset_name='dft_3d',id_tag='jid')
+   cgcnn_pred(prop="optb88vdw_total_energy",dataset_name='dft_3d',id_tag='jid')

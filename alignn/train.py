@@ -39,6 +39,7 @@ from alignn import models
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
+from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
 from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
@@ -139,6 +140,7 @@ def train_dgl(
     `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
+    print(config)
     if type(config) is dict:
         try:
             print(config)
@@ -167,7 +169,12 @@ def train_dgl(
         ignite.utils.manual_seed(config.random_seed)
 
     line_graph = False
-    alignn_models = {"alignn", "dense_alignn", "alignn_cgcnn"}
+    alignn_models = {
+        "alignn",
+        "dense_alignn",
+        "alignn_cgcnn",
+        "alignn_layernorm",
+    }
     if config.model.name == "clgn":
         line_graph = True
     if config.model.name == "cgcnn":
@@ -230,6 +237,7 @@ def train_dgl(
         "alignn": ALIGNN,
         "dense_alignn": DenseALIGNN,
         "alignn_cgcnn": ACGCNN,
+        "alignn_layernorm": ALIGNN_LN,
     }
     if model is None:
         net = _model.get(config.model.name)(config.model)
