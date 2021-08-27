@@ -14,7 +14,8 @@ from jarvis.core.utils import chunks
 path = "ids_train_val_test.json"
 item = "id_test"
 dataset = "dft_3d"
-prop = "formation_energy_peratom"
+prop = "optb88vdw_bandgap"
+# "formation_energy_peratom"
 model_path = "checkpoint_300.pt"
 id_tag = "jid"
 
@@ -67,7 +68,7 @@ chnks = chunks(test_ids, n_size)
 print(len(test_ids), len(chnks), n_size)
 maes = []
 for i in chnks:
-    mae = predict_for_db(ids=i)
+    mae = predict_for_db(ids=i, prop=prop)
     maes.append(mae)
     print("MAE", mae)
 maes = np.array(maes)
