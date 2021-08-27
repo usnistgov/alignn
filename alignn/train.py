@@ -207,6 +207,7 @@ def train_dgl(
             train_ratio=config.train_ratio,
             val_ratio=config.val_ratio,
             test_ratio=config.test_ratio,
+            shuffle_train_val=config.shuffle_train_val,
             batch_size=config.batch_size,
             atom_features=config.atom_features,
             neighbor_strategy=config.neighbor_strategy,

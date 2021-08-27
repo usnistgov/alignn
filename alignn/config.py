@@ -181,6 +181,8 @@ class TrainingConfig(BaseSettings):
     train_ratio: Optional[float] = 0.8
     val_ratio: Optional[float] = 0.1
     test_ratio: Optional[float] = 0.1
+    shuffle_train_val: bool = False
+    cv_seed: Optional[int] = None
 
     pin_memory: bool = False
     num_workers: int = 4

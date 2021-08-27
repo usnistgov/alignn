@@ -136,6 +136,7 @@ def load_graphs(
 def get_id_train_val_test(
     total_size=1000,
     split_seed=123,
+    cv_seed=None,
     train_ratio=None,
     val_ratio=0.1,
     test_ratio=0.1,
@@ -143,6 +144,7 @@ def get_id_train_val_test(
     n_test=None,
     n_val=None,
     keep_data_order=False,
+    shuffle_train_val=False,
 ):
     """Get train, val, test array indices."""
     if (
@@ -185,6 +187,16 @@ def get_id_train_val_test(
     id_train = ids[:n_train]
     id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
     id_test = ids[-n_test:]
+
+    if shuffle_train_val:
+        # for cross-validation splitting
+        # merge train and val ids, and re-shuffle
+        cv_ids = np.r_[id_train, id_val]
+        random.seed(cv_seed)
+        random.shuffle(cv_ids)
+        id_train = cv_ids[:n_train]
+        id_val = cv_ids[n_train:]
+
     return id_train, id_val, id_test
 
 
@@ -265,6 +277,7 @@ def get_train_val_loaders(
     train_ratio=None,
     val_ratio=0.1,
     test_ratio=0.1,
+    shuffle_train_val=False,
     batch_size: int = 5,
     standardize: bool = False,
     line_graph: bool = True,
@@ -285,7 +298,10 @@ def get_train_val_loaders(
     output_dir=None,
     cache_dir=None,
 ):
-    """Help function to set up JARVIS train and val dataloaders."""
+    """Help function to set up JARVIS train and val dataloaders.
+
+    shuffle_train_val: True for cross-validation; randomizes train/val split
+    """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -357,6 +373,7 @@ def get_train_val_loaders(
         n_test=n_test,
         n_val=n_val,
         keep_data_order=keep_data_order,
+        shuffle_train_val=shuffle_train_val,
     )
 
     # save DFT ids
