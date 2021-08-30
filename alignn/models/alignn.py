@@ -35,6 +35,7 @@ class ALIGNNConfig(BaseSettings):
     # fc_layers: int = 1
     # fc_features: int = 64
     output_features: int = 1
+    norm: Literal["layernorm", "batchnorm"] = "layernorm"
 
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
@@ -64,6 +65,7 @@ class EdgeGatedGraphConv(nn.Module):
         edge_input_features: int,
         output_features: int,
         residual: bool = True,
+        norm = nn.BatchNorm1d,
     ):
         """Initialize parameters for ALIGNN update."""
         super().__init__()
@@ -82,7 +84,7 @@ class EdgeGatedGraphConv(nn.Module):
         self.edge_gate = nn.Linear(
             edge_input_features, output_features, bias=False
         )
-        self.bn_edges = nn.LayerNorm(output_features)
+        self.bn_edges = norm(output_features)
 
         self.src_update = nn.Linear(
             node_input_features, output_features, bias=False
@@ -90,7 +92,7 @@ class EdgeGatedGraphConv(nn.Module):
         self.dst_update = nn.Linear(
             node_input_features, output_features, bias=False
         )
-        self.bn_nodes = nn.LayerNorm(output_features)
+        self.bn_nodes = norm(output_features)
 
     def forward(
         self,
@@ -178,6 +180,7 @@ class ALIGNNConv(nn.Module):
         out_features: int,
         order: Literal["triplet-pair", "pair-triplet"] = "triplet-pair",
         reduction: float = 0.5,
+        norm = nn.BatchNorm1d,
     ):
         """Set up ALIGNN parameters.
 
@@ -216,6 +219,7 @@ class ALIGNNConv(nn.Module):
             gcn_size,
             gcn_size,
             residual=False,
+            norm=norm,
         )
 
         # x: in_features
@@ -225,6 +229,7 @@ class ALIGNNConv(nn.Module):
             gcn_size,
             gcn_size,
             residual=False,
+            norm=norm
         )
 
     def forward(
@@ -276,12 +281,12 @@ class ALIGNNConv(nn.Module):
 class MLPLayer(nn.Module):
     """Multilayer perceptron layer helper."""
 
-    def __init__(self, in_features: int, out_features: int):
+    def __init__(self, in_features: int, out_features: int, norm=nn.BatchNorm1d):
         """Linear, Batchnorm, SiLU layer."""
         super().__init__()
         self.layer = nn.Sequential(
             nn.Linear(in_features, out_features),
-            nn.LayerNorm(out_features),
+            norm(out_features),
             nn.SiLU(),
         )
 
@@ -303,8 +308,12 @@ class ALIGNN(nn.Module):
         print(config)
         self.classification = config.classification
 
+        norm = {"batchnorm": nn.BatchNorm1d, "layernorm": nn.LayerNorm}[
+            config.norm
+        ]
+
         self.atom_embedding = MLPLayer(
-            config.atom_input_features, config.hidden_features
+            config.atom_input_features, config.hidden_features, norm=norm
         )
 
         self.edge_embedding = nn.Sequential(
@@ -313,8 +322,8 @@ class ALIGNN(nn.Module):
                 vmax=8.0,
                 bins=config.edge_input_features,
             ),
-            MLPLayer(config.edge_input_features, config.embedding_features),
-            MLPLayer(config.embedding_features, config.hidden_features),
+            MLPLayer(config.edge_input_features, config.embedding_features, norm=norm),
+            MLPLayer(config.embedding_features, config.hidden_features, norm=norm),
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
@@ -322,8 +331,8 @@ class ALIGNN(nn.Module):
                 vmax=1.0,
                 bins=config.triplet_input_features,
             ),
-            MLPLayer(config.triplet_input_features, config.embedding_features),
-            MLPLayer(config.embedding_features, config.hidden_features),
+            MLPLayer(config.triplet_input_features, config.embedding_features, norm=norm),
+            MLPLayer(config.embedding_features, config.hidden_features, norm=norm),
         )
 
         self.alignn_layers = nn.ModuleList(
@@ -333,6 +342,7 @@ class ALIGNN(nn.Module):
                     config.hidden_features,
                     order=config.alignn_order,
                     reduction=config.squeeze_ratio,
+                    norm=norm,
                 )
                 for idx in range(config.alignn_layers)
             ]
@@ -343,6 +353,7 @@ class ALIGNN(nn.Module):
                     config.hidden_features,
                     config.hidden_features,
                     config.hidden_features,
+                    norm=norm,
                 )
                 for idx in range(config.gcn_layers)
             ]
