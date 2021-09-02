@@ -47,7 +47,7 @@ config = {
 if __name__ == "__main__":
 
     # ray.init(local_mode=True)
-    ray.init(dashboard_port=os.environ["UID"])
+    ray.init(dashboard_port=os.environ.get("UID", 60281))
 
     analysis = tune.run(
         train_dgl,

@@ -14,7 +14,8 @@ from ray.tune.schedulers import ASHAScheduler
 from alignn.train import train_dgl
 
 config = {
-    "target": tune.grid_search(["optb88vdw_bandgap", "pair-triplet"]),
+    # "target": tune.grid_search(["optb88vdw_bandgap", "pair-triplet"]),
+    "target": "formation_energy_peratom",
     "epochs": 200,
     "n_train": tune.grid_search([1024, 2048, 4096, 8192, 16384, 32768, 44578]),
     "n_val": 5500,
@@ -48,7 +49,7 @@ config = {
 if __name__ == "__main__":
 
     # ray.init(local_mode=True)
-    ray.init(dashboard_port=os.environ["UID"])
+    ray.init(dashboard_port=os.environ.get("UID", 60281))
 
     analysis = tune.run(
         train_dgl,
@@ -56,8 +57,7 @@ if __name__ == "__main__":
         resources_per_trial={"cpu": 8, "gpu": 1},
         metric="mae",
         mode="min",
-        # scheduler=ASHAScheduler(metric="mae", mode="min", grace_period=15),
         config=config,
-        local_dir="./ray_ablation",
+        local_dir="./ray_learning_curve",
     )
     print(analysis)
