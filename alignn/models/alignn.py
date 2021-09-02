@@ -25,17 +25,15 @@ class ALIGNNConfig(BaseSettings):
     name: Literal["alignn"]
     alignn_layers: int = 4
     alignn_order: Literal["triplet-pair", "pair-triplet"] = "triplet-pair"
-    squeeze_ratio: float = 0.5
+    squeeze_ratio: float = 1.0
     gcn_layers: int = 4
     atom_input_features: int = 92
     edge_input_features: int = 80
     triplet_input_features: int = 40
     embedding_features: int = 64
     hidden_features: int = 256
-    # fc_layers: int = 1
-    # fc_features: int = 64
     output_features: int = 1
-    norm: Literal["layernorm", "batchnorm"] = "layernorm"
+    norm: Literal["layernorm", "batchnorm"] = "batchnorm"
 
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
@@ -65,7 +63,7 @@ class EdgeGatedGraphConv(nn.Module):
         edge_input_features: int,
         output_features: int,
         residual: bool = True,
-        norm = nn.BatchNorm1d,
+        norm=nn.BatchNorm1d,
     ):
         """Initialize parameters for ALIGNN update."""
         super().__init__()
@@ -180,7 +178,7 @@ class ALIGNNConv(nn.Module):
         out_features: int,
         order: Literal["triplet-pair", "pair-triplet"] = "triplet-pair",
         reduction: float = 0.5,
-        norm = nn.BatchNorm1d,
+        norm=nn.BatchNorm1d,
     ):
         """Set up ALIGNN parameters.
 
@@ -225,11 +223,7 @@ class ALIGNNConv(nn.Module):
         # x: in_features
         # y: out_features
         self.node_update = EdgeGatedGraphConv(
-            gcn_size,
-            gcn_size,
-            gcn_size,
-            residual=False,
-            norm=norm
+            gcn_size, gcn_size, gcn_size, residual=False, norm=norm
         )
 
     def forward(
@@ -281,7 +275,9 @@ class ALIGNNConv(nn.Module):
 class MLPLayer(nn.Module):
     """Multilayer perceptron layer helper."""
 
-    def __init__(self, in_features: int, out_features: int, norm=nn.BatchNorm1d):
+    def __init__(
+        self, in_features: int, out_features: int, norm=nn.BatchNorm1d
+    ):
         """Linear, Batchnorm, SiLU layer."""
         super().__init__()
         self.layer = nn.Sequential(
@@ -322,8 +318,14 @@ class ALIGNN(nn.Module):
                 vmax=8.0,
                 bins=config.edge_input_features,
             ),
-            MLPLayer(config.edge_input_features, config.embedding_features, norm=norm),
-            MLPLayer(config.embedding_features, config.hidden_features, norm=norm),
+            MLPLayer(
+                config.edge_input_features,
+                config.embedding_features,
+                norm=norm,
+            ),
+            MLPLayer(
+                config.embedding_features, config.hidden_features, norm=norm
+            ),
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
@@ -331,8 +333,14 @@ class ALIGNN(nn.Module):
                 vmax=1.0,
                 bins=config.triplet_input_features,
             ),
-            MLPLayer(config.triplet_input_features, config.embedding_features, norm=norm),
-            MLPLayer(config.embedding_features, config.hidden_features, norm=norm),
+            MLPLayer(
+                config.triplet_input_features,
+                config.embedding_features,
+                norm=norm,
+            ),
+            MLPLayer(
+                config.embedding_features, config.hidden_features, norm=norm
+            ),
         )
 
         self.alignn_layers = nn.ModuleList(

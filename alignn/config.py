@@ -192,8 +192,8 @@ class TrainingConfig(BaseSettings):
     # optimizer
     epochs: int = 300
     batch_size: int = 64
-    weight_decay: float = 0
-    learning_rate: float = 1e-2
+    weight_decay: float = 1e-5
+    learning_rate: float = 1e-3
     warmup_steps: int = 2000
     criterion: Literal["mse", "l1", "poisson", "zig"] = "mse"
     optimizer: Literal["adamw", "sgd"] = "adamw"
