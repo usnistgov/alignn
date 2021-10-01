@@ -49,11 +49,11 @@ Examples
 ---------
 
 #### Dataset
-Users can keep their structure files in `POSCAR`, `.cif`, or `.xyz` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be id_prop.csv file.
+Users can keep their structure files in `POSCAR`, `.cif`, or `.xyz` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop.csv` file.
 
-In this directory, `id_prop.csv`, the filenames, and correponding target values are kept in comma separated values (csv) format.
+In this directory, `id_prop.csv`, the filenames, and correponding target values are kept in `comma separated values (csv) format`.
 
-Here is an example of training OptB88vdw bandgaps of 50 materials from JARVIS-DFT database. The example is created using the [generate_sample_data_reg.py](https://github.com/usnistgov/alignn/blob/main/alignn/examples/sample_data/scripts/generate_sample_data_reg.py) script. Users can modify the script more than 50 data, or make their own dataset in this format. For list of available datasets see [Databases](https://jarvis-tools.readthedocs.io/en/master/databases.html).
+Here is an example of training OptB88vdw bandgaps of 50 materials from JARVIS-DFT database. The example is created using the [generate_sample_data_reg.py](https://github.com/usnistgov/alignn/blob/main/alignn/examples/sample_data/scripts/generate_sample_data_reg.py) script. Users can modify the script for more than 50 data, or make their own dataset in this format. For list of available datasets see [Databases](https://jarvis-tools.readthedocs.io/en/master/databases.html).
 
 The dataset in split in 80:10:10 as training-validation-test set (controlled by `train_ratio, val_ratio, test_ratio`) . To change the split proportion and other parameters, change the `config_example.json` file. If, users want to train on certain sets and val/test on another dataset, set `n_train`, `n_val`, `n_test` manually in the `config_example.json` and also set `keep_data_order` as True there so that random shuffle is disabled.
 
