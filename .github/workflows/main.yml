@@ -36,4 +36,5 @@ jobs:
         pip freeze
         coverage run -m pytest
         coverage report -m
-        # codecov
+        codecov
+        #codecov --token=""
