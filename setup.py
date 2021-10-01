@@ -17,11 +17,11 @@ setuptools.setup(
     install_requires=[
         "numpy>=1.19.5",
         "scipy>=1.6.3",
-        "jarvis-tools>=2021.07.19",
+        "jarvis-tools>=2021.09.30",
         "torch>=1.7.1",
         "dgl-cu101>=0.6.0",
         "dgl>=0.6.0",
-        "scikit-learn>=0.24.1",
+        "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",
         "tqdm>=4.60.0",
         "pandas==1.2.4",
