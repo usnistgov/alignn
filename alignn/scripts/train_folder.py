@@ -40,10 +40,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--batch_size",
-    default=2,
-    help="Batch size"
-    
+    "--batch_size", default=None, help="Batch size, generally 64"
 )
 
 parser.add_argument(
@@ -77,7 +74,7 @@ def train_for_folder(
     if output_dir is not None:
         config.output_dir = output_dir
     if batch_size is not None:
-        config.batch_size = batch_size
+        config.batch_size = int(batch_size)
     with open(id_prop_dat, "r") as f:
         reader = csv.reader(f)
         data = [row for row in reader]
@@ -173,5 +170,5 @@ if __name__ == "__main__":
         keep_data_order=args.keep_data_order,
         classification_threshold=args.classification_threshold,
         output_dir=args.output_dir,
-        batch_size=int(args.batch_size)
+        batch_size=(args.batch_size),
     )

@@ -17,7 +17,7 @@
     "epochs": 3,
     "batch_size": 2,
     "weight_decay": 1e-05,
-    "learning_rate": 0.01,
+    "learning_rate": 0.001,
     "filename": "sample",
     "warmup_steps": 2000,
     "criterion": "mse",

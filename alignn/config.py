@@ -112,11 +112,13 @@ TARGET_ENUM = Literal[
     "b3lyp_scharber_jsc",
     "log_kd_ki",
     "max_co2_adsp",
+    "min_co2_adsp",
     "lcd",
     "pld",
     "void_fraction",
     "surface_area_m2g",
     "surface_area_m2cm3",
+    "co2_absp",
 ]
 
 
@@ -154,7 +156,7 @@ class TrainingConfig(BaseSettings):
     # logging configuration
 
     # training configuration
-    random_seed: int = 123
+    random_seed: Optional[int] = 123
     classification_threshold: Optional[float] = None
     # target_range: Optional[List] = None
     n_val: Optional[int] = None
