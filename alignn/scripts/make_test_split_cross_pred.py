@@ -1,5 +1,5 @@
 from jarvis.db.jsonutils import loadjson
-from alignn.models.alignn_layernorm import ALIGNN, ALIGNNConfig
+from alignn.models.alignn_layernorm import ALIGNN  # , ALIGNNConfig
 
 # from alignn.models.alignn import ALIGNN
 import pandas as pd

@@ -1,16 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-plt.switch_backend("agg")
 from sklearn.metrics import r2_score, mean_absolute_error
+plt.switch_backend("agg")
 
 df = pd.read_csv("prediction_results_test_set.csv")
 target = df.target.values
 pred = df.prediction.values
 df["abs_diff"] = (df["target"] - df["prediction"]).abs()
-plt.plot(target, target,c='g')
-plt.scatter(target, pred, c="blue",alpha=0.5,s=1)
+plt.plot(target, target, c="g")
+plt.scatter(target, pred, c="blue", alpha=0.5, s=1)
 title = (
     "R2,MAE:"
     + str(round(r2_score(target, pred), 3))

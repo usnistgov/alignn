@@ -1,4 +1,5 @@
-from alignn.data import load_dataset, get_train_val_loaders
+from alignn.data import load_dataset
+# from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 from alignn.train import train_dgl
