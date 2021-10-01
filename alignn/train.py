@@ -161,7 +161,7 @@ def train_dgl(
     f.close()
     global tmp_output_dir
     tmp_output_dir = config.output_dir
-    pprint.pprint(tmp, sort_dicts=False)
+    pprint.pprint(tmp)  # , sort_dicts=False)
     if config.classification_threshold is not None:
         classification = True
     if config.random_seed is not None:
