@@ -149,6 +149,7 @@ def get_id_train_val_test(
     if not keep_data_order:
         random.seed(split_seed)
         random.shuffle(ids)
+    # np.random.shuffle(ids)
     if n_train + n_val + n_test > total_size:
         raise ValueError(
             "Check total number of samples.",
@@ -164,6 +165,7 @@ def get_id_train_val_test(
     # test_size = round(N * 0.2)
 
     # full train/val test split
+    # ids = ids[::-1]
     id_train = ids[:n_train]
     id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
     id_test = ids[-n_test:]

@@ -15,6 +15,7 @@ from alignn.models.densegcn import DenseGCNConfig
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.dense_alignn import DenseALIGNNConfig
 from alignn.models.alignn_cgcnn import ACGCNNConfig
+from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
 
 # from typing import List
 
@@ -111,11 +112,13 @@ TARGET_ENUM = Literal[
     "b3lyp_scharber_jsc",
     "log_kd_ki",
     "max_co2_adsp",
+    "min_co2_adsp",
     "lcd",
     "pld",
     "void_fraction",
     "surface_area_m2g",
     "surface_area_m2cm3",
+    "co2_absp",
 ]
 
 
@@ -127,6 +130,7 @@ class TrainingConfig(BaseSettings):
     # dataset configuration
     dataset: Literal[
         "dft_3d",
+        "jdft_3d-8-18-2021",
         "dft_2d",
         "megnet",
         "megnet2",
@@ -152,7 +156,7 @@ class TrainingConfig(BaseSettings):
     # logging configuration
 
     # training configuration
-    random_seed: int = 123
+    random_seed: Optional[int] = 123
     classification_threshold: Optional[float] = None
     # target_range: Optional[List] = None
     n_val: Optional[int] = None
@@ -187,6 +191,13 @@ class TrainingConfig(BaseSettings):
     distributed: bool = False
     n_early_stopping: Optional[int] = None  # typically 50
     output_dir: str = os.path.abspath(".")  # typically 50
+    # alignn_layers: int = 4
+    # gcn_layers: int =4
+    # edge_input_features: int= 80
+    # hidden_features: int= 256
+    # triplet_input_features: int=40
+    # embedding_features: int=64
+
     # model configuration
     model: Union[
         CGCNNConfig,
@@ -194,6 +205,7 @@ class TrainingConfig(BaseSettings):
         SimpleGCNConfig,
         DenseGCNConfig,
         ALIGNNConfig,
+        ALIGNN_LN_Config,
         DenseALIGNNConfig,
         ACGCNNConfig,
     ] = ALIGNNConfig(name="alignn")

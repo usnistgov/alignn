@@ -25,6 +25,18 @@ def train_prop_model(
     n_epochs=None,
     id_tag=None,
     num_workers=None,
+    weight_decay=None,
+    alignn_layers=None,
+    gcn_layers=None,
+    edge_input_features=None,
+    triplet_input_features=None,
+    embedding_features=None,
+    hidden_features=None,
+    output_features=None,
+    random_seed=None,
+    n_early_stopping=None,
+    cutoff=None,
+    max_neighbors=None,
 ):
     """Train models for a dataset and a property."""
     if scheduler is None:
@@ -54,6 +66,31 @@ def train_prop_model(
             "name": name,
         },
     }
+    if n_early_stopping is not None:
+        config["n_early_stopping"] = n_early_stopping
+    if cutoff is not None:
+        config["cutoff"] = cutoff
+    if max_neighbors is not None:
+        config["max_neighbors"] = max_neighbors
+    if weight_decay is not None:
+        config["weight_decay"] = weight_decay
+    if alignn_layers is not None:
+        config["model"]["alignn_layers"] = alignn_layers
+    if gcn_layers is not None:
+        config["model"]["gcn_layers"] = gcn_layers
+    if edge_input_features is not None:
+        config["model"]["edge_input_features"] = edge_input_features
+    if hidden_features is not None:
+        config["model"]["hidden_features"] = hidden_features
+    if embedding_features is not None:
+        config["model"]["embedding_features"] = embedding_features
+    if output_features is not None:
+        config["model"]["output_features"] = output_features
+    if random_seed is not None:
+        config["random_seed"] = random_seed
+    # if model_name is not None:
+    #    config['model']['name']=model_name
+
     if id_tag is not None:
         config["id_tag"] = id_tag
     if train_ratio is not None:
@@ -90,6 +127,8 @@ def train_prop_model(
     if dataset == "oqmd_3d_no_cfid":
         config["id_tag"] = "_oqmd_entry_id"
         config["num_workers"] = 0
+    if dataset == "hmof" and prop == "co2_absp":
+        config["model"]["output_features"] = 5
     if dataset == "edos_pdos":
         if prop == "edos_up":
             config["model"]["output_features"] = 300

@@ -40,6 +40,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--batch_size", default=None, help="Batch size, generally 64"
+)
+
+parser.add_argument(
     "--output_dir",
     default="./",
     help="Folder to save outputs",
@@ -51,6 +55,7 @@ def train_for_folder(
     config_name="config.json",
     keep_data_order=False,
     classification_threshold=None,
+    batch_size=None,
     output_dir=None,
 ):
     """Train for a folder."""
@@ -68,6 +73,8 @@ def train_for_folder(
         config.classification_threshold = float(classification_threshold)
     if output_dir is not None:
         config.output_dir = output_dir
+    if batch_size is not None:
+        config.batch_size = int(batch_size)
     with open(id_prop_dat, "r") as f:
         reader = csv.reader(f)
         data = [row for row in reader]
@@ -163,4 +170,5 @@ if __name__ == "__main__":
         keep_data_order=args.keep_data_order,
         classification_threshold=args.classification_threshold,
         output_dir=args.output_dir,
+        batch_size=(args.batch_size),
     )
