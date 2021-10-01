@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8]
+        python-version: [3.7,3.8]
 
     steps:
     - uses: actions/checkout@v2
@@ -32,7 +32,7 @@ jobs:
       run: |
         export DGLBACKEND=pytorch
         pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage 
-        echo 'pip freeze'
+        echo 'PIP freeze'
         pip freeze
         coverage run -m pytest
         coverage report -m
