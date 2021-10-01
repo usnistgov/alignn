@@ -45,6 +45,13 @@ git clone https://github.com/usnistgov/alignn.git
 cd alignn
 python setup.py develop
 ```
+
+Instead of git-clone, ALIGNN can be install using `pip` command as follows:
+```
+pip install alignn
+```
+
+
 Examples
 ---------
 
