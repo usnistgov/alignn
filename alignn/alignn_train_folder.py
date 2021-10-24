@@ -162,7 +162,9 @@ def train_for_folder(
     # train_data = get_torch_dataset(
 
 
-if __name__ == "__main__":
+def cli():
+    """Run command line."""
+    # if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     train_for_folder(
         root_dir=args.root_dir,
