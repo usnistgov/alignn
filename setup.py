@@ -31,6 +31,10 @@ setuptools.setup(
         "pycodestyle>=2.7.0",
         "pydocstyle>=6.0.0",
     ],
+    scripts=["alignn/scripts/alignn_train_folder"],
+    # entry_points={
+    #    'console_scripts':['alignn_train_folder=alignn.train_folder:cli'],
+    # },
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/usnistgov/alignn",
