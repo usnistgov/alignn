@@ -35,7 +35,8 @@ setuptools.setup(
     # scripts=["alignn/alignn_train_folder.py"],
     entry_points={
         "console_scripts": [
-            "train_folder=alignn.train_folder"
+            "train_folder=alignn.script.train_folder"
+            "pretrained=alignn.pretrained"
         ],
     },
     long_description=long_description,
