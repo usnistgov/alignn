@@ -30,7 +30,7 @@ setuptools.setup(
         "flake8>=3.9.1",
         "pycodestyle>=2.7.0",
         "pydocstyle>=6.0.0",
-        "pyparsing==2.0.2",
+        "pyparsing>=2.2.1",
     ],
     # scripts=["alignn/alignn_train_folder.py"],
     entry_points={
