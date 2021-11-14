@@ -100,7 +100,12 @@ These scripts automatically download datasets from [Databases](https://jarvis-to
 Using pretrained models
 -------------------------
 
-All the trained models are distributed on [figshare](https://figshare.com/projects/ALIGNN_models/126478) and this [pretrained_model.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/scripts/pretrained_model.py) can be applied to use them.
+All the trained models are distributed on [figshare](https://figshare.com/projects/ALIGNN_models/126478) and this [pretrained.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/pretrained.py) can be applied to use them.
+
+Web-app
+------------
+
+A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https://jarvis.nist.gov/jalignn/)
 
 Notes:
 1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111.

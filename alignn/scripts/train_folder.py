@@ -3,9 +3,6 @@ import csv
 import os
 import sys
 from jarvis.core.atoms import Atoms
-
-# from jarvis.core.graphs import Graph
-# from alignn.models.alignn import ALIGNN
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
 from alignn.config import TrainingConfig
@@ -18,12 +15,16 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--root_dir",
     default="./",
-    help="Folder with id_props.csv, poscars",
+    help="Folder with id_props.csv, structure files",
 )
 parser.add_argument(
     "--config_name",
     default="alignn/examples/sample_data/config_example.json",
     help="Name of the config file",
+)
+
+parser.add_argument(
+    "--file_format", default="poscar", help="poscar/cif/xyz/pdb file format."
 )
 
 parser.add_argument(
@@ -44,6 +45,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--epochs", default=None, help="Number of epochs, generally 300"
+)
+
+parser.add_argument(
     "--output_dir",
     default="./",
     help="Folder to save outputs",
@@ -56,6 +61,8 @@ def train_for_folder(
     keep_data_order=False,
     classification_threshold=None,
     batch_size=None,
+    epochs=None,
+    file_format="poscar",
     output_dir=None,
 ):
     """Train for a folder."""
@@ -75,6 +82,8 @@ def train_for_folder(
         config.output_dir = output_dir
     if batch_size is not None:
         config.batch_size = int(batch_size)
+    if epochs is not None:
+        config.epochs = int(epochs)
     with open(id_prop_dat, "r") as f:
         reader = csv.reader(f)
         data = [row for row in reader]
@@ -85,11 +94,27 @@ def train_for_folder(
     lists_length_equal = True
     for i in data:
         info = {}
-        poscar_name = i[0]
-        poscar_path = os.path.join(root_dir, poscar_name)
-        atoms = Atoms.from_poscar(poscar_path)
+        file_name = i[0]
+        file_path = os.path.join(root_dir, file_name)
+        if file_format == "poscar":
+            atoms = Atoms.from_poscar(file_path)
+        elif file_format == "cif":
+            atoms = Atoms.from_cif(file_path)
+        elif file_format == "xyz":
+            # Note using 500 angstrom as box size
+            atoms = Atoms.from_xyz(file_path, box_size=500)
+        elif file_format == "pdb":
+            # Note using 500 angstrom as box size
+            # Recommended install pytraj
+            # conda install -c ambermd pytraj
+            atoms = Atoms.from_pdb(file_path, max_lat=500)
+        else:
+            raise NotImplementedError(
+                "File format not implemented", file_format
+            )
+
         info["atoms"] = atoms.to_dict()
-        info["jid"] = poscar_name
+        info["jid"] = file_name
 
         tmp = [float(j) for j in i[1:]]  # float(i[1])
         if len(tmp) == 1:
@@ -171,4 +196,6 @@ if __name__ == "__main__":
         classification_threshold=args.classification_threshold,
         output_dir=args.output_dir,
         batch_size=(args.batch_size),
+        epochs=(args.epochs),
+        file_format=(args.file_format),
     )

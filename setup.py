@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2021.11.11",
+    version="2021.11.12",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -35,7 +35,7 @@ setuptools.setup(
     # scripts=["alignn/alignn_train_folder.py"],
     entry_points={
         "console_scripts": [
-            "alignn_train_folder=alignn.alignn_train_folder:cli"
+            "train_folder=alignn.train_folder:cli"
         ],
     },
     long_description=long_description,
