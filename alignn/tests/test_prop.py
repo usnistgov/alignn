@@ -3,10 +3,12 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 from alignn.train import train_dgl
-
-plt.switch_backend("agg")
+from alignn.pretrained import get_prediction
 from sklearn.metrics import mean_absolute_error
 import os
+from jarvis.core.atoms import Atoms
+
+plt.switch_backend("agg")
 
 config = {
     "dataset": "dft_2d",
@@ -56,6 +58,17 @@ def test_models():
     print()
 
     config["model"]["name"] = "alignn"
+    t1 = time.time()
+    result = train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print("train=", result["train"])
+    print("validation=", result["validation"])
+    print()
+    print()
+    print()
+
+    config["model"]["name"] = "alignn_layernorm"
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
@@ -202,5 +215,18 @@ def test_models():
     """
 
 
+def test_pretrained():
+    box = [[2.715, 2.715, 0], [0, 2.715, 2.715], [2.715, 0, 2.715]]
+    coords = [[0, 0, 0], [0.25, 0.2, 0.25]]
+    elements = ["Si", "Si"]
+    Si = Atoms(lattice_mat=box, coords=coords, elements=elements)
+    prd = get_prediction(atoms=Si)
+    print(prd)
+    cmd1 = "python alignn/pretrained.py"
+    os.system(cmd1)
+
+
+# test_pretrained()
 # test_runtime_training()
+
 # test_models()

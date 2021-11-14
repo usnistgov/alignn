@@ -26,6 +26,26 @@ The line graph convolution updates the triplet representations and the pair repr
 
 ![ALIGNN layer schematic](https://github.com/usnistgov/alignn/blob/main/alignn/tex/alignn2.png)
 
+Performances
+-------------------------
+
+On QM9 dataset
+
+![QM9](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/qm9.PNG)
+
+On Materials project dataset
+
+![MP](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/MP.PNG)
+
+On JARVIS-DFT dataset (classification)
+
+![JV-class](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jvclass.PNG)
+
+On JARVIS-DFT dataset (regression)
+
+![JV-reg1](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv.PNG)
+![JV-reg2](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv2.PNG)
+
 Installation
 -------------------------
 First create a conda environment:
@@ -61,7 +81,7 @@ Examples
 ---------
 
 #### Dataset
-Users can keep their structure files in `POSCAR`, `.cif`, or `.xyz` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop.csv` file.
+Users can keep their structure files in `POSCAR`, `.cif`, `.xyz` or `.pdb` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop.csv` file.
 
 In this directory, `id_prop.csv`, the filenames, and correponding target values are kept in `comma separated values (csv) format`.
 
@@ -94,13 +114,31 @@ An example is given below for training formation energy per atom, bandgap and to
 python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp
 ```
 #### Automated model training
-Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the [alignn/scripts'](https://github.com/usnistgov/alignn/tree/main/alignn/scripts) folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.
-These scripts automatically download datasets from [Databases](https://jarvis-tools.readthedocs.io/en/master/databases.html) in [jarvis-tools] (https://github.com/usnistgov/jarvis) package and train several models. Make sure you specify your specific queuing system details in the scripts.
+Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the [alignn/scripts/train_*.py](https://github.com/usnistgov/alignn/tree/main/alignn/scripts) folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.
+These scripts automatically download datasets from [Databases in jarvis-tools](https://jarvis-tools.readthedocs.io/en/master/databases.html) and train several models. Make sure you specify your specific queuing system details in the scripts.
 
 Using pretrained models
 -------------------------
 
-All the trained models are distributed on [figshare](https://figshare.com/projects/ALIGNN_models/126478) and this [pretrained_model.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/scripts/pretrained_model.py) can be applied to use them.
+All the trained models are distributed on [figshare](https://figshare.com/projects/ALIGNN_models/126478) and this [pretrained.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/pretrained.py) can be applied to use them.
+
+A brief help section is shown using:
+
+```
+python alignn/pretrained.py -h
+```
+An example of prediction formation energy per atom using JARVIS-DFT dataset trained model is shown below:
+
+```
+python alignn/pretrained.py --model_name jv_formation_energy_peratom_alignn --file_format poscar --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp
+```
+
+Web-app
+------------
+
+A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https://jarvis.nist.gov/jalignn/)
+
+![JARVIS-ALIGNN](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jalignn.PNG)
 
 Notes:
 1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111.
