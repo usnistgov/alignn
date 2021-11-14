@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2021.11.12",
+    version="2021.11.13",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -35,7 +35,8 @@ setuptools.setup(
     # scripts=["alignn/alignn_train_folder.py"],
     entry_points={
         "console_scripts": [
-            "train_folder=alignn.train_folder:cli"
+            "train_folder=alignn.script.train_folder"
+            "pretrained=alignn.pretrained"
         ],
     },
     long_description=long_description,
@@ -47,5 +48,5 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.7",
 )
