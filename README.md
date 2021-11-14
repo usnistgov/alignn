@@ -24,7 +24,7 @@ The atomistic line graph *L(g)* represents relationships between atom triplets: 
 The line graph convolution updates the triplet representations and the pair representations; the direct graph convolution further updates the pair representations and the atom representations.
 
 
-![ALIGNN layer schematic](alignn/tex/alignn2.png)
+![ALIGNN layer schematic](https://github.com/usnistgov/alignn/blob/main/alignn/tex/alignn2.png)
 
 Installation
 -------------------------
@@ -52,7 +52,7 @@ cd alignn
 python setup.py develop
 ```
 
-Instead of git-clone, ALIGNN can be install using `pip` command as follows:
+As an alternate method, ALIGNN can also be install using `pip` command as follows:
 ```
 pip install alignn
 ```
@@ -96,6 +96,11 @@ python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data_mu
 #### Automated model training
 Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the [alignn/scripts'](https://github.com/usnistgov/alignn/tree/main/alignn/scripts) folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.
 These scripts automatically download datasets from [Databases](https://jarvis-tools.readthedocs.io/en/master/databases.html) in [jarvis-tools] (https://github.com/usnistgov/jarvis) package and train several models. Make sure you specify your specific queuing system details in the scripts.
+
+Using pretrained models
+-------------------------
+
+All the trained models are distributed on [figshare](https://figshare.com/projects/ALIGNN_models/126478) and this [pretrained_model.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/scripts/pretrained_model.py) can be applied to use them.
 
 Notes:
 1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111.

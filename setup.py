@@ -10,13 +10,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2021.10.01",
+    version="2021.11.11",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
     install_requires=[
         "numpy>=1.19.5",
-        "scipy>=1.6.3",
+        "scipy>=1.6.1",
         "jarvis-tools>=2021.07.19",
         "torch>=1.7.1",
         "dgl-cu101>=0.6.0",
@@ -24,12 +24,13 @@ setuptools.setup(
         "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",
         "tqdm>=4.60.0",
-        "pandas==1.2.4",
-        "pytorch-ignite==0.5.0.dev20210429",
+        "pandas>=1.2.3",
+        "pytorch-ignite>=0.4.7",
         "pydantic>=1.8.1",
         "flake8>=3.9.1",
         "pycodestyle>=2.7.0",
         "pydocstyle>=6.0.0",
+        "pyparsing>=2.2.1,<3",
     ],
     # scripts=["alignn/alignn_train_folder.py"],
     entry_points={
@@ -46,5 +47,5 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
 )
