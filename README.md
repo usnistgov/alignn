@@ -26,6 +26,26 @@ The line graph convolution updates the triplet representations and the pair repr
 
 ![ALIGNN layer schematic](https://github.com/usnistgov/alignn/blob/main/alignn/tex/alignn2.png)
 
+Performances
+-------------------------
+
+On QM9 dataset
+
+![QM9](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/qm9.PNG)
+
+On Materials project dataset
+
+![MP](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/MP.PNG)
+
+On JARVIS-DFT dataset (classification)
+
+![JV-class](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jvclass.PNG)
+
+On JARVIS-DFT dataset (regression)
+
+![JV-reg1](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv.PNG)
+![JV-reg2](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv2.PNG)
+
 Installation
 -------------------------
 First create a conda environment:
@@ -106,6 +126,7 @@ Web-app
 ------------
 
 A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https://jarvis.nist.gov/jalignn/)
+
 
 Notes:
 1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111.
