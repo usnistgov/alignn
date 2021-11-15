@@ -36,12 +36,21 @@ config = {
 
 
 def test_runtime_training():
-    cmd1 = 'python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json"'
+    cmd1 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json"'
     os.system(cmd1)
-    cmd2 = 'python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data" --classification_threshold 0.01 --config "alignn/examples/sample_data/config_example.json"'
+    cmd2 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --classification_threshold 0.01 --config "alignn/examples/sample_data/config_example.json"'
     os.system(cmd2)
-    cmd3 = 'python alignn/scripts/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
+    cmd3 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
     os.system(cmd3)
+
+
+def test_minor_configs():
+    tmp = config
+    # tmp["log_tensorboard"] = True
+    tmp["n_early_stopping"] = 2
+    tmp["model"]["name"] = "alignn"
+    config["write_predictions"] = True
+    result = train_dgl(tmp)
 
 
 def test_models():
@@ -57,6 +66,7 @@ def test_models():
     print()
     print()
 
+    config["write_predictions"] = True
     config["model"]["name"] = "alignn"
     t1 = time.time()
     result = train_dgl(config)
@@ -172,7 +182,7 @@ def test_models():
 
     config["model"]["name"] = "alignn_cgcnn"
     config["write_predictions"] = False
-    config["save_dataloader"] = False
+    config["save_dataloader"] = True
     config["classification_threshold"] = 0.0
     t1 = time.time()
     result = train_dgl(config)
@@ -226,6 +236,7 @@ def test_pretrained():
     os.system(cmd1)
 
 
+# test_minor_configs()
 # test_pretrained()
 # test_runtime_training()
 

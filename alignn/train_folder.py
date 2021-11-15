@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Module to train for a folder with formatted dataset."""
 import csv
 import os
