@@ -44,6 +44,15 @@ def test_runtime_training():
     os.system(cmd3)
 
 
+def test_minor_configs():
+    tmp = config
+    # tmp["log_tensorboard"] = True
+    tmp["n_early_stopping"] = 2
+    tmp["model"]["name"] = "alignn"
+    config["write_predictions"] = True
+    result = train_dgl(tmp)
+
+
 def test_models():
     """Test CGCNN end to end training."""
     config["model"]["name"] = "dense_alignn"
@@ -57,6 +66,7 @@ def test_models():
     print()
     print()
 
+    config["write_predictions"] = True
     config["model"]["name"] = "alignn"
     t1 = time.time()
     result = train_dgl(config)
@@ -172,7 +182,7 @@ def test_models():
 
     config["model"]["name"] = "alignn_cgcnn"
     config["write_predictions"] = False
-    config["save_dataloader"] = False
+    config["save_dataloader"] = True
     config["classification_threshold"] = 0.0
     t1 = time.time()
     result = train_dgl(config)
@@ -226,6 +236,7 @@ def test_pretrained():
     os.system(cmd1)
 
 
+# test_minor_configs()
 # test_pretrained()
 # test_runtime_training()
 
