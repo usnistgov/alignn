@@ -19,9 +19,13 @@ from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
 
 # from typing import List
 
-VERSION = (
-    subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
-)
+try:
+    VERSION = (
+        subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+    )
+except Exception as exp:
+    VERSION = "NA"
+    pass
 
 
 FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "cgcnn": 92}

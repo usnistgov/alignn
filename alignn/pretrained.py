@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Module to download and load pre-trained ALIGNN models."""
 import requests
 import os
