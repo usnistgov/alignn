@@ -14,7 +14,7 @@ import argparse
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
 
-# Name of the model, figshare link, number of outouts
+# Name of the model, figshare link, number of outputs
 all_models = {
     "jv_formation_energy_peratom_alignn": [
         "https://figshare.com/ndownloader/files/31458679",

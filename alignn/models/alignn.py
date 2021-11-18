@@ -195,7 +195,7 @@ class ALIGNN(nn.Module):
     def __init__(self, config: ALIGNNConfig = ALIGNNConfig(name="alignn")):
         """Initialize class with number of input features, conv layers."""
         super().__init__()
-        print(config)
+        # print(config)
         self.classification = config.classification
 
         self.atom_embedding = MLPLayer(
