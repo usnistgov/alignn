@@ -154,6 +154,7 @@ A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https:
 ![JARVIS-ALIGNN](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jalignn.PNG)
 
 <a name="performances"></a>
+
 Performances
 -------------------------
 
@@ -213,16 +214,13 @@ Useful notes (based on some of the queries we received)
 References
 -----------------
 
-Please see `Detailed publications list can be found here: <https://jarvis-tools.readthedocs.io/en/master/publications.html>`__
+Please see detailed publications list [here](https://jarvis-tools.readthedocs.io/en/master/publications.html).
 
 <a name="contrib"></a>
 How to contribute
 -----------------
 
-.. image:: https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square
-        :target: http://makeapullrequest.com
-
-For detailed instructions, please see `Contribution instructions <https://github.com/usnistgov/jarvis/blob/master/Contribution.rst>`__
+For detailed instructions, please see [Contribution instructions](https://github.com/usnistgov/jarvis/blob/master/Contribution.rst>)
 
 <a name="corres"></a>
 Correspondence
