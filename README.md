@@ -12,8 +12,22 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/band-gap-on-jarvis-dft)](https://paperswithcode.com/sota/band-gap-on-jarvis-dft?p=atomistic-line-graph-neural-network-for)
 [![Downloads](https://pepy.tech/badge/alignn)](https://pepy.tech/project/alignn)
 
+# Table of Contents
+* [Introduction](#intro)
+* [Installation](#install)
+* [Examples](#example)
+* [Pre-trained models](#pretrained)
+* [Quick start using colab](#colab)
+* [JARVIS-ALIGNN webapp](#webapp)
+* [Peformances on a few datasets](#performances)
+* [Useful notes](#notes)
+* [References](#refs)
+* [How to contribute](#contrib)
+* [Correspondence](#corres)
+* [Funding support](#fund)
 
-# ALIGNN
+<a name="intro"></a>
+# ALIGNN (Introduction)
 The Atomistic Line Graph Neural Network (https://www.nature.com/articles/s41524-021-00650-1)  introduces a new graph convolution layer that explicitly models both two and three body interactions in atomistic systems.
 
 This is achieved by composing two edge-gated graph convolution layers, the first applied to the atomistic line graph *L(g)* (representing triplet interactions) and the second applied to the atomistic bond graph *g* (representing pair interactions).
@@ -26,7 +40,7 @@ The line graph convolution updates the triplet representations and the pair repr
 
 ![ALIGNN layer schematic](https://github.com/usnistgov/alignn/blob/main/alignn/tex/alignn2.png)
 
-
+<a name="install"></a>
 Installation
 -------------------------
 First create a conda environment:
@@ -66,6 +80,7 @@ As an alternate method, ALIGNN can also be installed using `pip` command as foll
 pip install alignn dgl-cu111
 ```
 
+<a name="example"></a>
 Examples
 ---------
 
@@ -106,12 +121,13 @@ An example is given below for training formation energy per atom, bandgap and to
 Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the [alignn/scripts/train_*.py](https://github.com/usnistgov/alignn/tree/main/alignn/scripts) folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.
 These scripts automatically download datasets from [Databases in jarvis-tools](https://jarvis-tools.readthedocs.io/en/master/databases.html) and train several models. Make sure you specify your specific queuing system details in the scripts.
 
-Using pretrained models
+<a name="pretrained"></a>
+Using pre-trained models
 -------------------------
 
 All the trained models are distributed on [figshare](https://figshare.com/projects/ALIGNN_models/126478) and this [pretrained.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/pretrained.py) can be applied to use them. These models can be used to directly make predictions.
 
-A brief help section is shown using:
+A brief help section (`-h`) is shown using:
 
 ```
 !pretrained.py -h
@@ -121,14 +137,15 @@ An example of prediction formation energy per atom using JARVIS-DFT dataset trai
 ```
 !pretrained.py --model_name jv_formation_energy_peratom_alignn --file_format poscar --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp
 ```
+<a name="colab"></a>
+Quick start using GoogleColab notebook example
+-----------------------------------------------
 
-GoogleColab notebook example
------------------------------
-
-The following notebook provides an example of 1) installing ALIGNN model, 2) training the example data and 3) using the pretrained models. For this example, you don't need to install alignn package on your local computer/cluster, it requires a gmail account to login. Learn more about Google colab [here](https://colab.research.google.com/notebooks/intro.ipynb).
+The following [notebook](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb) provides an example of 1) installing ALIGNN model, 2) training the example data and 3) using the pretrained models. For this example, you don't need to install alignn package on your local computer/cluster, it requires a gmail account to login. Learn more about Google colab [here](https://colab.research.google.com/notebooks/intro.ipynb).
 
 [![name](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)
 
+<a name="webapp"></a>
 Web-app
 ------------
 
@@ -136,46 +153,69 @@ A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https:
 
 ![JARVIS-ALIGNN](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jalignn.PNG)
 
+<a name="performances"></a>
 Performances
 -------------------------
 
-On QM9 dataset
+### 1) On QM9 dataset
 
 ![QM9](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/qm9.PNG)
 
-On Materials project dataset
+### 2) On Materials project 2018 dataset
 
 ![MP](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/MP.PNG)
 
-On JARVIS-DFT dataset (classification)
+### 3) On JARVIS-DFT 2021 dataset (classification)
 
 ![JV-class](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jvclass.PNG)
 
-On JARVIS-DFT dataset (regression)
+### 4) On JARVIS-DFT 2021 dataset (regression)
 
 ![JV-reg1](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv.PNG)
 ![JV-reg2](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv2.PNG)
 
-On hMOF dataset
+### 5) On hMOF dataset
 
-On qMOF dataset
+![hMOF](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/hMOF.PNG)
 
-On OMDB dataset
+### 6) On qMOF dataset
 
-Om HOPV dataset
+MAE on electronic bandgap 0.20 eV
 
-Notes:
-1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111.
+### 7) On OMDB dataset
+
+coming soon!
+
+### 8) On HOPV dataset
+
+coming soon!
+
+### 9) On QETB dataset
+
+coming soon!
+
+### 10) On OpenCatalyst dataset 
+
+coming soon!
+
+
+<a name="notes"></a>
+Useful notes (based on some of the queries we received)
+---------------------------------------------------------
+
+1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111, so e.g. `pip install dgl-cu111` .
 2) The undirected graph and its line graph is constructured in `jarvis-tools` package using [jarvis.core.graphs](https://github.com/usnistgov/jarvis/blob/master/jarvis/core/graphs.py#L197)
 3) While comnventional '.cif' and '.pdb' files can be read using jarvis-tools, for complex files you might have to install `cif2cell` and `pytraj` respectively i.e.`pip install cif2cell==2.0.0a3` and `conda install -c ambermd pytraj`.
 4) Make sure you use `batch_size` as 32 or 64 for large datasets, and not 2 as given in the example config file, else it will take much longer to train, and performnce might drop a lot.
 5) Note that `train_folder.py` and `pretrained.py` in alignn folder are actually python executable scripts. So, even if you don't provide absolute path of these scripts, they should work.
 
+<a name="refs"></a>
 References
 -----------------
 
-Please see `Publications related to JARVIS infrastructure can be found here: <https://jarvis-tools.readthedocs.io/en/master/publications.html>`__
+Please see `Detailed publications list can be found here: <https://jarvis-tools.readthedocs.io/en/master/publications.html>`__
 
+<a name="contrib"></a>
 How to contribute
 -----------------
 
@@ -184,11 +224,13 @@ How to contribute
 
 For detailed instructions, please see `Contribution instructions <https://github.com/usnistgov/jarvis/blob/master/Contribution.rst>`__
 
+<a name="corres"></a>
 Correspondence
 --------------------
 
 Please report bugs as Github issues (https://github.com/usnistgov/alignn/issues) or email to kamal.choudhary@nist.gov.
 
+<a name="fund"></a>
 Funding support
 --------------------
 
