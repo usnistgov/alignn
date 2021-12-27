@@ -122,7 +122,10 @@ TARGET_ENUM = Literal[
     "void_fraction",
     "surface_area_m2g",
     "surface_area_m2cm3",
-    "co2_absp",
+    "indir_gap",
+    "f_enp",
+    "final_energy",
+    "energy_per_atom",
 ]
 
 
@@ -147,6 +150,7 @@ class TrainingConfig(BaseSettings):
         "edos_up",
         "edos_pdos",
         "qmof",
+        "qe_tb",
         "hmof",
         "hpov",
         "pdbbind",
