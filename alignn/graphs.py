@@ -243,7 +243,7 @@ class Graph(object):
             lg = g.line_graph(shared=True)
             lg.apply_edges(compute_bond_cosines)
             lgg = lg.line_graph(shared=True)
-            lgg.apply_edges(compute_bond_cosines2)
+            lgg.apply_edges(compute_bond_dihedral)
             return g, lg, lgg
         else:
             return g
@@ -511,7 +511,6 @@ def compute_bond_cosines(edges):
     # cos(theta) = ba \dot bc / (||ba|| ||bc||)
     r1 = -edges.src["r"]
     r2 = edges.dst["r"]
-    print("r1", r1, r1.shape)
     bond_cosine = torch.sum(r1 * r2, dim=1) / (
         torch.norm(r1, dim=1) * torch.norm(r2, dim=1)
     )
@@ -520,31 +519,28 @@ def compute_bond_cosines(edges):
     # print (r1,r1.shape)
     # print (r2,r2.shape)
     # print (bond_cosine,bond_cosine.shape)
-    return {"h": bond_cosine}
+    return {"h": bond_cosine, "r1": r1, "r2": r2}
 
 
-def compute_bond_cosines2(edges):
-    """Compute bond angle cosines from bond displacement vectors."""
-    # line graph edge: (a, b), (b, c)
-    # `a -> b -> c`
-    # use law of cosines to compute angles cosines
-    # negate src bond so displacements are like `a <- b -> c`
-    # cos(theta) = ba \dot bc / (||ba|| ||bc||)
-    r1 = -edges.src["h"]
-    print("r1dih", r1, r1.shape)
-    r2 = edges.dst["h"]
-    print("r2dih", r2, r2.shape)
-    # bond_cosine = torch.sum(r1 * r2, dim=1) / (
-    #    torch.norm(r1, dim=1) * torch.norm(r2, dim=1)
-    # )
-    bond_cosine = r2  # (torch.atan(torch.norm(r2)))
-    # bond_cosine = torch.clamp(bond_cosine, -1, 1)
-    # bond_cosine= r1-r2 #torch.sum(r1 * r2)# * torch.norm(r2)
-    # bond_cosine = torch.arccos((torch.clamp(bond_cosine, -1, 1)))
-    # print (r1,r1.shape)
-    # print (r2,r2.shape)
-    # print (bond_cosine,bond_cosine.shape)
-    return {"k": bond_cosine}
+def compute_bond_dihedral(edges):
+    """Compute bond dihedral from bond displacement vectors."""
+
+    d1 = -edges.src["r1"]  # i
+    d2 = edges.dst["r1"]  # j
+    d3 = -edges.src["r2"]  # k
+    d4 = edges.dst["r2"]  # l
+    v1 = d3 - d4
+    v2 = d2 - d1
+    v3 = d1 - d2
+    v23 = torch.cross(v2, v3)
+    v12 = torch.cross(v1, v2)
+    phi = torch.atan2(
+        torch.norm(v2, dim=1) * torch.tensordot(v1, v23),
+        torch.tensordot(v12, v23),
+    )
+    # print("phi", phi, torch.unique(phi),phi.shape)
+
+    return {"phi": phi}
 
 
 class StructureDataset(torch.utils.data.Dataset):
@@ -604,10 +600,10 @@ class StructureDataset(torch.utils.data.Dataset):
                 lg.apply_edges(compute_bond_cosines)
                 self.line_graphs.append(lg)
                 lgg = lg.line_graph(shared=True)
-                print("g", g)
-                print("lg", lg)
-                print("lgg", lgg)
-                lgg.apply_edges(compute_bond_cosines2)
+                # print("g", g)
+                # print("lg", lg)
+                # print("lgg", lgg)
+                lgg.apply_edges(compute_bond_dihedral)
                 self.line_graphs_dih.append(lgg)
 
         if classification:

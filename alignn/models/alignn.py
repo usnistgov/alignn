@@ -271,9 +271,14 @@ class ALIGNN(nn.Module):
         if len(self.alignn_layers) > 0:
             g, lg, lgg = g
             lg = lg.local_var()
+            lgg = lgg.local_var()
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
+
+            phi = self.angle_embedding(lgg.edata.pop("phi"))
+            # print ('phi',phi,phi.shape)
+            # print ('z',z,z.shape)
 
         g = g.local_var()
 
