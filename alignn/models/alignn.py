@@ -28,6 +28,7 @@ class ALIGNNConfig(BaseSettings):
     atom_input_features: int = 92
     edge_input_features: int = 80
     triplet_input_features: int = 40
+    quad_input_features: int = 40
     embedding_features: int = 64
     hidden_features: int = 256
     # fc_layers: int = 1
@@ -147,9 +148,11 @@ class ALIGNNConv(nn.Module):
         self,
         g: dgl.DGLGraph,
         lg: dgl.DGLGraph,
+        lgg: dgl.DGLGraph,
         x: torch.Tensor,
         y: torch.Tensor,
         z: torch.Tensor,
+        phi: torch.Tensor,
     ):
         """Node and Edge updates for ALIGNN layer.
 
@@ -159,13 +162,17 @@ class ALIGNNConv(nn.Module):
         """
         g = g.local_var()
         lg = lg.local_var()
+        lgg = lgg.local_var()
         # Edge-gated graph convolution update on crystal graph
         x, m = self.node_update(g, x, y)
 
         # Edge-gated graph convolution update on crystal graph
         y, z = self.edge_update(lg, m, z)
 
-        return x, y, z
+        y, n = self.node_update(lg, y, z)
+        z, phi = self.edge_update(lgg, n, phi)
+
+        return x, y, z, phi
 
 
 class MLPLayer(nn.Module):
@@ -218,6 +225,16 @@ class ALIGNN(nn.Module):
                 bins=config.triplet_input_features,
             ),
             MLPLayer(config.triplet_input_features, config.embedding_features),
+            MLPLayer(config.embedding_features, config.hidden_features),
+        )
+
+        self.dih_embedding = nn.Sequential(
+            RBFExpansion(
+                vmin=-2,
+                vmax=2.0,
+                bins=config.quad_input_features,
+            ),
+            MLPLayer(config.quad_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
         )
 
@@ -276,7 +293,7 @@ class ALIGNN(nn.Module):
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
 
-            phi = self.angle_embedding(lgg.edata.pop("phi"))
+            phi = self.dih_embedding(lgg.edata.pop("phi"))
             # print ('phi',phi,phi.shape)
             # print ('z',z,z.shape)
 
@@ -290,9 +307,9 @@ class ALIGNN(nn.Module):
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
         y = self.edge_embedding(bondlength)
 
-        # ALIGNN updates: update node, edge, triplet features
         for alignn_layer in self.alignn_layers:
-            x, y, z = alignn_layer(g, lg, x, y, z)
+            x, y, z, phi = alignn_layer(g, lg, lgg, x, y, z, phi)
+        # ALIGNN updates: update node, edge, triplet features
 
         # gated GCN updates: update node, edge features
         for gcn_layer in self.gcn_layers:
