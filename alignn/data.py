@@ -12,7 +12,9 @@ import dgl
 import numpy as np
 import pandas as pd
 from jarvis.core.atoms import Atoms
-from jarvis.core.graphs import Graph, StructureDataset
+from alignn.graphs import Graph, StructureDataset
+
+# from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
 from torch.utils.data import DataLoader
 from tqdm import tqdm

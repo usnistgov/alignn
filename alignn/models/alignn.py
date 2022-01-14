@@ -269,7 +269,7 @@ class ALIGNN(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
-            g, lg = g
+            g, lg, lgg = g
             lg = lg.local_var()
 
             # angle features (fixed)
