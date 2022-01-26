@@ -209,7 +209,7 @@ Useful notes (based on some of the queries we received)
 3) While comnventional '.cif' and '.pdb' files can be read using jarvis-tools, for complex files you might have to install `cif2cell` and `pytraj` respectively i.e.`pip install cif2cell==2.0.0a3` and `conda install -c ambermd pytraj`.
 4) Make sure you use `batch_size` as 32 or 64 for large datasets, and not 2 as given in the example config file, else it will take much longer to train, and performnce might drop a lot.
 5) Note that `train_folder.py` and `pretrained.py` in alignn folder are actually python executable scripts. So, even if you don't provide absolute path of these scripts, they should work.
-
+6) Learn about the issue with QM9 results here: https://github.com/usnistgov/alignn/issues/54
 <a name="refs"></a>
 References
 -----------------
