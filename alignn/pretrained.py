@@ -261,7 +261,7 @@ def get_multiple_predictions(
     model_name="jv_formation_energy_peratom_alignn",
     print_freq=100,
 ):
-    """Use pretrained model on a large set of structures."""
+    """Use pretrained model on a number of structures."""
     # import glob
     # atoms_array=[]
     # for i in glob.glob("alignn/examples/sample_data/*.vasp"):
