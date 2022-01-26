@@ -4,6 +4,7 @@
 import csv
 import os
 import sys
+import time
 from jarvis.core.atoms import Atoms
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
@@ -175,7 +176,7 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
     )
-
+    t1 = time.time()
     train_dgl(
         config,
         train_val_test_loaders=[
@@ -185,6 +186,8 @@ def train_for_folder(
             prepare_batch,
         ],
     )
+    t2 = time.time()
+    print("Time taken (s):", t2 - t1)
 
     # train_data = get_torch_dataset(
 
