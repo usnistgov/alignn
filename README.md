@@ -224,7 +224,7 @@ The results from models other than ALIGNN are reported as given in corresponding
 
 ### 4) On QM9 dataset
 
-Note the [issue](https://github.com/usnistgov/alignn/issues/54) related to QM9 dataset. The results from models other than ALIGNN are reported as given in corresponding papers, not necessarily reproduced by us.
+Note the [issue](https://github.com/usnistgov/alignn/issues/54) related to QM9 dataset. The results from models other than ALIGNN are reported as given in corresponding papers, not necessarily reproduced by us. These models were trained with same parameters as solid-state databases but for 1000 epochs.
 
 | Target | Units | SchNet | MEGNet  | DimeNet++ | ALIGNN |
 |:------:|-------|--------|---------|-----------|--------|
