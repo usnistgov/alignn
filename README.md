@@ -158,22 +158,78 @@ A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https:
 Performances
 -------------------------
 
-### 1) On QM9 dataset
+### 1) On JARVIS-DFT 2021 dataset (classification)
 
-![QM9](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/qm9.PNG)
+|     Model                               |     Threshold         |     ALIGNN    |
+|-----------------------------------------|-----------------------|---------------|
+|     Metal/non-metal classifier (OPT)    |     0.01 eV           |     0.92      |
+|     Metal/non-metal classifier (MBJ)    |     0.01 eV           |     0.92      |
+|     Magnetic/non-Magnetic classifier    |     0.05 µB           |     0.91      |
+|     High/low SLME                       |     10 %              |     0.83      |
+|     High/low spillage                   |     0.1               |     0.80      |
+|     Stable/unstable (ehull)             |     0.1 eV            |     0.94      |
+|     High/low-n-Seebeck                  |     -100 µVK-1        |     0.88      |
+|     High/low-p-Seebeck                  |     100 µVK-1         |     0.92      |
+|     High/low-n-powerfactor              |     1000 µW(mK2)-1    |     0.74      |
+|     High/low-p-powerfactor              |     1000µW(mK2)-1     |     0.74      |
 
-### 2) On Materials project 2018 dataset
 
-![MP](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/MP.PNG)
+### 2) On JARVIS-DFT 2021 dataset (regression)
 
-### 3) On JARVIS-DFT 2021 dataset (classification)
+|     Property                                 |     Units                 |     MAD       |     CFID      |     CGCNN    |     ALIGNN    |     MAD: MAE    |
+|----------------------------------------------|---------------------------|---------------|---------------|--------------|---------------|-----------------|
+|     Formation   energy                       |     eV(atom)-1            |     0.86      |     0.14      |     0.063    |     0.033     |     26.06       |
+|     Bandgap (OPT)                            |     eV                    |     0.99      |     0.30      |     0.20     |     0.14      |     7.07        |
+|     Total   energy                           |     eV(atom)-1            |     1.78      |     0.24      |     0.078    |     0.037     |     48.11       |
+|     Ehull                                    |     eV                    |     1.14      |     0.22      |     0.17     |     0.076     |     15.00       |
+|     Bandgap   (MBJ)                          |     eV                    |     1.79      |     0.53      |     0.41     |     0.31      |     5.77        |
+|     Kv                                       |     GPa                   |     52.80     |     14.12     |     14.47    |     10.40     |     5.08        |
+|     Gv                                       |     GPa                   |     27.16     |     11.98     |     11.75    |     9.48      |     2.86        |
+|     Mag. mom                                 |     µB                    |     1.27      |     0.45      |     0.37     |     0.26      |     4.88        |
+|     SLME   (%)                               |     No   unit             |     10.93     |     6.22      |     5.66     |     4.52      |     2.42        |
+|     Spillage                                 |     No unit               |     0.52      |     0.39      |     0.40     |     0.35      |     1.49        |
+|     Kpoint-length                            |     Å                     |     17.88     |     9.68      |     10.60    |     9.51      |     1.88        |
+|     Plane-wave cutoff                        |     eV                    |     260.4     |     139.4     |     151.0    |     133.8     |     1.95        |
+|     єx   (OPT)                               |     No   unit             |     57.40     |     24.83     |     27.17    |     20.40     |     2.81        |
+|     єy (OPT)                                 |     No unit               |     57.54     |     25.03     |     26.62    |     19.99     |     2.88        |
+|     єz   (OPT)                               |     No   unit             |     56.03     |     24.77     |     25.69    |     19.57     |     2.86        |
+|     єx (MBJ)                                 |     No unit               |     64.43     |     30.96     |     29.82    |     24.05     |     2.68        |
+|     єy   (MBJ)                               |     No   unit             |     64.55     |     29.89     |     30.11    |     23.65     |     2.73        |
+|     єz (MBJ)                                 |     No unit               |     60.88     |     29.18     |     30.53    |     23.73     |     2.57        |
+|     є   (DFPT:elec+ionic)                    |     No   unit             |     45.81     |     43.71     |     38.78    |     28.15     |     1.63        |
+|     Max. piezoelectric strain coeff (dij)    |     CN-1                  |     24.57     |     36.41     |     34.71    |     20.57     |     1.19        |
+|     Max.   piezo. stress coeff (eij)         |     Cm-2                  |     0.26      |     0.23      |     0.19     |     0.147     |     1.77        |
+|     Exfoliation energy                       |     meV(atom)^-1          |     62.63     |     63.31     |     50.0     |     51.42     |     1.22        |
+|     Max. EFG                                 |     10^21 Vm-2            |     43.90     |     24.54     |     24.7     |     19.12     |     2.30        |
+|     avg. me                                  |     electron mass unit    |     0.22      |     0.14      |     0.12     |     0.085     |     2.59        |
+|     avg. mh                                  |     electron mass unit    |     0.41      |     0.20      |     0.17     |     0.124     |     3.31        |
+|     n-Seebeck                                |     µVK-1                 |     113.0     |     56.38     |     49.32    |     40.92     |     2.76        |
+|     n-PF                                     |     µW(mK2)-1             |     697.80    |     521.54    |     552.6    |     442.30    |     1.58        |
+|     p-Seebeck                                |     µVK-1                 |     166.33    |     62.74     |     52.68    |     42.42     |     3.92        |
+|     p-PF                                     |     µW(mK2)-1             |     691.67    |     505.45    |     560.8    |     440.26    |     1.57        |
 
-![JV-class](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jvclass.PNG)
+### 3) On QM9 dataset
 
-### 4) On JARVIS-DFT 2021 dataset (regression)
+| Target | Units | SchNet | MEGNet  | DimeNet++ | ALIGNN |
+|:------:|-------|--------|---------|-----------|--------|
+|  HOMO  | eV    |  0.041 |  0.043  |   0.0246  | 0.0214 |
+|  LUMO  | eV    |  0.034 |  0.044  |   0.0195  | 0.0195 |
+|   Gap  | eV    |  0.063 |  0.066  |   0.0326  | 0.0381 |
+|  ZPVE  | eV    | 0.0017 | 0.00143 |  0.00121  | 0.0031 |
+|    µ   | Debye |  0.033 |   0.05  |   0.0297  | 0.0146 |
+|    α   | Bohr3 |  0.235 |  0.081  |   0.0435  | 0.0561 |
+|    R2  | Bohr2 |  0.073 |  0.302  |   0.331   | 0.5432 |
+|   U0   | eV    |  0.014 |  0.012  |  0.00632  | 0.0153 |
+|    U   | eV    |  0.019 |  0.013  |  0.00628  | 0.0144 |
+|    H   | eV    |  0.014 |  0.012  |  0.00653  | 0.0147 |
+|    G   | eV    |  0.014 |  0.012  |  0.00756  | 0.0144 |
 
-![JV-reg1](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv.PNG)
-![JV-reg2](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jv2.PNG)
+### 4) On Materials project 2018 dataset
+
+|     Prop    |     Unit      |     MAD     |     CFID     |     CGCNN    |     MEGNet    |     SchNet    |     ALIGNN    |     MAD:MAE    |
+|-------------|---------------|-------------|--------------|--------------|---------------|---------------|---------------|----------------|
+|     Ef      |     eV/at.    |     0.93    |     0.104    |     0.039    |     0.028     |     0.035     |     0.022     |     42.27      |
+|     Eg      |     eV        |     1.35    |     0.434    |     0.388    |     0.33      |     -         |     0.218     |     6.19       |
 
 ### 5) On hMOF dataset
 
@@ -210,6 +266,7 @@ Useful notes (based on some of the queries we received)
 4) Make sure you use `batch_size` as 32 or 64 for large datasets, and not 2 as given in the example config file, else it will take much longer to train, and performnce might drop a lot.
 5) Note that `train_folder.py` and `pretrained.py` in alignn folder are actually python executable scripts. So, even if you don't provide absolute path of these scripts, they should work.
 6) Learn about the issue with QM9 results here: https://github.com/usnistgov/alignn/issues/54
+7) Make sure you have `pandas` version as 1.2.3.
 
 
 <a name="refs"></a>
