@@ -243,7 +243,17 @@ Note the [issue](https://github.com/usnistgov/alignn/issues/54) related to QM9 d
 
 ### 5) On hMOF dataset
 
-![hMOF](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/hMOF.PNG)
+| Property           | Unit            | MAD     | MAE    | MAD:MAE | R<sup>2</sup> | RMSE   |
+|--------------------|-----------------|---------|--------|---------|-------|--------|
+| Grav. surface area | m<sup>2 </sup>g<sup>-1</sup>  | 1430.82 | 91.15  | 15.70   | 0.99  | 180.89 |
+| Vol. surface area  | m<sup>2 </sup>cm<sup>-3</sup> | 561.44  | 107.81 | 5.21    | 0.91  | 229.24 |
+| Void fraction      | No unit         | 0.16    | 0.017  | 9.41    | 0.98  | 0.03   |
+| LCD                | Å   | 3.44    | 0.75   | 4.56    | 0.83  | 1.83   |
+| PLD                | Å  | 3.55    | 0.92   | 3.86    | 0.78  | 2.12   |
+| All adsp           | mol kg<sup>-1</sup>   | 1.70    | 0.18   | 9.44    | 0.95  | 0.49   |
+| Adsp at 0.01bar    | mol kg<sup>-1</sup>  | 0.12    | 0.04   | 3.00    | 0.77  | 0.11   |
+| Adsp at 2.5bar     | mol kg<sup>-1</sup>   | 2.16    | 0.48   | 4.50    | 0.90  | 0.97   |
+
 
 ### 6) On qMOF dataset
 
