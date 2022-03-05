@@ -203,6 +203,7 @@ class Graph(object):
         max_attempts=3,
         id: Optional[str] = None,
         compute_line_graph: bool = True,
+        compute_line_dih_graph: bool = False,
         use_canonize: bool = False,
     ):
         """Obtain a DGLGraph for Atoms object."""
@@ -235,11 +236,16 @@ class Graph(object):
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
         g.edata["r"] = r
-
+        g.ndata["R"] = torch.tensor(atoms.cart_coords)
+        g.ndata["Z"] = torch.tensor(np.array(atoms.atomic_numbers))
         if compute_line_graph:
             # construct atomistic line graph
             # (nodes are bonds, edges are bond pairs)
             # and add bond angle cosines as edge features
+            lg = g.line_graph(shared=True)
+            lg.apply_edges(compute_bond_cosines)
+            return g, lg
+        if compute_line_dih_graph:
             lg = g.line_graph(shared=True)
             lg.apply_edges(compute_bond_cosines)
             lgg = lg.line_graph(shared=True)
@@ -481,6 +487,26 @@ def prepare_line_graph_batch(
     non_blocking=False,
 ):
     """Send line graph batch to device.
+    Note: the batch is a nested tuple, with the graph and line graph together
+    """
+    g, lg, t = batch
+    batch = (
+        (
+            g.to(device, non_blocking=non_blocking),
+            lg.to(device, non_blocking=non_blocking),
+        ),
+        t.to(device, non_blocking=non_blocking),
+    )
+
+    return batch
+
+
+def prepare_line_dih_graph_batch(
+    batch: Tuple[Tuple[dgl.DGLGraph, dgl.DGLGraph], torch.Tensor],
+    device=None,
+    non_blocking=False,
+):
+    """Send line graph batch to device.
 
     Note: the batch is a nested tuple, with the graph and line graph together
     """
@@ -554,6 +580,7 @@ class StructureDataset(torch.utils.data.Dataset):
         atom_features="atomic_number",
         transform=None,
         line_graph=False,
+        line_dih_graph=False,
         classification=False,
         id_tag="jid",
     ):
@@ -567,6 +594,7 @@ class StructureDataset(torch.utils.data.Dataset):
         self.graphs = graphs
         self.target = target
         self.line_graph = line_graph
+        self.line_dih_graph = line_dih_graph
 
         self.labels = self.df[target]
         self.ids = self.df[id_tag]
@@ -589,10 +617,22 @@ class StructureDataset(torch.utils.data.Dataset):
             g.ndata["atom_features"] = f
 
         self.prepare_batch = prepare_dgl_batch
+        print("line_graph", line_graph)
+        print("line_dih_graph", line_dih_graph)
         if line_graph:
-            self.prepare_batch = prepare_line_graph_batch
 
+            self.prepare_batch = prepare_line_graph_batch
             print("building line graphs")
+            self.line_graphs = []
+            for g in tqdm(graphs):
+                lg = g.line_graph(shared=True)
+                lg.apply_edges(compute_bond_cosines)
+                self.line_graphs.append(lg)
+
+        if line_dih_graph:
+
+            self.prepare_batch = prepare_line_dih_graph_batch
+            print("building line  dih graphs")
             self.line_graphs = []
             self.line_graphs_dih = []
             for g in tqdm(graphs):
@@ -642,6 +682,8 @@ class StructureDataset(torch.utils.data.Dataset):
             g = self.transform(g)
 
         if self.line_graph:
+            return g, self.line_graphs[idx], label
+        if self.line_dih_graph:
             return g, self.line_graphs[idx], self.line_graphs_dih[idx], label
 
         return g, label
@@ -672,6 +714,21 @@ class StructureDataset(torch.utils.data.Dataset):
     @staticmethod
     def collate_line_graph(
         samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+    ):
+        """Dataloader helper to batch graphs cross `samples`."""
+        graphs, line_graphs, labels = map(list, zip(*samples))
+        batched_graph = dgl.batch(graphs)
+        batched_line_graph = dgl.batch(line_graphs)
+        if len(labels[0].size()) > 0:
+            return batched_graph, batched_line_graph, torch.stack(labels)
+        else:
+            return batched_graph, batched_line_graph, torch.tensor(labels)
+
+    @staticmethod
+    def collate_line_dih_graph(
+        samples: List[
+            Tuple[dgl.DGLGraph, dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]
+        ]
     ):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, line_graphs, line_graphs_dih, labels = map(list, zip(*samples))

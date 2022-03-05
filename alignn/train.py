@@ -13,8 +13,10 @@ import ignite
 import torch
 
 from ignite.contrib.handlers import TensorboardLogger
+
 try:
     from ignite.contrib.handlers.stores import EpochOutputStore
+
     # For different version of pytorch-ignite
 except Exception as exp:
     from ignite.handlers.stores import EpochOutputStore
@@ -46,12 +48,19 @@ from alignn import models
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
+from alignn.models.alignn_dih import ALIGNNDih
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
 from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
+from alignn.models.schnet import SchNet
+
+# from alignn.models.schnett import SchNett
 from alignn.models.icgcnn import iCGCNN
 from alignn.models.alignn_cgcnn import ACGCNN
+from alignn.models.dimenet import DimeNet
+
+# from alignn.models.dimenet_models.dimenet import DimeNet
 from jarvis.db.jsonutils import dumpjson
 import json
 import pprint
@@ -176,8 +185,10 @@ def train_dgl(
         ignite.utils.manual_seed(config.random_seed)
 
     line_graph = False
+    line_dih_graph = False
     alignn_models = {
         "alignn",
+        "alignn_dih",
         "dense_alignn",
         "alignn_cgcnn",
         "alignn_layernorm",
@@ -188,8 +199,14 @@ def train_dgl(
         line_graph = True
     if config.model.name == "icgcnn":
         line_graph = True
-    if config.model.name in alignn_models and config.model.alignn_layers > 0:
+    if (
+        config.model.name in alignn_models
+        and config.model.alignn_layers > 0
+        and config.model.name != "alignn_dih"
+    ):
         line_graph = True
+    if config.model.name == "alignn_dih":
+        line_dih_graph = True
     # print ('output_dir train', config.output_dir)
     if not train_val_test_loaders:
         # use input standardization for all real-valued feature sets
@@ -213,6 +230,7 @@ def train_dgl(
             neighbor_strategy=config.neighbor_strategy,
             standardize=config.atom_features != "cgcnn",
             line_graph=line_graph,
+            line_dih_graph=line_dih_graph,
             id_tag=config.id_tag,
             pin_memory=config.pin_memory,
             workers=config.num_workers,
@@ -242,6 +260,9 @@ def train_dgl(
         "icgcnn": iCGCNN,
         "densegcn": DenseGCN,
         "alignn": ALIGNN,
+        "alignn_dih": ALIGNNDih,
+        "dimenet": DimeNet,
+        "schnet": SchNet,
         "dense_alignn": DenseALIGNN,
         "alignn_cgcnn": ACGCNN,
         "alignn_layernorm": ALIGNN_LN,
@@ -550,8 +571,8 @@ def train_dgl(
         with torch.no_grad():
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                g, lg, lgg, target = dat
+                out_data = net([g.to(device), lg.to(device), lgg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(open("sc.pkl", "rb"))
@@ -586,9 +607,21 @@ def train_dgl(
         with torch.no_grad():
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
-                out_data = out_data.cpu().numpy().tolist()
+                if len(dat) == 2:
+                    g, target = dat
+                    # print("g", g)
+                    out_data = net(g.to(device))
+                    # out_data = net([g.to(device)])
+                if len(dat) == 3:
+                    g, lg, target = dat
+                    out_data = net([g.to(device), lg.to(device)])
+                if len(dat) == 4:
+                    g, lg, lgg, target = dat
+                    out_data = net(
+                        [g.to(device), lg.to(device), lgg.to(device)]
+                    )
+                out_data = out_data.cpu().numpy().flatten().tolist()
+                #####out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
                         open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
@@ -599,6 +632,9 @@ def train_dgl(
                 target = target.cpu().numpy().flatten().tolist()
                 if len(target) == 1:
                     target = target[0]
+                if len(out_data) == 1:
+                    out_data = out_data[0]
+                # print ('target',id,target,out_data)
                 f.write("%s, %6f, %6f\n" % (id, target, out_data))
                 targets.append(target)
                 predictions.append(out_data)

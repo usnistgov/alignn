@@ -126,6 +126,31 @@ def train_for_folder(
         info["target"] = tmp  # float(i[1])
         n_outputs.append(info["target"])
         dataset.append(info)
+
+    line_graph = False
+    line_dih_graph = False
+    alignn_models = {
+        "alignn",
+        "alignn_dih",
+        "dense_alignn",
+        "alignn_cgcnn",
+        "alignn_layernorm",
+    }
+    if config.model.name == "clgn":
+        line_graph = True
+    if config.model.name == "cgcnn":
+        line_graph = True
+    if config.model.name == "icgcnn":
+        line_graph = True
+    if (
+        config.model.name in alignn_models
+        and config.model.alignn_layers > 0
+        and config.model.name != "alignn_dih"
+    ):
+        line_graph = True
+    if config.model.name == "alignn_dih":
+        line_dih_graph = True
+
     if multioutput:
         lists_length_equal = False not in [
             len(i) == len(n_outputs[0]) for i in n_outputs
@@ -156,6 +181,8 @@ def train_for_folder(
         train_ratio=config.train_ratio,
         val_ratio=config.val_ratio,
         test_ratio=config.test_ratio,
+        line_graph=line_graph,
+        line_dih_graph=line_dih_graph,
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,

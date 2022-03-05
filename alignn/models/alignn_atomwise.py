@@ -19,10 +19,10 @@ from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
 
 
-class ALIGNNConfig(BaseSettings):
+class ALIGNNAtomWiseConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.alignn."""
 
-    name: Literal["alignn"]
+    name: Literal["alignn_atomwise"]
     alignn_layers: int = 4
     gcn_layers: int = 4
     atom_input_features: int = 92
@@ -185,14 +185,19 @@ class MLPLayer(nn.Module):
         return self.layer(x)
 
 
-class ALIGNN(nn.Module):
+class ALIGNNAtomWise(nn.Module):
     """Atomistic Line graph network.
 
     Chain alternating gated graph convolution updates on crystal graph
     and atomistic line graph.
     """
 
-    def __init__(self, config: ALIGNNConfig = ALIGNNConfig(name="alignn")):
+    def __init__(
+        self,
+        config: ALIGNNAtomWiseConfig = ALIGNNAtomWiseConfig(
+            name="alignn_atomwise"
+        ),
+    ):
         """Initialize class with number of input features, conv layers."""
         super().__init__()
         # print(config)
@@ -240,6 +245,8 @@ class ALIGNN(nn.Module):
         )
 
         self.readout = AvgPooling()
+
+        self.fc2 = nn.Linear(config.hidden_features, 3)
 
         if self.classification:
             self.fc = nn.Linear(config.hidden_features, 2)
@@ -292,10 +299,20 @@ class ALIGNN(nn.Module):
         # gated GCN updates: update node, edge features
         for gcn_layer in self.gcn_layers:
             x, y = gcn_layer(g, x, y)
-
         # norm-activation-pool-classify
-        h = self.readout(g, x)
-        out = self.fc(h)
+        atomwise = False
+
+        if atomwise:
+            out = self.fc(h)
+            h = self.readout(g, x)
+        else:
+            h = self.readout(g, x)
+            out = self.fc(h)
+            out2 = self.fc2(x)
+            h2 = self.readout(g, out2)
+            print("h2", h2, h2.shape)
+            print("out2", out2, out2.shape)
+        # print ('out', h, h.shape)
 
         if self.link:
             out = self.link(out)

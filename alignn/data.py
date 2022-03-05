@@ -183,6 +183,7 @@ def get_torch_dataset(
     use_canonize="",
     name="",
     line_graph="",
+    line_dih_graph=False,
     cutoff=8.0,
     max_neighbors=12,
     classification=False,
@@ -209,13 +210,13 @@ def get_torch_dataset(
         cutoff=cutoff,
         max_neighbors=max_neighbors,
     )
-
     data = StructureDataset(
         df,
         graphs,
         target=target,
         atom_features=atom_features,
         line_graph=line_graph,
+        line_dih_graph=line_dih_graph,
         id_tag=id_tag,
         classification=classification,
     )
@@ -237,6 +238,7 @@ def get_train_val_loaders(
     batch_size: int = 5,
     standardize: bool = False,
     line_graph: bool = True,
+    line_dih_graph: bool = False,
     split_seed: int = 123,
     workers: int = 0,
     pin_memory: bool = True,
@@ -453,6 +455,7 @@ def get_train_val_loaders(
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
+            line_dih_graph=line_dih_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
@@ -468,6 +471,7 @@ def get_train_val_loaders(
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
+            line_dih_graph=line_dih_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
@@ -483,6 +487,7 @@ def get_train_val_loaders(
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
+            line_dih_graph=line_dih_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
@@ -491,8 +496,11 @@ def get_train_val_loaders(
         )
 
         collate_fn = train_data.collate
+        print("line_graph,line_dih_graph", line_graph, line_dih_graph)
         if line_graph:
             collate_fn = train_data.collate_line_graph
+        if line_dih_graph:
+            collate_fn = train_data.collate_line_dih_graph
 
         # use a regular pytorch dataloader
         train_loader = DataLoader(
