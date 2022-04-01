@@ -3,7 +3,10 @@
 A prototype crystal line graph network dgl implementation.
 """
 from typing import Tuple, Union
-
+from torch.autograd import grad
+from alignn.graphs import Graph
+from jarvis.core.specie import atomic_numbers_to_symbols
+from jarvis.core.atoms import Atoms
 import dgl
 import dgl.function as fn
 import numpy as np
@@ -245,8 +248,8 @@ class ALIGNNAtomWise(nn.Module):
         )
 
         self.readout = AvgPooling()
-
-        self.fc2 = nn.Linear(config.hidden_features, 3)
+        nout = 3
+        self.fc2 = nn.Linear(config.hidden_features, nout)
 
         if self.classification:
             self.fc = nn.Linear(config.hidden_features, 2)
@@ -287,9 +290,22 @@ class ALIGNNAtomWise(nn.Module):
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
+        # R=g.ndata['R'].cpu().numpy()
+        # Z=g.ndata['Z'].cpu().numpy()
+        # H=g.ndata['H'][0].cpu().numpy()
+        # elements=atomic_numbers_to_symbols(Z)
+        # atoms=Atoms(elements=elements,coords=R,lattice_mat=H,cartesian=True)
+        # g,lg=Graph.atom_dgl_multigraph(atoms)
 
+        r = torch.tensor(g.edata["r"])
+        # R = torch.tensor(R)
+        r.requires_grad_(True)
+        # R.requires_grad_(True)
+        # print ('atoms',atoms)
+        # print ('Rgrad',R.grad)
+        # x.requires_grad_(True)
         # initial bond features
-        bondlength = torch.norm(g.edata.pop("r"), dim=1)
+        bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
 
         # ALIGNN updates: update node, edge, triplet features
@@ -300,20 +316,30 @@ class ALIGNNAtomWise(nn.Module):
         for gcn_layer in self.gcn_layers:
             x, y = gcn_layer(g, x, y)
         # norm-activation-pool-classify
-        atomwise = False
-
-        if atomwise:
-            out = self.fc(h)
-            h = self.readout(g, x)
-        else:
-            h = self.readout(g, x)
-            out = self.fc(h)
-            out2 = self.fc2(x)
-            h2 = self.readout(g, out2)
-            print("h2", h2, h2.shape)
-            print("out2", out2, out2.shape)
+        h = self.readout(g, x)
+        out = self.fc(h)
+        # out2 = self.fc2(x)
+        # h2 = self.readout(g, out2)
+        # print("h2", h2, h2.shape)
+        # print("out2", out2, out2.shape)
         # print ('out', h, h.shape)
+        # h2.requires_grad_(True)
+        create_graph = True  # False
+        dy = grad(
+            out,
+            r,
+            # retain_graph=True,
+            grad_outputs=torch.ones_like(out),
+            create_graph=create_graph,
+        )[0]
+        # tmp=dy.shape[0]/g.number_of_nodes()
+        forces = torch.sum(dy.view(g.number_of_nodes(), 24, 3), 1)
 
+        # print ('dy,R,out,nats',dy.shape,R.shape,out.shape,atoms.num_atoms)
+        # print('dy=',dy)
+        # print('out=',out)
+        print("forces", forces, forces.shape)
+        print("energy", out, out.shape)
         if self.link:
             out = self.link(out)
 
