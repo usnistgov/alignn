@@ -222,6 +222,7 @@ class TrainingConfig(BaseSettings):
         ALIGNNDihConfig,
         SchNetConfig,
         DimeNetConfig,
+        ALIGNNAtomWiseConfig,
         ALIGNN_LN_Config,
         DenseALIGNNConfig,
         ACGCNNConfig,

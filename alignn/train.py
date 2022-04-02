@@ -49,6 +49,7 @@ from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
 from alignn.models.alignn_dih import ALIGNNDih
+from alignn.models.alignn_atomwise import ALIGNNAtomWise
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
 from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
@@ -261,6 +262,7 @@ def train_dgl(
         "densegcn": DenseGCN,
         "alignn": ALIGNN,
         "alignn_dih": ALIGNNDih,
+        "alignn_atomwise": ALIGNNAtomWise,
         "dimenet": DimeNet,
         "schnet": SchNet,
         "dense_alignn": DenseALIGNN,
@@ -423,11 +425,10 @@ def train_dgl(
             global_step_transform=lambda *_: trainer.state.epoch,
         )
         trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
+
     if config.progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
-        # pbar.attach(evaluator,output_transform=lambda x: {"mae": x})
-
     history = {
         "train": {m: [] for m in metrics.keys()},
         "validation": {m: [] for m in metrics.keys()},
@@ -442,84 +443,11 @@ def train_dgl(
         train_eos.attach(train_evaluator)
 
     # collect evaluation performance
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def log_results(engine):
-        """Print training and validation metrics to console."""
-        train_evaluator.run(train_loader)
-        evaluator.run(val_loader)
-
-        tmetrics = train_evaluator.state.metrics
-        vmetrics = evaluator.state.metrics
-        for metric in metrics.keys():
-            tm = tmetrics[metric]
-            vm = vmetrics[metric]
-            if metric == "roccurve":
-                tm = [k.tolist() for k in tm]
-                vm = [k.tolist() for k in vm]
-            if isinstance(tm, torch.Tensor):
-                tm = tm.cpu().numpy().tolist()
-                vm = vm.cpu().numpy().tolist()
-
-            history["train"][metric].append(tm)
-            history["validation"][metric].append(vm)
-
-        # for metric in metrics.keys():
-        #    history["train"][metric].append(tmetrics[metric])
-        #    history["validation"][metric].append(vmetrics[metric])
-
-        if config.store_outputs:
-            history["EOS"] = eos.data
-            history["trainEOS"] = train_eos.data
-            dumpjson(
-                filename=os.path.join(config.output_dir, "history_val.json"),
-                data=history["validation"],
-            )
-            dumpjson(
-                filename=os.path.join(config.output_dir, "history_train.json"),
-                data=history["train"],
-            )
-        if config.progress:
-            pbar = ProgressBar()
-            if not classification:
-                pbar.log_message(f"Val_MAE: {vmetrics['mae']:.4f}")
-                pbar.log_message(f"Train_MAE: {tmetrics['mae']:.4f}")
-            else:
-                pbar.log_message(f"Train ROC AUC: {tmetrics['rocauc']:.4f}")
-                pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
-
-    if config.n_early_stopping is not None:
-        if classification:
-            my_metrics = "accuracy"
-        else:
-            my_metrics = "mae"
-
-        def default_score_fn(engine):
-            score = engine.state.metrics[my_metrics]
-            return score
-
-        es_handler = EarlyStopping(
-            patience=config.n_early_stopping,
-            score_function=default_score_fn,
-            trainer=trainer,
-        )
-        evaluator.add_event_handler(Events.EPOCH_COMPLETED, es_handler)
-    # optionally log results to tensorboard
-    if config.log_tensorboard:
-
-        tb_logger = TensorboardLogger(
-            log_dir=os.path.join(config.output_dir, "tb_logs", "test")
-        )
-        for tag, evaluator in [
-            ("training", train_evaluator),
-            ("validation", evaluator),
-        ]:
-            tb_logger.attach_output_handler(
-                evaluator,
-                event_name=Events.EPOCH_COMPLETED,
-                tag=tag,
-                metric_names=["loss", "mae"],
-                global_step_transform=global_step_from_engine(trainer),
-            )
+    # @trainer.on(Events.EPOCH_COMPLETED)
+    # def log_results(engine):
+    #    """Print training and validation metrics to console."""
+    #    train_evaluator.run(train_loader)
+    #    evaluator.run(val_loader)
 
     # train the model!
     trainer.run(train_loader, max_epochs=config.epochs)
@@ -529,7 +457,7 @@ def train_dgl(
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
     if config.write_predictions and classification:
-        net.eval()
+        # net.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
             "w",
@@ -537,6 +465,7 @@ def train_dgl(
         f.write("id,target,prediction\n")
         targets = []
         predictions = []
+        """
         with torch.no_grad():
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
@@ -551,6 +480,18 @@ def train_dgl(
                 predictions.append(
                     top_class.cpu().numpy().flatten().tolist()[0]
                 )
+        """
+        ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+        for dat, id in zip(test_loader, ids):
+            g, lg, target = dat
+            out_data = net([g.to(device), lg.to(device)])
+            # out_data = torch.exp(out_data.cpu())
+            top_p, top_class = torch.topk(torch.exp(out_data), k=1)
+            target = int(target.cpu().numpy().flatten().tolist()[0])
+
+            f.write("%s, %d, %d\n" % (id, (target), (top_class)))
+            targets.append(target)
+            predictions.append(top_class.cpu().numpy().flatten().tolist()[0])
         f.close()
         from sklearn.metrics import roc_auc_score
 
@@ -566,25 +507,27 @@ def train_dgl(
         and not classification
         and config.model.output_features > 1
     ):
-        net.eval()
+        # net.eval()
         mem = []
-        with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, lgg, target = dat
-                out_data = net([g.to(device), lg.to(device), lgg.to(device)])
-                out_data = out_data.cpu().numpy().tolist()
-                if config.standard_scalar_and_pca:
-                    sc = pk.load(open("sc.pkl", "rb"))
-                    out_data = list(
-                        sc.transform(np.array(out_data).reshape(1, -1))[0]
-                    )  # [0][0]
-                target = target.cpu().numpy().flatten().tolist()
-                info = {}
-                info["id"] = id
-                info["target"] = target
-                info["predictions"] = out_data
-                mem.append(info)
+        # with torch.no_grad():
+        #    ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+        #    for dat, id in zip(test_loader, ids):
+        ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+        for dat, id in zip(test_loader, ids):
+            g, lg, lgg, target = dat
+            out_data = net([g.to(device), lg.to(device), lgg.to(device)])
+            out_data = out_data.cpu().numpy().tolist()
+            if config.standard_scalar_and_pca:
+                sc = pk.load(open("sc.pkl", "rb"))
+                out_data = list(
+                    sc.transform(np.array(out_data).reshape(1, -1))[0]
+                )  # [0][0]
+            target = target.cpu().numpy().flatten().tolist()
+            info = {}
+            info["id"] = id
+            info["target"] = target
+            info["predictions"] = out_data
+            mem.append(info)
         dumpjson(
             filename=os.path.join(
                 config.output_dir, "multi_out_predictions.json"
@@ -596,7 +539,7 @@ def train_dgl(
         and not classification
         and config.model.output_features == 1
     ):
-        net.eval()
+        # net.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
             "w",
@@ -604,40 +547,40 @@ def train_dgl(
         f.write("id,target,prediction\n")
         targets = []
         predictions = []
-        with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                if len(dat) == 2:
-                    g, target = dat
-                    # print("g", g)
-                    out_data = net(g.to(device))
-                    # out_data = net([g.to(device)])
-                if len(dat) == 3:
-                    g, lg, target = dat
-                    out_data = net([g.to(device), lg.to(device)])
-                if len(dat) == 4:
-                    g, lg, lgg, target = dat
-                    out_data = net(
-                        [g.to(device), lg.to(device), lgg.to(device)]
-                    )
-                out_data = out_data.cpu().numpy().flatten().tolist()
-                #####out_data = out_data.cpu().numpy().tolist()
-                if config.standard_scalar_and_pca:
-                    sc = pk.load(
-                        open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
-                    )
-                    out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
-                        0
-                    ][0]
-                target = target.cpu().numpy().flatten().tolist()
-                if len(target) == 1:
-                    target = target[0]
-                if len(out_data) == 1:
-                    out_data = out_data[0]
-                # print ('target',id,target,out_data)
-                f.write("%s, %6f, %6f\n" % (id, target, out_data))
-                targets.append(target)
-                predictions.append(out_data)
+        # with torch.no_grad():
+        #    ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+        #    for dat, id in zip(test_loader, ids):
+        ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+        for dat, id in zip(test_loader, ids):
+            if len(dat) == 2:
+                g, target = dat
+                # print("g", g)
+                out_data = net(g.to(device))
+                # out_data = net([g.to(device)])
+            if len(dat) == 3:
+                g, lg, target = dat
+                out_data = net([g.to(device), lg.to(device)])
+            if len(dat) == 4:
+                g, lg, lgg, target = dat
+                out_data = net([g.to(device), lg.to(device), lgg.to(device)])
+            out_data = out_data.cpu().numpy().flatten().tolist()
+            #####out_data = out_data.cpu().numpy().tolist()
+            if config.standard_scalar_and_pca:
+                sc = pk.load(
+                    open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                )
+                out_data = sc.transform(np.array(out_data).reshape(-1, 1))[0][
+                    0
+                ]
+            target = target.cpu().numpy().flatten().tolist()
+            if len(target) == 1:
+                target = target[0]
+            if len(out_data) == 1:
+                out_data = out_data[0]
+            # print ('target',id,target,out_data)
+            f.write("%s, %6f, %6f\n" % (id, target, out_data))
+            targets.append(target)
+            predictions.append(out_data)
         f.close()
         from sklearn.metrics import mean_absolute_error
 
@@ -667,34 +610,7 @@ def train_dgl(
                 f.write(line)
             f.close()
 
-    # TODO: Fix IDs for train loader
-    """
-    if config.write_train_predictions:
-        net.eval()
-        f = open("train_prediction_results.csv", "w")
-        f.write("id,target,prediction\n")
-        with torch.no_grad():
-            ids = train_loader.dataset.dataset.ids[
-                train_loader.dataset.indices
-            ]
-            print("lens", len(ids), len(train_loader.dataset.dataset))
-            x = []
-            y = []
-
-            for dat, id in zip(train_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
-                out_data = out_data.cpu().numpy().tolist()
-                target = target.cpu().numpy().flatten().tolist()
-                for i, j in zip(out_data, target):
-                    x.append(i)
-                    y.append(j)
-            for i, j, k in zip(ids, x, y):
-                f.write("%s, %6f, %6f\n" % (i, j, k))
-        f.close()
-
-    """
-    return history
+    # return history
 
 
 if __name__ == "__main__":

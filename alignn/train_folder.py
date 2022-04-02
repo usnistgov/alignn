@@ -71,6 +71,7 @@ def train_for_folder(
     # config_dat=os.path.join(root_dir,config_name)
     id_prop_dat = os.path.join(root_dir, "id_prop.csv")
     config = loadjson(config_name)
+    config = TrainingConfig(**config)
     if type(config) is dict:
         try:
             config = TrainingConfig(**config)
@@ -135,6 +136,7 @@ def train_for_folder(
         "dense_alignn",
         "alignn_cgcnn",
         "alignn_layernorm",
+        "alignn_atomwise",
     }
     if config.model.name == "clgn":
         line_graph = True

@@ -237,7 +237,11 @@ class Graph(object):
         g.ndata["atom_features"] = node_features
         g.edata["r"] = r
         g.ndata["R"] = torch.tensor(atoms.cart_coords)
+        g.ndata["H"] = torch.tensor(
+            [atoms.lattice_mat for ii in range(atoms.num_atoms)]
+        )
         g.ndata["Z"] = torch.tensor(np.array(atoms.atomic_numbers))
+        # g.ndata["elements"] = torch.tensor(np.array(atoms.elements))
         if compute_line_graph:
             # construct atomistic line graph
             # (nodes are bonds, edges are bond pairs)
