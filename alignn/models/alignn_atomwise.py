@@ -290,18 +290,20 @@ class ALIGNNAtomWise(nn.Module):
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
-        # R=g.ndata['R'].cpu().numpy()
-        # Z=g.ndata['Z'].cpu().numpy()
-        # H=g.ndata['H'][0].cpu().numpy()
-        # elements=atomic_numbers_to_symbols(Z)
-        # atoms=Atoms(elements=elements,coords=R,lattice_mat=H,cartesian=True)
+        R = g.ndata["R"].cpu().numpy()
+        Z = g.ndata["Z"].cpu().numpy()
+        H = g.ndata["H"][0].cpu().numpy()
+        elements = atomic_numbers_to_symbols(Z)
+        atoms = Atoms(
+            elements=elements, coords=R, lattice_mat=H, cartesian=True
+        )
+        print("atoms", atoms)
         # g,lg=Graph.atom_dgl_multigraph(atoms)
 
         r = torch.tensor(g.edata["r"])
         # R = torch.tensor(R)
         r.requires_grad_(True)
         # R.requires_grad_(True)
-        # print ('atoms',atoms)
         # print ('Rgrad',R.grad)
         # x.requires_grad_(True)
         # initial bond features
@@ -328,18 +330,15 @@ class ALIGNNAtomWise(nn.Module):
         dy = grad(
             out,
             r,
-            # retain_graph=True,
             grad_outputs=torch.ones_like(out),
             create_graph=create_graph,
         )[0]
-        # tmp=dy.shape[0]/g.number_of_nodes()
-        forces = torch.sum(dy.view(g.number_of_nodes(), 24, 3), 1)
-
-        # print ('dy,R,out,nats',dy.shape,R.shape,out.shape,atoms.num_atoms)
-        # print('dy=',dy)
-        # print('out=',out)
-        print("forces", forces, forces.shape)
+        print("shapes", r.shape, dy.shape)
+        g.edata["dy_dr"] = dy
+        g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "forces"))
+        print("forces", g.ndata["forces"])
         print("energy", out, out.shape)
+        print("num nodes", g.number_of_nodes())
         if self.link:
             out = self.link(out)
 
