@@ -73,11 +73,11 @@ class EdgeGatedGraphConv(nn.Module):
         self.src_gate = nn.Linear(input_features, output_features)
         self.dst_gate = nn.Linear(input_features, output_features)
         self.edge_gate = nn.Linear(input_features, output_features)
-        self.bn_edges = nn.BatchNorm1d(output_features)
+        self.bn_edges = nn.LayerNorm(output_features)
 
         self.src_update = nn.Linear(input_features, output_features)
         self.dst_update = nn.Linear(input_features, output_features)
-        self.bn_nodes = nn.BatchNorm1d(output_features)
+        self.bn_nodes = nn.LayerNorm(output_features)
 
     def forward(
         self,
@@ -179,7 +179,7 @@ class MLPLayer(nn.Module):
         super().__init__()
         self.layer = nn.Sequential(
             nn.Linear(in_features, out_features),
-            nn.BatchNorm1d(out_features),
+            nn.LayerNorm(out_features),
             nn.SiLU(),
         )
 
@@ -297,12 +297,12 @@ class ALIGNNAtomWise(nn.Module):
         atoms = Atoms(
             elements=elements, coords=R, lattice_mat=H, cartesian=True
         )
-        print("atoms", atoms)
+        # print("atoms", atoms)
         # g,lg=Graph.atom_dgl_multigraph(atoms)
-
-        r = torch.tensor(g.edata["r"])
+        r = g.edata["r"].clone().detach().requires_grad_(True)
+        # r = torch.tensor(g.edata["r"])
         # R = torch.tensor(R)
-        r.requires_grad_(True)
+        # r.requires_grad_(True)
         # R.requires_grad_(True)
         # print ('Rgrad',R.grad)
         # x.requires_grad_(True)
@@ -326,23 +326,25 @@ class ALIGNNAtomWise(nn.Module):
         # print("out2", out2, out2.shape)
         # print ('out', h, h.shape)
         # h2.requires_grad_(True)
-        create_graph = True  # False
+        create_graph = True  # True  # False
         dy = grad(
             out,
             r,
             grad_outputs=torch.ones_like(out),
             create_graph=create_graph,
+            retain_graph=True,
         )[0]
-        print("shapes", r.shape, dy.shape)
+        # print("shapes", r.shape, dy.shape)
         g.edata["dy_dr"] = dy
         g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "forces"))
         print("forces", g.ndata["forces"])
-        print("energy", out, out.shape)
-        print("num nodes", g.number_of_nodes())
+        # print("energy", out, out.shape)
+        # print("num nodes", g.number_of_nodes())
         if self.link:
             out = self.link(out)
 
         if self.classification:
             # out = torch.round(torch.sigmoid(out))
             out = self.softmax(out)
-        return torch.squeeze(out)
+        return torch.squeeze(g.ndata["forces"])
+        # return torch.squeeze(out)

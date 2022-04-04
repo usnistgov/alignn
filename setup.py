@@ -14,6 +14,7 @@ setuptools.setup(
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
+    install_requires=[],
     install_requires=[
         "numpy>=1.19.5",
         "scipy>=1.6.1",
@@ -32,8 +33,9 @@ setuptools.setup(
         "pydocstyle>=6.0.0",
         "pyparsing>=2.2.1,<3",
     ],
+
     # scripts=["alignn/alignn_train_folder.py"],
-    scripts=["alignn/pretrained.py", "alignn/train_folder.py"],
+    scripts=["alignn/pretrained.py", "alignn/train_folder.py","alignn/train_folder_grad.py"],
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/usnistgov/alignn",
