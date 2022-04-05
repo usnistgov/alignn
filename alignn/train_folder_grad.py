@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
 """Module to train for a folder with formatted dataset."""
-import csv
 import os
 import sys
-from jarvis.core.atoms import Atoms
-from alignn.data_grad import get_train_val_loaders
-from alignn.train_atomwise import train_dgl
+from alignn.data import get_train_val_loaders
+from alignn.train import train_dgl
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
@@ -101,17 +99,23 @@ def train_for_folder(
         info["target"] = kk
         info["atoms"] = jj
         info["atomwise_target"] = ff
+        info["atomwise_grad"] = ff
         info["jid"] = ii
         dataset.append(info)
+    # Assuming all the atomwise_target data are of same length
+    # atomwise_grad in of size 3 each for each node
+    """
+    if "atomwise_target" in info:
+        print ("atomwise_target size",len(info["atomwise_target"][0]))
+        config.model.atomwise_output_features=len(info["atomwise_target"])
+    """
 
     n_outputs = []
     multioutput = False
     lists_length_equal = True
     line_graph = False
-    line_dih_graph = False
     alignn_models = {
         "alignn",
-        "alignn_dih",
         "dense_alignn",
         "alignn_cgcnn",
         "alignn_layernorm",
@@ -123,14 +127,8 @@ def train_for_folder(
         line_graph = True
     if config.model.name == "icgcnn":
         line_graph = True
-    if (
-        config.model.name in alignn_models
-        and config.model.alignn_layers > 0
-        and config.model.name != "alignn_dih"
-    ):
+    if config.model.name in alignn_models and config.model.alignn_layers > 0:
         line_graph = True
-    if config.model.name == "alignn_dih":
-        line_dih_graph = True
 
     if multioutput:
         lists_length_equal = False not in [
@@ -155,7 +153,9 @@ def train_for_folder(
         prepare_batch,
     ) = get_train_val_loaders(
         dataset_array=dataset,
-        target=config.target,
+        target="target",
+        target_atomwise="atomwise_target",
+        target_grad="atomwise_grad",
         n_train=config.n_train,
         n_val=config.n_val,
         n_test=config.n_test,
@@ -163,7 +163,6 @@ def train_for_folder(
         val_ratio=config.val_ratio,
         test_ratio=config.test_ratio,
         line_graph=line_graph,
-        line_dih_graph=line_dih_graph,
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,

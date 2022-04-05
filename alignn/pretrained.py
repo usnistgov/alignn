@@ -9,7 +9,7 @@ from alignn.models.alignn import ALIGNN, ALIGNNConfig
 import tempfile
 import torch
 import sys
-from jarvis.db.jsonutils import loadjson
+# from jarvis.db.jsonutils import loadjson
 import argparse
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph

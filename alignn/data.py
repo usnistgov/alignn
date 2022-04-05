@@ -57,7 +57,7 @@ def load_dataset(
     d = data
     if limit is not None:
         d = d[:limit]
-    d = pd.DataFrame(d)
+    # d = pd.DataFrame(d)
     # d = d.replace("na", np.nan)
     return d
 
@@ -69,7 +69,7 @@ def mean_absolute_deviation(data, axis=None):
 
 
 def load_graphs(
-    df: pd.DataFrame,
+    dataset=[],
     name: str = "dft_3d",
     neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
@@ -110,6 +110,8 @@ def load_graphs(
     if cachefile is not None and cachefile.is_file():
         graphs, labels = dgl.load_graphs(str(cachefile))
     else:
+        df = pd.DataFrame(dataset)
+
         graphs = df["atoms"].progress_apply(atoms_to_graph).values
         if cachefile is not None:
             dgl.save_graphs(str(cachefile), graphs.tolist())
@@ -178,12 +180,13 @@ def get_torch_dataset(
     dataset=[],
     id_tag="jid",
     target="",
+    target_atomwise="",
+    target_grad="",
     neighbor_strategy="",
     atom_features="",
     use_canonize="",
     name="",
     line_graph="",
-    line_dih_graph=False,
     cutoff=8.0,
     max_neighbors=12,
     classification=False,
@@ -192,8 +195,8 @@ def get_torch_dataset(
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
-    # print("df", df)
-    vals = df[target].values
+    print(" data df", df)
+    vals = np.array([ii[target] for ii in dataset])  # df[target].values
     print("data range", np.max(vals), np.min(vals))
     f = open(os.path.join(output_dir, tmp_name + "_data_range"), "w")
     line = "Max=" + str(np.max(vals)) + "\n"
@@ -214,9 +217,10 @@ def get_torch_dataset(
         df,
         graphs,
         target=target,
+        target_atomwise=target_atomwise,
+        target_grad=target_grad,
         atom_features=atom_features,
         line_graph=line_graph,
-        line_dih_graph=line_dih_graph,
         id_tag=id_tag,
         classification=classification,
     )
@@ -227,6 +231,8 @@ def get_train_val_loaders(
     dataset: str = "dft_3d",
     dataset_array=[],
     target: str = "formation_energy_peratom",
+    target_atomwise: str = "",
+    target_grad: str = "",
     atom_features: str = "cgcnn",
     neighbor_strategy: str = "k-nearest",
     n_train=None,
@@ -238,7 +244,6 @@ def get_train_val_loaders(
     batch_size: int = 5,
     standardize: bool = False,
     line_graph: bool = True,
-    line_dih_graph: bool = False,
     split_seed: int = 123,
     workers: int = 0,
     pin_memory: bool = True,
@@ -451,11 +456,12 @@ def get_train_val_loaders(
             id_tag=id_tag,
             atom_features=atom_features,
             target=target,
+            target_atomwise=target_atomwise,
+            target_grad=target_grad,
             neighbor_strategy=neighbor_strategy,
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
-            line_dih_graph=line_dih_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
@@ -467,11 +473,12 @@ def get_train_val_loaders(
             id_tag=id_tag,
             atom_features=atom_features,
             target=target,
+            target_atomwise=target_atomwise,
+            target_grad=target_grad,
             neighbor_strategy=neighbor_strategy,
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
-            line_dih_graph=line_dih_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
@@ -483,11 +490,12 @@ def get_train_val_loaders(
             id_tag=id_tag,
             atom_features=atom_features,
             target=target,
+            target_atomwise=target_atomwise,
+            target_grad=target_grad,
             neighbor_strategy=neighbor_strategy,
             use_canonize=use_canonize,
             name=dataset,
             line_graph=line_graph,
-            line_dih_graph=line_dih_graph,
             cutoff=cutoff,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
@@ -496,11 +504,9 @@ def get_train_val_loaders(
         )
 
         collate_fn = train_data.collate
-        print("line_graph,line_dih_graph", line_graph, line_dih_graph)
+        # print("line_graph,line_dih_graph", line_graph, line_dih_graph)
         if line_graph:
             collate_fn = train_data.collate_line_graph
-        if line_dih_graph:
-            collate_fn = train_data.collate_line_dih_graph
 
         # use a regular pytorch dataloader
         train_loader = DataLoader(

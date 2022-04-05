@@ -203,7 +203,6 @@ class Graph(object):
         max_attempts=3,
         id: Optional[str] = None,
         compute_line_graph: bool = True,
-        compute_line_dih_graph: bool = False,
         use_canonize: bool = False,
     ):
         """Obtain a DGLGraph for Atoms object."""
@@ -236,12 +235,7 @@ class Graph(object):
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
         g.edata["r"] = r
-        g.ndata["R"] = torch.tensor(atoms.cart_coords)
-        g.ndata["H"] = torch.tensor(
-            [atoms.lattice_mat for ii in range(atoms.num_atoms)]
-        )
-        g.ndata["Z"] = torch.tensor(np.array(atoms.atomic_numbers))
-        # g.ndata["elements"] = torch.tensor(np.array(atoms.elements))
+
         if compute_line_graph:
             # construct atomistic line graph
             # (nodes are bonds, edges are bond pairs)
@@ -249,12 +243,6 @@ class Graph(object):
             lg = g.line_graph(shared=True)
             lg.apply_edges(compute_bond_cosines)
             return g, lg
-        if compute_line_dih_graph:
-            lg = g.line_graph(shared=True)
-            lg.apply_edges(compute_bond_cosines)
-            lgg = lg.line_graph(shared=True)
-            lgg.apply_edges(compute_bond_dihedral)
-            return g, lg, lgg
         else:
             return g
 
@@ -491,6 +479,7 @@ def prepare_line_graph_batch(
     non_blocking=False,
 ):
     """Send line graph batch to device.
+
     Note: the batch is a nested tuple, with the graph and line graph together
     """
     g, lg, t = batch
@@ -498,28 +487,6 @@ def prepare_line_graph_batch(
         (
             g.to(device, non_blocking=non_blocking),
             lg.to(device, non_blocking=non_blocking),
-        ),
-        t.to(device, non_blocking=non_blocking),
-    )
-
-    return batch
-
-
-def prepare_line_dih_graph_batch(
-    batch: Tuple[Tuple[dgl.DGLGraph, dgl.DGLGraph], torch.Tensor],
-    device=None,
-    non_blocking=False,
-):
-    """Send line graph batch to device.
-
-    Note: the batch is a nested tuple, with the graph and line graph together
-    """
-    g, lg, lgg, t = batch
-    batch = (
-        (
-            g.to(device, non_blocking=non_blocking),
-            lg.to(device, non_blocking=non_blocking),
-            lgg.to(device, non_blocking=non_blocking),
         ),
         t.to(device, non_blocking=non_blocking),
     )
@@ -549,28 +516,7 @@ def compute_bond_cosines(edges):
     # print (r1,r1.shape)
     # print (r2,r2.shape)
     # print (bond_cosine,bond_cosine.shape)
-    return {"h": bond_cosine, "r1": r1, "r2": r2}
-
-
-def compute_bond_dihedral(edges):
-    """Compute bond dihedral from bond displacement vectors."""
-
-    d1 = -edges.src["r1"]  # i
-    d2 = edges.dst["r1"]  # j
-    d3 = -edges.src["r2"]  # k
-    d4 = edges.dst["r2"]  # l
-    v1 = d3 - d4
-    v2 = d2 - d1
-    v3 = d1 - d2
-    v23 = torch.cross(v2, v3)
-    v12 = torch.cross(v1, v2)
-    phi = torch.atan2(
-        torch.norm(v2, dim=1) * torch.tensordot(v1, v23),
-        torch.tensordot(v12, v23),
-    )
-    # print("phi", phi, torch.unique(phi),phi.shape)
-
-    return {"phi": phi}
+    return {"h": bond_cosine}
 
 
 class StructureDataset(torch.utils.data.Dataset):
@@ -581,10 +527,11 @@ class StructureDataset(torch.utils.data.Dataset):
         df: pd.DataFrame,
         graphs: Sequence[dgl.DGLGraph],
         target: str,
+        target_atomwise="",
+        target_grad="",
         atom_features="atomic_number",
         transform=None,
         line_graph=False,
-        line_dih_graph=False,
         classification=False,
         id_tag="jid",
     ):
@@ -593,14 +540,39 @@ class StructureDataset(torch.utils.data.Dataset):
         `df`: pandas dataframe from e.g. jarvis.db.figshare.data
         `graphs`: DGLGraph representations corresponding to rows in `df`
         `target`: key for label column in `df`
+        `target_grad`: For fitting forces etc.
+        `target_atomwise`: For fitting bader charge on atoms etc.
         """
         self.df = df
         self.graphs = graphs
         self.target = target
+        self.target_atomwise = target_atomwise
+        self.target_grad = target_grad
         self.line_graph = line_graph
-        self.line_dih_graph = line_dih_graph
-
+        print("df", df)
         self.labels = self.df[target]
+
+        if self.target_atomwise is not None and self.target_atomwise != "":
+            # self.labels_atomwise = df[self.target_atomwise]
+            self.labels_atomwise = []
+            for ii, i in df.iterrows():
+                self.labels_atomwise.append(
+                    torch.tensor(np.array(i[self.target_atomwise])).type(
+                        torch.get_default_dtype()
+                    )
+                )
+
+        if self.target_grad is not None and self.target_grad != "":
+            # self.labels_atomwise = df[self.target_atomwise]
+            self.labels_grad = []
+            for ii, i in df.iterrows():
+                self.labels_grad.append(
+                    torch.tensor(np.array(i[self.target_grad])).type(
+                        torch.get_default_dtype()
+                    )
+                )
+            # print (self.labels_atomwise)
+
         self.ids = self.df[id_tag]
         self.labels = torch.tensor(self.df[target]).type(
             torch.get_default_dtype()
@@ -611,7 +583,7 @@ class StructureDataset(torch.utils.data.Dataset):
 
         # load selected node representation
         # assume graphs contain atomic number in g.ndata["atom_features"]
-        for g in graphs:
+        for i, g in enumerate(graphs):
             z = g.ndata.pop("atom_features")
             g.ndata["atomic_number"] = z
             z = z.type(torch.IntTensor).squeeze()
@@ -619,36 +591,21 @@ class StructureDataset(torch.utils.data.Dataset):
             if g.num_nodes() == 1:
                 f = f.unsqueeze(0)
             g.ndata["atom_features"] = f
+            if self.target_atomwise is not None and self.target_atomwise != "":
+                g.ndata[self.target_atomwise] = self.labels_atomwise[i]
+            if self.target_grad is not None and self.target_grad != "":
+                g.ndata[self.target_grad] = self.labels_grad[i]
 
         self.prepare_batch = prepare_dgl_batch
-        print("line_graph", line_graph)
-        print("line_dih_graph", line_dih_graph)
         if line_graph:
-
             self.prepare_batch = prepare_line_graph_batch
+
             print("building line graphs")
             self.line_graphs = []
             for g in tqdm(graphs):
                 lg = g.line_graph(shared=True)
                 lg.apply_edges(compute_bond_cosines)
                 self.line_graphs.append(lg)
-
-        if line_dih_graph:
-
-            self.prepare_batch = prepare_line_dih_graph_batch
-            print("building line  dih graphs")
-            self.line_graphs = []
-            self.line_graphs_dih = []
-            for g in tqdm(graphs):
-                lg = g.line_graph(shared=True)
-                lg.apply_edges(compute_bond_cosines)
-                self.line_graphs.append(lg)
-                lgg = lg.line_graph(shared=True)
-                # print("g", g)
-                # print("lg", lg)
-                # print("lgg", lgg)
-                lgg.apply_edges(compute_bond_dihedral)
-                self.line_graphs_dih.append(lgg)
 
         if classification:
             self.labels = self.labels.view(-1).long()
@@ -687,8 +644,6 @@ class StructureDataset(torch.utils.data.Dataset):
 
         if self.line_graph:
             return g, self.line_graphs[idx], label
-        if self.line_dih_graph:
-            return g, self.line_graphs[idx], self.line_graphs_dih[idx], label
 
         return g, label
 
@@ -727,32 +682,6 @@ class StructureDataset(torch.utils.data.Dataset):
             return batched_graph, batched_line_graph, torch.stack(labels)
         else:
             return batched_graph, batched_line_graph, torch.tensor(labels)
-
-    @staticmethod
-    def collate_line_dih_graph(
-        samples: List[
-            Tuple[dgl.DGLGraph, dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]
-        ]
-    ):
-        """Dataloader helper to batch graphs cross `samples`."""
-        graphs, line_graphs, line_graphs_dih, labels = map(list, zip(*samples))
-        batched_graph = dgl.batch(graphs)
-        batched_line_graph = dgl.batch(line_graphs)
-        batched_line_graph_dih = dgl.batch(line_graphs_dih)
-        if len(labels[0].size()) > 0:
-            return (
-                batched_graph,
-                batched_line_graph,
-                batched_line_graph_dih,
-                torch.stack(labels),
-            )
-        else:
-            return (
-                batched_graph,
-                batched_line_graph,
-                batched_line_graph_dih,
-                torch.tensor(labels),
-            )
 
 
 """

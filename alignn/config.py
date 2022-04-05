@@ -29,7 +29,7 @@ try:
     VERSION = (
         subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
     )
-except Exception as exp:
+except Exception:
     VERSION = "NA"
     pass
 

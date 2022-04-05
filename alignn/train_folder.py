@@ -4,6 +4,7 @@
 import csv
 import os
 import sys
+import time
 from jarvis.core.atoms import Atoms
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
@@ -71,7 +72,6 @@ def train_for_folder(
     # config_dat=os.path.join(root_dir,config_name)
     id_prop_dat = os.path.join(root_dir, "id_prop.csv")
     config = loadjson(config_name)
-    config = TrainingConfig(**config)
     if type(config) is dict:
         try:
             config = TrainingConfig(**config)
@@ -127,32 +127,6 @@ def train_for_folder(
         info["target"] = tmp  # float(i[1])
         n_outputs.append(info["target"])
         dataset.append(info)
-
-    line_graph = False
-    line_dih_graph = False
-    alignn_models = {
-        "alignn",
-        "alignn_dih",
-        "dense_alignn",
-        "alignn_cgcnn",
-        "alignn_layernorm",
-        "alignn_atomwise",
-    }
-    if config.model.name == "clgn":
-        line_graph = True
-    if config.model.name == "cgcnn":
-        line_graph = True
-    if config.model.name == "icgcnn":
-        line_graph = True
-    if (
-        config.model.name in alignn_models
-        and config.model.alignn_layers > 0
-        and config.model.name != "alignn_dih"
-    ):
-        line_graph = True
-    if config.model.name == "alignn_dih":
-        line_dih_graph = True
-
     if multioutput:
         lists_length_equal = False not in [
             len(i) == len(n_outputs[0]) for i in n_outputs
@@ -183,8 +157,6 @@ def train_for_folder(
         train_ratio=config.train_ratio,
         val_ratio=config.val_ratio,
         test_ratio=config.test_ratio,
-        line_graph=line_graph,
-        line_dih_graph=line_dih_graph,
         batch_size=config.batch_size,
         atom_features=config.atom_features,
         neighbor_strategy=config.neighbor_strategy,
@@ -204,7 +176,7 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
     )
-
+    t1 = time.time()
     train_dgl(
         config,
         train_val_test_loaders=[
@@ -214,6 +186,8 @@ def train_for_folder(
             prepare_batch,
         ],
     )
+    t2 = time.time()
+    print("Time taken (s):", t2 - t1)
 
     # train_data = get_torch_dataset(
 

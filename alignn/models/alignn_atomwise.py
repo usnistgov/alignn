@@ -4,9 +4,6 @@ A prototype crystal line graph network dgl implementation.
 """
 from typing import Tuple, Union
 from torch.autograd import grad
-from alignn.graphs import Graph
-from jarvis.core.specie import atomic_numbers_to_symbols
-from jarvis.core.atoms import Atoms
 import dgl
 import dgl.function as fn
 import numpy as np
@@ -36,7 +33,12 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     # fc_layers: int = 1
     # fc_features: int = 64
     output_features: int = 1
-
+    grad_multiplier: int = -1
+    calculate_gradient: bool = True
+    atomwise_output_features: int = 3
+    graphwise_weight: float = 0.9
+    gradwise_weight: float = 0.9
+    atomwise_weight: float = 0.9
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
@@ -205,7 +207,11 @@ class ALIGNNAtomWise(nn.Module):
         super().__init__()
         # print(config)
         self.classification = config.classification
-
+        self.config = config
+        if self.config.gradwise_weight == 0:
+            self.config.calculate_gradient = False
+        if self.config.atomwise_weight == 0:
+            self.config.atomwise_output_features = None
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
         )
@@ -248,8 +254,10 @@ class ALIGNNAtomWise(nn.Module):
         )
 
         self.readout = AvgPooling()
-        nout = 3
-        self.fc2 = nn.Linear(config.hidden_features, nout)
+        if config.atomwise_output_features is not None:
+            self.fc_atomwise = nn.Linear(
+                config.hidden_features, config.atomwise_output_features
+            )
 
         if self.classification:
             self.fc = nn.Linear(config.hidden_features, 2)
@@ -286,27 +294,12 @@ class ALIGNNAtomWise(nn.Module):
             z = self.angle_embedding(lg.edata.pop("h"))
 
         g = g.local_var()
+        result = {}
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
-        R = g.ndata["R"].cpu().numpy()
-        Z = g.ndata["Z"].cpu().numpy()
-        H = g.ndata["H"][0].cpu().numpy()
-        elements = atomic_numbers_to_symbols(Z)
-        atoms = Atoms(
-            elements=elements, coords=R, lattice_mat=H, cartesian=True
-        )
-        # print("atoms", atoms)
-        # g,lg=Graph.atom_dgl_multigraph(atoms)
         r = g.edata["r"].clone().detach().requires_grad_(True)
-        # r = torch.tensor(g.edata["r"])
-        # R = torch.tensor(R)
-        # r.requires_grad_(True)
-        # R.requires_grad_(True)
-        # print ('Rgrad',R.grad)
-        # x.requires_grad_(True)
-        # initial bond features
         bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
 
@@ -318,33 +311,35 @@ class ALIGNNAtomWise(nn.Module):
         for gcn_layer in self.gcn_layers:
             x, y = gcn_layer(g, x, y)
         # norm-activation-pool-classify
-        h = self.readout(g, x)
-        out = self.fc(h)
-        # out2 = self.fc2(x)
-        # h2 = self.readout(g, out2)
-        # print("h2", h2, h2.shape)
-        # print("out2", out2, out2.shape)
-        # print ('out', h, h.shape)
-        # h2.requires_grad_(True)
-        create_graph = True  # True  # False
-        dy = grad(
-            out,
-            r,
-            grad_outputs=torch.ones_like(out),
-            create_graph=create_graph,
-            retain_graph=True,
-        )[0]
-        # print("shapes", r.shape, dy.shape)
-        g.edata["dy_dr"] = dy
-        g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "forces"))
-        print("forces", g.ndata["forces"])
-        # print("energy", out, out.shape)
-        # print("num nodes", g.number_of_nodes())
+        out = torch.empty(1)
+        if self.config.output_features is not None:
+            h = self.readout(g, x)
+            out = self.fc(h)
+        atomwise_pred = torch.empty(1)
+        if self.config.atomwise_output_features is not None:
+            atomwise_out = self.fc_atomwise(x)
+            atomwise_pred = self.readout(g, atomwise_out)
+            # print("h2",atomwise_pred, atomwise_pred.shape)
+        gradient = torch.empty(1)
+        if self.config.calculate_gradient:
+            create_graph = True  # True  # False
+            dy = self.config.grad_multiplier * grad(
+                out,
+                r,
+                grad_outputs=torch.ones_like(out),
+                create_graph=create_graph,
+                retain_graph=True,
+            )[0]
+            # print("shapes", dy)
+            g.edata["dy_dr"] = dy
+            g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
+            gradient = torch.squeeze(g.ndata["gradient"])
         if self.link:
             out = self.link(out)
 
         if self.classification:
-            # out = torch.round(torch.sigmoid(out))
             out = self.softmax(out)
-        return torch.squeeze(g.ndata["forces"])
-        # return torch.squeeze(out)
+        result["out"] = torch.squeeze(out)
+        result["grad"] = gradient
+        result["atomwise_pred"] = torch.squeeze(atomwise_pred)
+        return result
