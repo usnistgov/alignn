@@ -42,7 +42,8 @@ def test_runtime_training():
     os.system(cmd2)
     cmd3 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
     os.system(cmd3)
-
+    cmd4 = 'train_folder_grad.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp'
+    os.system(cmd4)
 
 def test_minor_configs():
     tmp = config
