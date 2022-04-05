@@ -14,7 +14,6 @@ setuptools.setup(
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
-    install_requires=[],
     install_requires=[
         "numpy>=1.19.5",
         "scipy>=1.6.1",
