@@ -315,11 +315,12 @@ class ALIGNNAtomWise(nn.Module):
         if self.config.output_features is not None:
             h = self.readout(g, x)
             out = self.fc(h)
+            out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
         if self.config.atomwise_output_features is not None:
             atomwise_out = self.fc_atomwise(x)
             atomwise_pred = self.readout(g, atomwise_out)
-            # print("h2",atomwise_pred, atomwise_pred.shape)
+            atomwise_pred = torch.squeeze(atomwise_pred)
         gradient = torch.empty(1)
         if self.config.calculate_gradient:
             create_graph = True  # True  # False
@@ -330,7 +331,6 @@ class ALIGNNAtomWise(nn.Module):
                 create_graph=create_graph,
                 retain_graph=True,
             )[0]
-            # print("shapes", dy)
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
@@ -339,7 +339,7 @@ class ALIGNNAtomWise(nn.Module):
 
         if self.classification:
             out = self.softmax(out)
-        result["out"] = torch.squeeze(out)
+        result["out"] = out
         result["grad"] = gradient
-        result["atomwise_pred"] = torch.squeeze(atomwise_pred)
+        result["atomwise_pred"] = atomwise_pred
         return result

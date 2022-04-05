@@ -106,6 +106,11 @@ Now, the model is trained as follows. Please increase the `batch_size` parameter
 ```
 train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp
 ```
+
+AtomWise prediction example:
+
+train_folder_grad.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example_atomwise.json" --output_dir=temp
+
 #### Classification example
 While the above example is for regression, the follwoing example shows a classification task for metal/non-metal based on the above bandgap values. We transform the dataset
 into 1 or 0 based on a threshold of 0.01 eV (controlled by the parameter, `classification_threshold`) and train a similar classification model. Currently, the script allows binary classification tasks only.

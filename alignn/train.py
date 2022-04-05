@@ -284,11 +284,13 @@ def train_dgl(
         )
 
     if config.model.name == "alignn_atomwise":
-        criterion = nn.MSELoss()
+        criterion = nn.L1Loss()
+        # criterion = nn.MSELoss()
         params = group_decay(net)
         optimizer = setup_optimizer(params, config)
         # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
         for e in range(config.epochs):
+            # optimizer.zero_grad()
             running_loss = 0
             for dats in train_loader:
                 optimizer.zero_grad()
@@ -298,28 +300,78 @@ def train_dgl(
                 loss3 = 0  # Such as forces
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
-                        result["out"][0], dats[2].to(device)
+                        result["out"], dats[2].to(device)
                     )
                 if config.model.atomwise_output_features is not None:
                     loss2 = config.model.atomwise_weight * criterion(
-                        result["atomwise_pred"][0].to(device),
+                        result["atomwise_pred"].to(device),
                         dats[0].ndata["atomwise_target"].to(device),
                     )
                 if config.model.calculate_gradient:
                     loss3 = config.model.gradwise_weight * criterion(
-                        result["grad"][0].to(device),
+                        result["grad"].to(device),
                         dats[0].ndata["atomwise_grad"].to(device),
                     )
                 loss = loss1 + loss2 + loss3
-                print("graphwise_loss", loss1)
-                print("atomwise_loss", loss2)
-                print("gradwise_loss", loss3)
-                print()
+                # print("graphwise_loss", loss1)
+                # print("atomwise_loss", loss2)
+                # print("gradwise_loss", loss3)
+                # print()
                 loss.backward()
                 optimizer.step()
+                # optimizer.zero_grad()
                 running_loss += loss.item()
             scheduler.step()
-            print("Losses", e, running_loss)
+            print("Training Loss", e, running_loss)
+            val_loss = 0
+            for dats in val_loader:
+                optimizer.zero_grad()
+                result = net([dats[0].to(device), dats[1].to(device)])
+                loss1 = 0  # Such as energy
+                loss2 = 0  # Such as bader charges
+                loss3 = 0  # Such as forces
+                if config.model.output_features is not None:
+                    loss1 = config.model.graphwise_weight * criterion(
+                        result["out"], dats[2].to(device)
+                    )
+                if config.model.atomwise_output_features is not None:
+                    loss2 = config.model.atomwise_weight * criterion(
+                        result["atomwise_pred"].to(device),
+                        dats[0].ndata["atomwise_target"].to(device),
+                    )
+                if config.model.calculate_gradient:
+                    loss3 = config.model.gradwise_weight * criterion(
+                        result["grad"].to(device),
+                        dats[0].ndata["atomwise_grad"].to(device),
+                    )
+                loss = loss1 + loss2 + loss3
+                val_loss += loss.item()
+            print("Validation Loss", e, val_loss)
+
+        test_loss = 0
+        for dats in test_loader:
+            optimizer.zero_grad()
+            result = net([dats[0].to(device), dats[1].to(device)])
+            loss1 = 0  # Such as energy
+            loss2 = 0  # Such as bader charges
+            loss3 = 0  # Such as forces
+            if config.model.output_features is not None:
+                loss1 = config.model.graphwise_weight * criterion(
+                    result["out"], dats[2].to(device)
+                )
+            if config.model.atomwise_output_features is not None:
+                loss2 = config.model.atomwise_weight * criterion(
+                    result["atomwise_pred"].to(device),
+                    dats[0].ndata["atomwise_target"].to(device),
+                )
+            if config.model.calculate_gradient:
+                loss3 = config.model.gradwise_weight * criterion(
+                    result["grad"].to(device),
+                    dats[0].ndata["atomwise_grad"].to(device),
+                )
+            loss = loss1 + loss2 + loss3
+            test_loss += loss.item()
+        print("Test Loss", e, test_loss)
         sys.exit()
 
     if config.distributed:
