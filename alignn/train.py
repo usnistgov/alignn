@@ -284,6 +284,7 @@ def train_dgl(
         )
 
     if config.model.name == "alignn_atomwise":
+        best_loss = 1000000000
         criterion = nn.L1Loss()
         # criterion = nn.MSELoss()
         params = group_decay(net)
@@ -346,6 +347,9 @@ def train_dgl(
                     )
                 loss = loss1 + loss2 + loss3
                 val_loss += loss.item()
+                if val_loss < best_loss:
+                    best_loss = val_loss
+                    torch.save(net.state_dict(), "best_model.pt")
             print("Validation Loss", e, val_loss)
 
         test_loss = 0

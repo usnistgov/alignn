@@ -2,6 +2,7 @@
 
 """Module to train for a folder with formatted dataset."""
 import os
+import numpy as np
 import sys
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
@@ -90,16 +91,19 @@ def train_for_folder(
     #    reader = csv.reader(f)
     #    data = [row for row in reader]
     # dict_keys(['jids', 'tags', 'energies', 'atoms', 'forces', 'stresses'])
-
+    mean_energy = np.array(dat["energies"]).mean()
+    mean_force = np.array(dat["forces"]).mean()
+    print("mean_energy", mean_energy)
+    print("mean_force", mean_force)
     dataset = []
     for ii, jj, kk, ff in zip(
-        dat["jids"], dat["atoms"], dat["energies"], dat["forces"]
+        dat["ids"], dat["atoms"], dat["energies"], dat["forces"]
     ):
         info = {}
-        info["target"] = kk
+        info["target"] = kk - mean_energy
         info["atoms"] = jj
-        info["atomwise_target"] = ff
-        info["atomwise_grad"] = ff
+        info["atomwise_target"] = ff - mean_force
+        info["atomwise_grad"] = ff - mean_force
         info["jid"] = ii
         dataset.append(info)
     # Assuming all the atomwise_target data are of same length
