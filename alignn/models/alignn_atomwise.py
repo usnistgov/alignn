@@ -295,7 +295,6 @@ class ALIGNNAtomWise(nn.Module):
             z = self.angle_embedding(lg.edata.pop("h"))
 
         g = g.local_var()
-        result = {}
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
@@ -359,4 +358,4 @@ class ALIGNNAtomWise(nn.Module):
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             outputs["grad"] = torch.squeeze(g.ndata["gradient"])
 
-        return result
+        return outputs
