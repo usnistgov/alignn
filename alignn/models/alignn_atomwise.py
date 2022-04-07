@@ -301,7 +301,10 @@ class ALIGNNAtomWise(nn.Module):
         x = self.atom_embedding(x)
 
         # bond vectors
-        r = g.edata["r"].clone().detach().requires_grad_(True)
+        r = g.edata["r"]
+        if self.config.calculate_gradient:
+            r.requires_grad_(True)
+
         bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
 
