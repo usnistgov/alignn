@@ -9,6 +9,7 @@ from functools import partial
 
 # from pathlib import Path
 from typing import Any, Dict, Union
+
 import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
@@ -21,45 +22,49 @@ except Exception:
     from ignite.handlers.stores import EpochOutputStore
 
     pass
-from ignite.handlers import EarlyStopping
-from ignite.contrib.handlers.tensorboard_logger import (
-    global_step_from_engine,
-)
+import json
+import os
+import pickle as pk
+import pprint
+import sys
+
+import numpy as np
+from ignite.contrib.handlers.tensorboard_logger import global_step_from_engine
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
+from ignite.contrib.metrics import ROC_AUC, RocCurve
 from ignite.engine import (
     Events,
     create_supervised_evaluator,
     create_supervised_trainer,
 )
-from ignite.contrib.metrics import ROC_AUC, RocCurve
+from ignite.handlers import (
+    Checkpoint,
+    DiskSaver,
+    EarlyStopping,
+    TerminateOnNan,
+)
 from ignite.metrics import (
     Accuracy,
+    ConfusionMatrix,
+    Loss,
+    MeanAbsoluteError,
     Precision,
     Recall,
-    ConfusionMatrix,
 )
-import sys
-import pickle as pk
-import numpy as np
-from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
-from ignite.metrics import Loss, MeanAbsoluteError
+from jarvis.db.jsonutils import dumpjson
 from torch import nn
+
 from alignn import models
-from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
+from alignn.data import get_train_val_loaders
 from alignn.models.alignn import ALIGNN
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
+from alignn.models.alignn_cgcnn import ACGCNN
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
-from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
-from alignn.models.alignn_cgcnn import ACGCNN
-from jarvis.db.jsonutils import dumpjson
-import json
-import pprint
-
-import os
+from alignn.models.modified_cgcnn import CGCNN
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -289,29 +294,30 @@ def train_dgl(
         # criterion = nn.MSELoss()
         params = group_decay(net)
         optimizer = setup_optimizer(params, config)
-        # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+
+        # training loop
         for e in range(config.epochs):
             # optimizer.zero_grad()
             running_loss = 0
-            for dats in train_loader:
+            for batch in train_loader:
+                (g, lg), y = prepare_batch(batch)
+
                 optimizer.zero_grad()
-                result = net([dats[0].to(device), dats[1].to(device)])
+                result = net((g, lg))
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
-                        result["out"], dats[2].to(device)
+                        result["out"], y
                     )
                 if config.model.atomwise_output_features is not None:
                     loss2 = config.model.atomwise_weight * criterion(
-                        result["atomwise_pred"].to(device),
-                        dats[0].ndata["atomwise_target"].to(device),
+                        result["atomwise_pred"], g.ndata["atomwise_target"]
                     )
                 if config.model.calculate_gradient:
                     loss3 = config.model.gradwise_weight * criterion(
-                        result["grad"].to(device),
-                        dats[0].ndata["atomwise_grad"].to(device),
+                        result["grad"], g.ndata["atomwise_grad"]
                     )
                 loss = loss1 + loss2 + loss3
                 # print("graphwise_loss", loss1)
@@ -325,25 +331,24 @@ def train_dgl(
             scheduler.step()
             print("Training Loss", e, running_loss)
             val_loss = 0
-            for dats in val_loader:
+            for batch in val_loader:
+                (g, lg), y = prepare_batch(batch)
                 optimizer.zero_grad()
-                result = net([dats[0].to(device), dats[1].to(device)])
+                result = net((g, lg))
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
-                        result["out"], dats[2].to(device)
+                        result["out"], y
                     )
                 if config.model.atomwise_output_features is not None:
                     loss2 = config.model.atomwise_weight * criterion(
-                        result["atomwise_pred"].to(device),
-                        dats[0].ndata["atomwise_target"].to(device),
+                        result["atomwise_pred"], g.ndata["atomwise_target"]
                     )
                 if config.model.calculate_gradient:
                     loss3 = config.model.gradwise_weight * criterion(
-                        result["grad"].to(device),
-                        dats[0].ndata["atomwise_grad"].to(device),
+                        result["grad"], g.ndata["atomwise_grad"]
                     )
                 loss = loss1 + loss2 + loss3
                 val_loss += loss.item()
@@ -353,25 +358,24 @@ def train_dgl(
             print("Validation Loss", e, val_loss)
 
         test_loss = 0
-        for dats in test_loader:
+        for batch in test_loader:
+            (g, lg), y = prepare_batch(batch)
             optimizer.zero_grad()
-            result = net([dats[0].to(device), dats[1].to(device)])
+            result = net((g, lg))
             loss1 = 0  # Such as energy
             loss2 = 0  # Such as bader charges
             loss3 = 0  # Such as forces
             if config.model.output_features is not None:
                 loss1 = config.model.graphwise_weight * criterion(
-                    result["out"], dats[2].to(device)
+                    result["out"], y
                 )
             if config.model.atomwise_output_features is not None:
                 loss2 = config.model.atomwise_weight * criterion(
-                    result["atomwise_pred"].to(device),
-                    dats[0].ndata["atomwise_target"].to(device),
+                    result["atomwise_pred"], g.ndata["atomwise_target"]
                 )
             if config.model.calculate_gradient:
                 loss3 = config.model.gradwise_weight * criterion(
-                    result["grad"].to(device),
-                    dats[0].ndata["atomwise_grad"].to(device),
+                    result["grad"], g.ndata["atomwise_grad"]
                 )
             loss = loss1 + loss2 + loss3
             test_loss += loss.item()
@@ -379,8 +383,9 @@ def train_dgl(
         sys.exit()
 
     if config.distributed:
-        import torch.distributed as dist
         import os
+
+        import torch.distributed as dist
 
         def setup(rank, world_size):
             os.environ["MASTER_ADDR"] = "localhost"
