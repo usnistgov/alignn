@@ -481,13 +481,25 @@ def train_dgl(
                 val_result.append(info)
                 val_loss += loss.item()
             mean_out, mean_atom, mean_grad = get_batch_errors(val_result)
-            # dumpjson(filename="Val_results.json", data=val_result)
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_model_name = "best_model.pt"
                 torch.save(
                     net.state_dict(),
                     os.path.join(config.output_dir, best_model_name),
+                )
+                print("Saving data for epoch:", e)
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "Train_results.json"
+                    ),
+                    data=train_result,
+                )
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "Val_results.json"
+                    ),
+                    data=val_result,
                 )
             print(
                 "ValLoss",
@@ -553,8 +565,10 @@ def train_dgl(
             loss = loss1 + loss2 + loss3
             test_loss += loss.item()
         print("TestLoss", e, test_loss)
-        dumpjson(filename="Test_results.json", data=test_result)
-        # print("Test Loss", e, test_loss)
+        dumpjson(
+            filename=os.path.join(config.output_dir, "Test_results.json"),
+            data=test_result,
+        )
         sys.exit()
 
     if config.distributed:

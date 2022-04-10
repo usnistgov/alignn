@@ -167,6 +167,17 @@ def test_models():
     print()
     print()
 
+
+
+    config["model"]["name"] = "alignn_atomwise"
+    t1 = time.time()
+    train_dgl(config)
+    t2 = time.time()
+    print("Total time", t2 - t1)
+    print()
+    print()
+    print()
+
     config["model"]["name"] = "cgcnn"
     config["write_predictions"] = False
     config["save_dataloader"] = False
