@@ -58,14 +58,6 @@ def test_minor_configs():
 
 def test_models():
     """Test CGCNN end to end training."""
-    from alignn.train_folder_grad import train_for_folder
-
-    root_dir = "alignn/examples/sample_data"
-    config = "alignn/examples/sample_data/config_example_atomwise.json"
-    train_for_folder(root_dir=root_dir, config_name=config)
-    print()
-    print()
-    print()
 
     config["model"]["name"] = "dense_alignn"
     t1 = time.time()
@@ -205,6 +197,17 @@ def test_models():
     print()
     print()
     print()
+
+
+    from alignn.train_folder_grad import train_for_folder
+    root_dir = "alignn/examples/sample_data"
+    config = "alignn/examples/sample_data/config_example_atomwise.json"
+    train_for_folder(root_dir=root_dir, config_name=config)
+    print()
+    print()
+    print()
+
+
 
     """
 
