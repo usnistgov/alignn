@@ -287,6 +287,7 @@ def train_dgl(
     if config.model.name == "alignn_atomwise":
 
         def get_batch_errors(dat=[]):
+            """Get errors for samples."""
             target_out = []
             pred_out = []
             grad = []
@@ -483,7 +484,11 @@ def train_dgl(
             # dumpjson(filename="Val_results.json", data=val_result)
             if val_loss < best_loss:
                 best_loss = val_loss
-                torch.save(net.state_dict(), "best_model.pt")
+                best_model_name = "best_model.pt"
+                torch.save(
+                    net.state_dict(),
+                    os.path.join(config.output_dir, best_model_name),
+                )
             print(
                 "ValLoss",
                 "Epoch",
