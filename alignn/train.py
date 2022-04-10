@@ -9,10 +9,10 @@ from functools import partial
 
 # from pathlib import Path
 from typing import Any, Dict, Union
-
 import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
+from sklearn.metrics import mean_absolute_error
 
 try:
     from ignite.contrib.handlers.stores import EpochOutputStore
@@ -22,49 +22,44 @@ except Exception:
     from ignite.handlers.stores import EpochOutputStore
 
     pass
-import json
-import os
-import pickle as pk
-import pprint
-import sys
-
-import numpy as np
-from ignite.contrib.handlers.tensorboard_logger import global_step_from_engine
+from ignite.handlers import EarlyStopping
+from ignite.contrib.handlers.tensorboard_logger import (
+    global_step_from_engine,
+)
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
-from ignite.contrib.metrics import ROC_AUC, RocCurve
 from ignite.engine import (
     Events,
     create_supervised_evaluator,
     create_supervised_trainer,
 )
-from ignite.handlers import (
-    Checkpoint,
-    DiskSaver,
-    EarlyStopping,
-    TerminateOnNan,
-)
+from ignite.contrib.metrics import ROC_AUC, RocCurve
 from ignite.metrics import (
     Accuracy,
-    ConfusionMatrix,
-    Loss,
-    MeanAbsoluteError,
     Precision,
     Recall,
+    ConfusionMatrix,
 )
-from jarvis.db.jsonutils import dumpjson
+import pickle as pk
+import numpy as np
+from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
+from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
-
 from alignn import models
-from alignn.config import TrainingConfig
 from alignn.data import get_train_val_loaders
+from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
-from alignn.models.alignn_cgcnn import ACGCNN
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
+from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
-from alignn.models.modified_cgcnn import CGCNN
+from alignn.models.alignn_cgcnn import ACGCNN
+from jarvis.db.jsonutils import dumpjson
+import json
+import pprint
+
+import os
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -289,103 +284,295 @@ def train_dgl(
         )
 
     if config.model.name == "alignn_atomwise":
-        best_loss = 1000000000
+
+        def get_batch_errors(dat=[]):
+            """Get errors for samples."""
+            target_out = []
+            pred_out = []
+            grad = []
+            atomw = []
+            mean_out = 0
+            mean_atom = 0
+            mean_grad = 0
+            for i in dat:
+                if i["target_out"]:
+                    for j, k in zip(i["target_out"], i["pred_out"]):
+                        target_out.append(j)
+                        pred_out.append(k)
+                if i["target_grad"]:
+                    for m, n in zip(i["target_grad"], i["pred_grad"]):
+                        x = np.abs(np.array(m) - np.array(n))
+                        grad.append(np.mean(x))
+                if i["target_atomwise_pred"]:
+                    for m, n in zip(
+                        i["target_atomwise_pred"], i["pred_atomwise_pred"]
+                    ):
+                        x = np.abs(np.array(m) - np.array(n))
+                        atomw.append(np.mean(x))
+
+            if i["target_out"]:
+                target_out = np.array(target_out)
+                pred_out = np.array(pred_out)
+                mean_out = mean_absolute_error(target_out, pred_out)
+            if i["target_grad"]:
+                mean_grad = np.array(grad).mean()
+            if i["target_atomwise_pred"]:
+                mean_atom = np.array(atomw).mean()
+            # print ('grad',mean_grad)
+            # print ('out',mean_out)
+            return mean_out, mean_atom, mean_grad
+
+        best_loss = np.inf
         criterion = nn.L1Loss()
         # criterion = nn.MSELoss()
         params = group_decay(net)
         optimizer = setup_optimizer(params, config)
-
-        # training loop
+        # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+        history_train = []
+        history_val = []
         for e in range(config.epochs):
             # optimizer.zero_grad()
             running_loss = 0
-            for batch in train_loader:
-                (g, lg), y = prepare_batch(batch)
-
+            # graphlevel_loss=0
+            # atomlevel_loss=0
+            # gradlevel_loss=0
+            train_result = []
+            for dats in train_loader:
                 optimizer.zero_grad()
-                result = net((g, lg))
+                result = net([dats[0].to(device), dats[1].to(device)])
+                info = {}
+                info["target_out"] = []
+                info["pred_out"] = []
+                info["target_atomwise_pred"] = []
+                info["pred_atomwise_pred"] = []
+                info["target_grad"] = []
+                info["pred_grad"] = []
+
+                # graphlevel_loss=0
+                # atomlevel_loss=0
+                # gradlevel_loss=0
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
-                        result["out"], y
+                        result["out"], dats[2].to(device)
                     )
+                    info["target_out"] = dats[2].cpu().numpy().tolist()
+                    info["pred_out"] = (
+                        result["out"].cpu().detach().numpy().tolist()
+                    )
+                    # graphlevel_loss += np.mean(
+                    #    np.abs(
+                    #        dats[2].cpu().numpy()
+                    #        - result["out"].cpu().detach().numpy()
+                    #    )
+                    # )
+
                 if config.model.atomwise_output_features is not None:
                     loss2 = config.model.atomwise_weight * criterion(
-                        result["atomwise_pred"], g.ndata["atomwise_target"]
+                        result["atomwise_pred"].to(device),
+                        dats[0].ndata["atomwise_target"].to(device),
                     )
+                    info["target_atomwise_pred"] = (
+                        dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
+                    )
+                    info["pred_atomwise_pred"] = (
+                        result["atomwise_pred"].cpu().detach().numpy().tolist()
+                    )
+                    # atomlevel_loss += np.mean(
+                    #    np.abs(
+                    #        dats[0].ndata["atomwise_target"].cpu().numpy()
+                    #        - result["atomwise_pred"].cpu().detach().numpy()
+                    #    )
+                    # )
+
                 if config.model.calculate_gradient:
                     loss3 = config.model.gradwise_weight * criterion(
-                        result["grad"], g.ndata["atomwise_grad"]
+                        result["grad"].to(device),
+                        dats[0].ndata["atomwise_grad"].to(device),
                     )
+                    info["target_grad"] = (
+                        dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
+                    )
+                    info["pred_grad"] = (
+                        result["grad"].cpu().detach().numpy().tolist()
+                    )
+                    # gradlevel_loss += np.mean(
+                    #    np.abs(
+                    #        dats[0].ndata["atomwise_grad"].cpu().numpy()
+                    #        - result["grad"].cpu().detach().numpy()
+                    #    )
+                    # )
+                train_result.append(info)
                 loss = loss1 + loss2 + loss3
-                # print("graphwise_loss", loss1)
-                # print("atomwise_loss", loss2)
-                # print("gradwise_loss", loss3)
-                # print()
                 loss.backward()
                 optimizer.step()
                 # optimizer.zero_grad()
                 running_loss += loss.item()
+            mean_out, mean_atom, mean_grad = get_batch_errors(train_result)
+            # dumpjson(filename="Train_results.json", data=train_result)
             scheduler.step()
-            print("Training Loss", e, running_loss)
+            print(
+                "TrainLoss",
+                "Epoch",
+                e,
+                "total",
+                running_loss,
+                "out",
+                mean_out,
+                "atom",
+                mean_atom,
+                "grad",
+                mean_grad,
+            )
+            history_train.append([mean_out, mean_atom, mean_grad])
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_train.json"),
+                data=history_train,
+            )
             val_loss = 0
-            for batch in val_loader:
-                (g, lg), y = prepare_batch(batch)
+            val_result = []
+            for dats in val_loader:
                 optimizer.zero_grad()
-                result = net((g, lg))
+                result = net([dats[0].to(device), dats[1].to(device)])
+                info = {}
+                info["target_out"] = []
+                info["pred_out"] = []
+                info["target_atomwise_pred"] = []
+                info["pred_atomwise_pred"] = []
+                info["target_grad"] = []
+                info["pred_grad"] = []
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
-                        result["out"], y
+                        result["out"], dats[2].to(device)
+                    )
+                    info["target_out"] = dats[2].cpu().numpy().tolist()
+                    info["pred_out"] = (
+                        result["out"].cpu().detach().numpy().tolist()
                     )
                 if config.model.atomwise_output_features is not None:
                     loss2 = config.model.atomwise_weight * criterion(
-                        result["atomwise_pred"], g.ndata["atomwise_target"]
+                        result["atomwise_pred"].to(device),
+                        dats[0].ndata["atomwise_target"].to(device),
+                    )
+                    info["target_atomwise_pred"] = (
+                        dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
+                    )
+                    info["pred_atomwise_pred"] = (
+                        result["atomwise_pred"].cpu().detach().numpy().tolist()
                     )
                 if config.model.calculate_gradient:
                     loss3 = config.model.gradwise_weight * criterion(
-                        result["grad"], g.ndata["atomwise_grad"]
+                        result["grad"].to(device),
+                        dats[0].ndata["atomwise_grad"].to(device),
+                    )
+                    info["target_grad"] = (
+                        dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
+                    )
+                    info["pred_grad"] = (
+                        result["grad"].cpu().detach().numpy().tolist()
                     )
                 loss = loss1 + loss2 + loss3
+                val_result.append(info)
                 val_loss += loss.item()
-                if val_loss < best_loss:
-                    best_loss = val_loss
-                    torch.save(net.state_dict(), "best_model.pt")
-            print("Validation Loss", e, val_loss)
+            mean_out, mean_atom, mean_grad = get_batch_errors(val_result)
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_model_name = "best_model.pt"
+                torch.save(
+                    net.state_dict(),
+                    os.path.join(config.output_dir, best_model_name),
+                )
+                print("Saving data for epoch:", e)
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "Train_results.json"
+                    ),
+                    data=train_result,
+                )
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "Val_results.json"
+                    ),
+                    data=val_result,
+                )
+            print(
+                "ValLoss",
+                "Epoch",
+                e,
+                "total",
+                val_loss,
+                "out",
+                mean_out,
+                "atom",
+                mean_atom,
+                "grad",
+                mean_grad,
+            )
+            history_val.append([mean_out, mean_atom, mean_grad])
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_val.json"),
+                data=history_val,
+            )
 
         test_loss = 0
-        for batch in test_loader:
-            (g, lg), y = prepare_batch(batch)
+        test_result = []
+        info = {}
+        for dats in test_loader:
             optimizer.zero_grad()
-            result = net((g, lg))
+            result = net([dats[0].to(device), dats[1].to(device)])
             loss1 = 0  # Such as energy
             loss2 = 0  # Such as bader charges
             loss3 = 0  # Such as forces
             if config.model.output_features is not None:
                 loss1 = config.model.graphwise_weight * criterion(
-                    result["out"], y
+                    result["out"], dats[2].to(device)
                 )
+                info["target_out"] = dats[2].cpu().numpy().tolist()
+                info["pred_out"] = (
+                    result["out"].cpu().detach().numpy().tolist()
+                )
+
             if config.model.atomwise_output_features is not None:
                 loss2 = config.model.atomwise_weight * criterion(
-                    result["atomwise_pred"], g.ndata["atomwise_target"]
+                    result["atomwise_pred"].to(device),
+                    dats[0].ndata["atomwise_target"].to(device),
                 )
+                info["target_atomwise_pred"] = (
+                    dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
+                )
+                info["pred_atomwise_pred"] = (
+                    result["atomwise_pred"].cpu().detach().numpy().tolist()
+                )
+
             if config.model.calculate_gradient:
                 loss3 = config.model.gradwise_weight * criterion(
-                    result["grad"], g.ndata["atomwise_grad"]
+                    result["grad"].to(device),
+                    dats[0].ndata["atomwise_grad"].to(device),
                 )
+                info["target_grad"] = (
+                    dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
+                )
+                info["pred_grad"] = (
+                    result["grad"].cpu().detach().numpy().tolist()
+                )
+            test_result.append(info)
             loss = loss1 + loss2 + loss3
             test_loss += loss.item()
-        print("Test Loss", e, test_loss)
-        sys.exit()
+        print("TestLoss", e, test_loss)
+        dumpjson(
+            filename=os.path.join(config.output_dir, "Test_results.json"),
+            data=test_result,
+        )
+        return test_result
 
     if config.distributed:
-        import os
-
         import torch.distributed as dist
+        import os
 
         def setup(rank, world_size):
             os.environ["MASTER_ADDR"] = "localhost"
@@ -735,7 +922,6 @@ def train_dgl(
                 targets.append(target)
                 predictions.append(out_data)
         f.close()
-        from sklearn.metrics import mean_absolute_error
 
         print(
             "Test MAE:",

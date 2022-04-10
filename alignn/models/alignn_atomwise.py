@@ -2,8 +2,8 @@
 
 A prototype crystal line graph network dgl implementation.
 """
-from typing import Dict, Tuple, Union
-
+from typing import Tuple, Union
+from torch.autograd import grad
 import dgl
 import dgl.function as fn
 import numpy as np
@@ -13,7 +13,6 @@ from dgl.nn import AvgPooling
 # from dgl.nn.functional import edge_softmax
 from pydantic.typing import Literal
 from torch import nn
-from torch.autograd import grad
 from torch.nn import functional as F
 
 from alignn.models.utils import RBFExpansion
@@ -280,7 +279,7 @@ class ALIGNNAtomWise(nn.Module):
 
     def forward(
         self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
-    ) -> Dict[str, torch.Tensor]:
+    ):
         """ALIGNN : start with `atom_features`.
 
         x: atom features (g.ndata)
@@ -295,16 +294,15 @@ class ALIGNNAtomWise(nn.Module):
             z = self.angle_embedding(lg.edata.pop("h"))
 
         g = g.local_var()
+        result = {}
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
-
-        # bond vectors
         r = g.edata["r"]
         if self.config.calculate_gradient:
             r.requires_grad_(True)
-
+        # r = g.edata["r"].clone().detach().requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
 
@@ -315,50 +313,38 @@ class ALIGNNAtomWise(nn.Module):
         # gated GCN updates: update node, edge features
         for gcn_layer in self.gcn_layers:
             x, y = gcn_layer(g, x, y)
-
-        # return a dictionary of network outputs
-        outputs = {}
-
-        # baseline output model
-        # node feature aggregation, then prediction module
+        # norm-activation-pool-classify
+        out = torch.empty(1)
         if self.config.output_features is not None:
             h = self.readout(g, x)
             out = self.fc(h)
             out = torch.squeeze(out)
-
-            if self.link:
-                out = self.link(out)
-
-            if self.classification:
-                out = self.softmax(out)
-
-            outputs["out"] = out
-
-        # atomwise prediction:
-        # per-node application of prediction module
-        # then aggregate per-node outputs
+        atomwise_pred = torch.empty(1)
         if self.config.atomwise_output_features is not None:
-            atomwise_out = self.fc_atomwise(x)
-            atomwise_pred = self.readout(g, atomwise_out)
-            atomwise_pred = torch.squeeze(atomwise_pred)
-            outputs["atomwise_pred"] = atomwise_pred
-
-        # force calculation
-        # take gradients wrt bond vectors
-        # then aggregate from bonds to atoms
+            atomwise_pred = self.fc_atomwise(x)
+            # atomwise_pred = torch.squeeze(self.readout(g, atomwise_pred))
+        gradient = torch.empty(1)
         if self.config.calculate_gradient:
-            # grad_multiplier = -1 for forces...
-            # i.e. force ~ negative du/dr
-            dy_dr = self.config.grad_multiplier * grad(
-                out,
-                r,
-                grad_outputs=torch.ones_like(out),
-            )[0]
-
-            # aggregate per-bond contributions
-            # to obtain per-atom gradients (corresponding to forces)
-            g.edata["dy_dr"] = dy_dr
+            create_graph = True  # True  # False
+            dy = (
+                self.config.grad_multiplier
+                * grad(
+                    out,
+                    r,
+                    grad_outputs=torch.ones_like(out),
+                    create_graph=create_graph,
+                    retain_graph=True,
+                )[0]
+            )
+            g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
-            outputs["grad"] = torch.squeeze(g.ndata["gradient"])
+            gradient = torch.squeeze(g.ndata["gradient"])
+        if self.link:
+            out = self.link(out)
 
-        return outputs
+        if self.classification:
+            out = self.softmax(out)
+        result["out"] = out
+        result["grad"] = gradient
+        result["atomwise_pred"] = atomwise_pred
+        return result

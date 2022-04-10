@@ -7,14 +7,14 @@
     "id_tag": "jid",
     "random_seed": 123,
     "classification_threshold": null,
-    "n_val": 30,
-    "n_test": 10,
+    "n_val": 5,
+    "n_test": 5,
     "n_train": 10,
     "train_ratio": 0.8,
     "val_ratio": 0.1,
     "test_ratio": 0.1,
     "target_multiplication_factor": null,
-    "epochs": 3,
+    "epochs": 2,
     "batch_size": 2,
     "weight_decay": 1e-05,
     "learning_rate": 0.001,
@@ -33,7 +33,7 @@
     "standard_scalar_and_pca": false,
     "use_canonize": false,
     "num_workers": 0,
-    "cutoff": 8.0,
+    "cutoff": 5.0,
     "max_neighbors": 12,
     "keep_data_order": false,
     "model": {
@@ -41,10 +41,12 @@
         "atom_input_features": 92,
         "calculate_gradient":true,
         "atomwise_output_features":3,
+        "alignn_layers":4,
+        "gcn_layers":4,
         "output_features": 1,
-        "graphwise_weight":0,
+        "graphwise_weight":1,
         "gradwise_weight":1,
-        "atomwise_weight":0
+        "atomwise_weight":1
           
     }
 }
