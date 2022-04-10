@@ -328,6 +328,8 @@ def train_dgl(
         params = group_decay(net)
         optimizer = setup_optimizer(params, config)
         # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+        history_train = []
+        history_val = []
         for e in range(config.epochs):
             # optimizer.zero_grad()
             running_loss = 0
@@ -373,7 +375,7 @@ def train_dgl(
                         dats[0].ndata["atomwise_target"].to(device),
                     )
                     info["target_atomwise_pred"] = (
-                        g.ndata["atomwise_target"].cpu().numpy().tolist()
+                        dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
                     )
                     info["pred_atomwise_pred"] = (
                         result["atomwise_pred"].cpu().detach().numpy().tolist()
@@ -424,6 +426,11 @@ def train_dgl(
                 "grad",
                 mean_grad,
             )
+            history_train.append([mean_out, mean_atom, mean_grad])
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_train.json"),
+                data=history_train,
+            )
             val_loss = 0
             val_result = []
             for dats in val_loader:
@@ -453,7 +460,7 @@ def train_dgl(
                         dats[0].ndata["atomwise_target"].to(device),
                     )
                     info["target_atomwise_pred"] = (
-                        g.ndata["atomwise_target"].cpu().numpy().tolist()
+                        dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
                     )
                     info["pred_atomwise_pred"] = (
                         result["atomwise_pred"].cpu().detach().numpy().tolist()
@@ -490,6 +497,11 @@ def train_dgl(
                 "grad",
                 mean_grad,
             )
+            history_val.append([mean_out, mean_atom, mean_grad])
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_val.json"),
+                data=history_val,
+            )
 
         test_loss = 0
         test_result = []
@@ -515,7 +527,7 @@ def train_dgl(
                     dats[0].ndata["atomwise_target"].to(device),
                 )
                 info["target_atomwise_pred"] = (
-                    g.ndata["atomwise_target"].cpu().numpy().tolist()
+                    dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
                 )
                 info["pred_atomwise_pred"] = (
                     result["atomwise_pred"].cpu().detach().numpy().tolist()
