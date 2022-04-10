@@ -1,5 +1,6 @@
 """Training script test suite."""
 import time
+from jarvis.db.jsonutils import loadjson
 import matplotlib.pyplot as plt
 import numpy as np
 from alignn.train import train_dgl
@@ -42,8 +43,9 @@ def test_runtime_training():
     os.system(cmd2)
     cmd3 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
     os.system(cmd3)
-    cmd4 = 'train_folder_grad.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp'
-    os.system(cmd4)
+    # cmd4 = 'train_folder_grad.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp'
+    # os.system(cmd4)
+
 
 def test_minor_configs():
     tmp = config
@@ -56,6 +58,15 @@ def test_minor_configs():
 
 def test_models():
     """Test CGCNN end to end training."""
+    from alignn.train_folder_grad import train_for_folder
+
+    root_dir = "alignn/examples/sample_data"
+    config = "alignn/examples/sample_data/config_example_atomwise.json"
+    train_for_folder(root_dir=root_dir, config_name=config)
+    print()
+    print()
+    print()
+
     config["model"]["name"] = "dense_alignn"
     t1 = time.time()
     result = train_dgl(config)
@@ -163,17 +174,6 @@ def test_models():
     print("Total time", t2 - t1)
     print("train=", result["train"])
     print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-
-
-    config["model"]["name"] = "alignn_atomwise"
-    t1 = time.time()
-    train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
     print()
     print()
     print()

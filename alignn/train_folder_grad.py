@@ -97,7 +97,7 @@ def train_for_folder(
     print("mean_force", mean_force)
     dataset = []
     for ii, jj, kk, ff in zip(
-        dat["ids"],
+        dat["jids"],
         dat["atoms"],
         dat["energies"],
         dat["forces"]
