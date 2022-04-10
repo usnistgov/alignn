@@ -46,7 +46,7 @@
         "output_features": 1,
         "graphwise_weight":1,
         "gradwise_weight":1,
-        "atomwise_weight":0
+        "atomwise_weight":1
           
     }
 }

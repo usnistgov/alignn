@@ -321,9 +321,8 @@ class ALIGNNAtomWise(nn.Module):
             out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
         if self.config.atomwise_output_features is not None:
-            atomwise_out = self.fc_atomwise(x)
-            atomwise_pred = self.readout(g, atomwise_out)
-            atomwise_pred = torch.squeeze(atomwise_pred)
+            atomwise_pred = self.fc_atomwise(x)
+            # atomwise_pred = torch.squeeze(self.readout(g, atomwise_pred))
         gradient = torch.empty(1)
         if self.config.calculate_gradient:
             create_graph = True  # True  # False
