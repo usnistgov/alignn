@@ -568,7 +568,7 @@ def train_dgl(
             filename=os.path.join(config.output_dir, "Test_results.json"),
             data=test_result,
         )
-        quit()
+        return test_result
 
     if config.distributed:
         import torch.distributed as dist
