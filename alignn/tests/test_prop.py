@@ -58,6 +58,29 @@ def test_minor_configs():
 
 def test_models():
     """Test CGCNN end to end training."""
+    config = {
+    "dataset": "dft_2d",
+    "target": "formation_energy_peratom",
+    # "target": "optb88vdw_bandgap",
+    "n_train": 50,
+    "n_test": 25,
+    "n_val": 25,
+    "num_workers": 0,
+    "atom_features": "cgcnn",
+    "neighbor_strategy": "k-nearest",
+    "epochs": 2,
+    "save_dataloader": False,
+    "batch_size": 10,
+    "weight_decay": 1e-05,
+    "learning_rate": 0.01,
+    "criterion": "mse",
+    "optimizer": "adamw",
+    "scheduler": "onecycle",
+    "num_workers": 4,
+    "model": {
+        "name": "alignn",
+       },
+    }
 
     config["model"]["name"] = "dense_alignn"
     t1 = time.time()
