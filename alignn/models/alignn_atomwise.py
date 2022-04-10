@@ -299,7 +299,10 @@ class ALIGNNAtomWise(nn.Module):
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
-        r = g.edata["r"].clone().detach().requires_grad_(True)
+        r = g.edata["r"]
+        if self.config.calculate_gradient:
+            r.requires_grad_(True)
+        # r = g.edata["r"].clone().detach().requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
 
@@ -324,13 +327,16 @@ class ALIGNNAtomWise(nn.Module):
         gradient = torch.empty(1)
         if self.config.calculate_gradient:
             create_graph = True  # True  # False
-            dy = self.config.grad_multiplier * grad(
-                out,
-                r,
-                grad_outputs=torch.ones_like(out),
-                create_graph=create_graph,
-                retain_graph=True,
-            )[0]
+            dy = (
+                self.config.grad_multiplier
+                * grad(
+                    out,
+                    r,
+                    grad_outputs=torch.ones_like(out),
+                    create_graph=create_graph,
+                    retain_graph=True,
+                )[0]
+            )
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])

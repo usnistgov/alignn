@@ -97,13 +97,17 @@ def train_for_folder(
     print("mean_force", mean_force)
     dataset = []
     for ii, jj, kk, ff in zip(
-        dat["ids"], dat["atoms"], dat["energies"], dat["forces"]
+        dat["ids"],
+        dat["atoms"],
+        dat["energies"],
+        dat["forces"]
+        # dat["jids"], dat["atoms"], dat["energies"], dat["forces"]
     ):
         info = {}
         info["target"] = kk - mean_energy
         info["atoms"] = jj
-        info["atomwise_target"] = ff - mean_force
-        info["atomwise_grad"] = ff - mean_force
+        info["atomwise_target"] = ff  # - mean_force
+        info["atomwise_grad"] = ff  # - mean_force
         info["jid"] = ii
         dataset.append(info)
     # Assuming all the atomwise_target data are of same length
