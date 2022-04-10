@@ -39,7 +39,6 @@ from ignite.metrics import (
     Recall,
     ConfusionMatrix,
 )
-import sys
 import pickle as pk
 import numpy as np
 from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
@@ -569,7 +568,7 @@ def train_dgl(
             filename=os.path.join(config.output_dir, "Test_results.json"),
             data=test_result,
         )
-        sys.exit()
+        quit()
 
     if config.distributed:
         import torch.distributed as dist
