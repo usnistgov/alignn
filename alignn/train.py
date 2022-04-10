@@ -984,3 +984,4 @@ if __name__ == "__main__":
         random_seed=123, epochs=10, n_train=32, n_val=32, batch_size=16
     )
     history = train_dgl(config, progress=True)
+    

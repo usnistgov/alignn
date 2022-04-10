@@ -348,3 +348,4 @@ class ALIGNNAtomWise(nn.Module):
         result["grad"] = gradient
         result["atomwise_pred"] = atomwise_pred
         return result
+      
