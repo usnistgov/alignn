@@ -36,9 +36,11 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     grad_multiplier: int = -1
     calculate_gradient: bool = True
     atomwise_output_features: int = 3
-    graphwise_weight: float = 0.9
-    gradwise_weight: float = 0.9
-    atomwise_weight: float = 0.9
+    graphwise_weight: float = 1.0
+    gradwise_weight: float = 1.0
+    atomwise_weight: float = 0.0
+    lj_weight: float = 0.0
+    bo_weight: float = 0.0
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
@@ -259,6 +261,10 @@ class ALIGNNAtomWise(nn.Module):
                 config.hidden_features, config.atomwise_output_features
             )
 
+        if config.lj_weight != 0:
+            self.fc_lj = nn.Linear(config.hidden_features, 2)
+        if config.bo_weight != 0:
+            self.fc_bo = nn.Linear(config.hidden_features, 13)
         if self.classification:
             self.fc = nn.Linear(config.hidden_features, 2)
             self.softmax = nn.LogSoftmax(dim=1)
@@ -323,19 +329,29 @@ class ALIGNNAtomWise(nn.Module):
         if self.config.atomwise_output_features is not None:
             atomwise_pred = self.fc_atomwise(x)
             # atomwise_pred = torch.squeeze(self.readout(g, atomwise_pred))
+        if self.config.lj_weight != 0:
+            lj_params = self.fc_lj(y)
+            power_12 = (lj_params[:, 0] / bondlength) ** 12
+            power_6 = (lj_params[:, 0] / bondlength) ** 6
+            lj_out = torch.sum(4 * lj_params[:, 1] * (power_12 - power_6))
+            out += self.config.lj_weight * torch.squeeze(lj_out)
+        if self.config.bo_weight != 0:
+            bo_params = self.fc_lj(z)
+
+            power_12 = (lj_params[:, 0] / bondlength) ** 12
+            power_6 = (lj_params[:, 0] / bondlength) ** 6
+            lj_out = torch.sum(4 * lj_params[:, 1] * (power_12 - power_6))
+            out += self.config.lj_weight * torch.squeeze(lj_out)
         gradient = torch.empty(1)
         if self.config.calculate_gradient:
             create_graph = True  # True  # False
-            dy = (
-                self.config.grad_multiplier
-                * grad(
-                    out,
-                    r,
-                    grad_outputs=torch.ones_like(out),
-                    create_graph=create_graph,
-                    retain_graph=True,
-                )[0]
-            )
+            dy = self.config.grad_multiplier * grad(
+                out,
+                r,
+                grad_outputs=torch.ones_like(out),
+                create_graph=create_graph,
+                retain_graph=True,
+            )[0]
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
