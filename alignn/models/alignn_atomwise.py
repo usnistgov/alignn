@@ -337,7 +337,7 @@ class ALIGNNAtomWise(nn.Module):
             out += self.config.lj_weight * torch.squeeze(lj_out)
         if self.config.bo_weight != 0:
             bo_params = self.fc_lj(z)
-
+            # TODO
             power_12 = (lj_params[:, 0] / bondlength) ** 12
             power_6 = (lj_params[:, 0] / bondlength) ** 6
             lj_out = torch.sum(4 * lj_params[:, 1] * (power_12 - power_6))
