@@ -521,13 +521,13 @@ def train_dgl(
 
         test_loss = 0
         test_result = []
-        info = {}
         for dats in test_loader:
             optimizer.zero_grad()
             result = net([dats[0].to(device), dats[1].to(device)])
             loss1 = 0  # Such as energy
             loss2 = 0  # Such as bader charges
             loss3 = 0  # Such as forces
+            info = {}
             if config.model.output_features is not None:
                 loss1 = config.model.graphwise_weight * criterion(
                     result["out"], dats[2].to(device)
