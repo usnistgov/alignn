@@ -46,7 +46,19 @@ class BondOrderInteraction(nn.Module):
         super().__init__()
         self.pair_parameters = 4
         self.src_params = nn.Linear(node_input_features, self.pair_parameters)
-        self.dst_params = nn.Linear(node_input_features, self.pair_parameters)
+        self.dst_params = nn.Linear(
+            node_input_features, self.pair_parameters, bias=False
+        )
+
+        # set bias parameters to log of baseline values?
+        # e.g. from Tersoff Si
+        # New empirical approach for the structure and energy of covalent systems
+        # units are eV and Å⁻¹
+        # log([A, λ1, B, λ2])
+        self.src_params.bias.data = torch.log(
+            # torch.tensor([2280.4, 1.4654, 154.87, 1.4654])  # diamond
+            torch.tensor([3264, 3.2394, 95.373, 1.3258])  # Si
+        )
 
         # sinusoidal cutoff function
         D = 0.5 * (cutoff_distance - cutoff_onset)
