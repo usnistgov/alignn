@@ -36,9 +36,10 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     grad_multiplier: int = -1
     calculate_gradient: bool = True
     atomwise_output_features: int = 3
-    graphwise_weight: float = 0.9
-    gradwise_weight: float = 0.9
-    atomwise_weight: float = 0.9
+    graphwise_weight: float = 1.0
+    gradwise_weight: float = 0.0
+    stresswise_weight: float = 0.0
+    atomwise_weight: float = 0.0
     # if link == log, apply `exp` to final outputs
     # to constrain predictions to be positive
     link: Literal["identity", "log", "logit"] = "identity"
@@ -324,8 +325,10 @@ class ALIGNNAtomWise(nn.Module):
             atomwise_pred = self.fc_atomwise(x)
             # atomwise_pred = torch.squeeze(self.readout(g, atomwise_pred))
         gradient = torch.empty(1)
+        stress = torch.empty(1)
+
         if self.config.calculate_gradient:
-            create_graph = True  # True  # False
+            create_graph = True
             dy = (
                 self.config.grad_multiplier
                 * grad(
@@ -339,6 +342,17 @@ class ALIGNNAtomWise(nn.Module):
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
+            if self.config.stresswise_weight != 0:
+                # 1 eV/Angstrom3 = 160.21766208 GPa
+                # 1 GPa = 10 kbar
+                # Following Virial stress formula, assuming inital velocity = 0
+                # Save volume as g.gdta['V']?
+                stress = (
+                    160.21766208
+                    * torch.matmul(r.T, dy)
+                    / (2 * g.ndata["V"][0])
+                    * 10
+                )
         if self.link:
             out = self.link(out)
 
@@ -346,5 +360,6 @@ class ALIGNNAtomWise(nn.Module):
             out = self.softmax(out)
         result["out"] = out
         result["grad"] = gradient
+        result["stress"] = stress
         result["atomwise_pred"] = atomwise_pred
         return result

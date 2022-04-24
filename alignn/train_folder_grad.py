@@ -63,13 +63,17 @@ def train_for_folder(
     classification_threshold=None,
     batch_size=None,
     epochs=None,
+    target_key="total_energy",
+    atomwise_key="forces",
+    gradwise_key="forces",
+    stresswise_key="stresses",
     file_format="poscar",
+    subtract_mean=True,
+    normalize_with_natoms=False,
     output_dir=None,
 ):
     """Train for a folder."""
-    # config_dat=os.path.join(root_dir,config_name)
     dat = loadjson(os.path.join(root_dir, "id_prop.json"))
-    # id_prop_dat = os.path.join(root_dir, "id_prop.csv")
     config = loadjson(config_name)
     config = TrainingConfig(**config)
     if type(config) is dict:
@@ -87,36 +91,53 @@ def train_for_folder(
         config.batch_size = int(batch_size)
     if epochs is not None:
         config.epochs = int(epochs)
-    # with open(id_prop_dat, "r") as f:
-    #    reader = csv.reader(f)
-    #    data = [row for row in reader]
-    # dict_keys(['jids', 'tags', 'energies', 'atoms', 'forces', 'stresses'])
-    mean_energy = np.array(dat["energies"]).mean()
-    mean_force = np.array(dat["forces"]).mean()
-    print("mean_energy", mean_energy)
-    print("mean_force", mean_force)
+    train_grad = True
+    train_stress = True
+    train_atom = True
+    target_atomwise = None  # "atomwise_target"
+    target_grad = None  # "atomwise_grad"
+    target_stress = None  # "stresses"
+
+    if config.model.atomwise_weight == 0:
+        train_atom = False
+    if config.model.gradwise_weight == 0:
+        train_grad = False
+    if config.model.stresswise_weight == 0:
+        train_stress = False
+    mem = []
+    enp = []
+    if subtract_mean:
+        for i in dat:
+            i["energy_per_atom"] = i[
+                target_key
+            ]  # / len(i["atoms"]["elements"])
+            mem.append(i)
+            enp.append(i["energy_per_atom"])
+        mean_energy = np.array(enp).mean()
+        print("mean_energy", mean_energy)
     dataset = []
-    for ii, jj, kk, ff in zip(
-        dat["jids"],
-        dat["atoms"],
-        dat["energies"],
-        dat["forces"]
-        # dat["jids"], dat["atoms"], dat["energies"], dat["forces"]
-    ):
+    for i in mem:
         info = {}
-        info["target"] = kk - mean_energy
-        info["atoms"] = jj
-        info["atomwise_target"] = ff  # - mean_force
-        info["atomwise_grad"] = ff  # - mean_force
-        info["jid"] = ii
+        if subtract_mean:
+            info["target"] = i["energy_per_atom"] - mean_energy
+        else:
+            info["target"] = i[target_key]
+        if normalize_with_natoms:
+            info["target"] = info["target"] / len(i["atoms"]["elements"])
+
+        if train_atom:
+            target_atomwise = "atomwise_target"
+            info["atomwise_target"] = i[atomwise_key]  # such as charges
+        if train_grad:
+            target_grad = "atomwise_grad"
+            info["atomwise_grad"] = i[gradwise_key]  # - mean_force
+        if train_stress:
+            info["stresses"] = i[stresswise_key]  # - mean_force
+            target_stress = "stresses"
+
+        info["atoms"] = i["atoms"]
+        info["jid"] = i["jid"]
         dataset.append(info)
-    # Assuming all the atomwise_target data are of same length
-    # atomwise_grad in of size 3 each for each node
-    """
-    if "atomwise_target" in info:
-        print ("atomwise_target size",len(info["atomwise_target"][0]))
-        config.model.atomwise_output_features=len(info["atomwise_target"])
-    """
 
     n_outputs = []
     multioutput = False
@@ -124,9 +145,7 @@ def train_for_folder(
     line_graph = False
     alignn_models = {
         "alignn",
-        "dense_alignn",
-        "alignn_cgcnn",
-        "alignn_layernorm",
+        # "alignn_layernorm",
         "alignn_atomwise",
     }
     if config.model.name == "clgn":
@@ -162,8 +181,9 @@ def train_for_folder(
     ) = get_train_val_loaders(
         dataset_array=dataset,
         target="target",
-        target_atomwise="atomwise_target",
-        target_grad="atomwise_grad",
+        target_atomwise=target_atomwise,
+        target_grad=target_grad,
+        target_stress=target_stress,
         n_train=config.n_train,
         n_val=config.n_val,
         n_test=config.n_test,

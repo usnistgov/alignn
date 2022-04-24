@@ -14,8 +14,8 @@
     "val_ratio": 0.1,
     "test_ratio": 0.1,
     "target_multiplication_factor": null,
-    "epochs": 300,
-    "batch_size": 16,
+    "epochs": 3,
+    "batch_size": 2,
     "weight_decay": 1e-05,
     "learning_rate": 0.001,
     "filename": "sample",
@@ -33,7 +33,7 @@
     "standard_scalar_and_pca": false,
     "use_canonize": false,
     "num_workers": 0,
-    "cutoff": 5.0,
+    "cutoff": 8.0,
     "max_neighbors": 12,
     "keep_data_order": false,
     "model": {
@@ -44,9 +44,10 @@
         "alignn_layers":4,
         "gcn_layers":4,
         "output_features": 1,
-        "graphwise_weight":1,
-        "gradwise_weight":1,
-        "atomwise_weight":0
+        "graphwise_weight":0.85,
+        "gradwise_weight":0.05,
+        "atomwise_weight":0.05,
+        "stresswise_weight":0.05
           
     }
 }

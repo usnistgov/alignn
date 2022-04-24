@@ -234,7 +234,13 @@ class Graph(object):
         )
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
+        g.ndata["lattice_mat"] = torch.tensor(
+            [atoms.lattice_mat for ii in range(atoms.num_atoms)]
+        )
         g.edata["r"] = r
+        g.ndata["V"] = torch.tensor(
+            [atoms.volume for ii in range(atoms.num_atoms)]
+        )
 
         if compute_line_graph:
             # construct atomistic line graph
@@ -529,6 +535,7 @@ class StructureDataset(torch.utils.data.Dataset):
         target: str,
         target_atomwise="",
         target_grad="",
+        target_stress="",
         atom_features="atomic_number",
         transform=None,
         line_graph=False,
@@ -548,11 +555,14 @@ class StructureDataset(torch.utils.data.Dataset):
         self.target = target
         self.target_atomwise = target_atomwise
         self.target_grad = target_grad
+        self.target_stress = target_stress
         self.line_graph = line_graph
         print("df", df)
         self.labels = self.df[target]
 
-        if self.target_atomwise is not None and self.target_atomwise != "":
+        if (
+            self.target_atomwise is not None and self.target_atomwise != ""
+        ):  # and "" not in self.target_atomwise:
             # self.labels_atomwise = df[self.target_atomwise]
             self.labels_atomwise = []
             for ii, i in df.iterrows():
@@ -562,7 +572,9 @@ class StructureDataset(torch.utils.data.Dataset):
                     )
                 )
 
-        if self.target_grad is not None and self.target_grad != "":
+        if (
+            self.target_grad is not None and self.target_grad != ""
+        ):  # and "" not in  self.target_grad :
             # self.labels_atomwise = df[self.target_atomwise]
             self.labels_grad = []
             for ii, i in df.iterrows():
@@ -572,6 +584,18 @@ class StructureDataset(torch.utils.data.Dataset):
                     )
                 )
             # print (self.labels_atomwise)
+        if (
+            self.target_stress is not None and self.target_stress != ""
+        ):  # and "" not in  self.target_stress :
+            # self.labels_atomwise = df[self.target_atomwise]
+            self.labels_stress = []
+            for ii, i in df.iterrows():
+                self.labels_stress.append(i[self.target_stress])
+                # self.labels_stress.append(
+                #    torch.tensor(np.array(i[self.target_stress])).type(
+                #        torch.get_default_dtype()
+                #    )
+                # )
 
         self.ids = self.df[id_tag]
         self.labels = torch.tensor(self.df[target]).type(
@@ -591,10 +615,24 @@ class StructureDataset(torch.utils.data.Dataset):
             if g.num_nodes() == 1:
                 f = f.unsqueeze(0)
             g.ndata["atom_features"] = f
-            if self.target_atomwise is not None and self.target_atomwise != "":
+            if (
+                self.target_atomwise is not None and self.target_atomwise != ""
+            ):  # and "" not in self.target_atomwise:
                 g.ndata[self.target_atomwise] = self.labels_atomwise[i]
-            if self.target_grad is not None and self.target_grad != "":
+            if (
+                self.target_grad is not None and self.target_grad != ""
+            ):  # and "" not in  self.target_grad:
                 g.ndata[self.target_grad] = self.labels_grad[i]
+            if (
+                self.target_stress is not None and self.target_stress != ""
+            ):  # and "" not in  self.target_stress:
+                print(
+                    "self.labels_stress[i]",
+                    [self.labels_stress[i] for ii in range(len(z))],
+                )
+                g.ndata[self.target_stress] = torch.tensor(
+                    [self.labels_stress[i] for ii in range(len(z))]
+                ).type(torch.get_default_dtype())
 
         self.prepare_batch = prepare_dgl_batch
         if line_graph:

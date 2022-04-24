@@ -291,14 +291,20 @@ def train_dgl(
             pred_out = []
             grad = []
             atomw = []
+            stress = []
             mean_out = 0
             mean_atom = 0
             mean_grad = 0
+            mean_stress = 0
             for i in dat:
                 if i["target_out"]:
                     for j, k in zip(i["target_out"], i["pred_out"]):
                         target_out.append(j)
                         pred_out.append(k)
+                if i["target_stress"]:
+                    for p, q in zip(i["target_stress"], i["pred_stress"]):
+                        x = np.abs(np.array(p) - np.array(q))
+                        stress.append(np.mean(x))
                 if i["target_grad"]:
                     for m, n in zip(i["target_grad"], i["pred_grad"]):
                         x = np.abs(np.array(m) - np.array(n))
@@ -309,18 +315,23 @@ def train_dgl(
                     ):
                         x = np.abs(np.array(m) - np.array(n))
                         atomw.append(np.mean(x))
-
-            if i["target_out"]:
+            if "target_out" in i:
+                # if i["target_out"]:
                 target_out = np.array(target_out)
                 pred_out = np.array(pred_out)
                 mean_out = mean_absolute_error(target_out, pred_out)
-            if i["target_grad"]:
+            if "target_stress" in i:
+                # if i["target_stress"]:
+                mean_stress = np.array(stress).mean()
+            if "target_grad" in i:
+                # if i["target_grad"]:
                 mean_grad = np.array(grad).mean()
-            if i["target_atomwise_pred"]:
+            if "target_atomwise_pred" in i:
+                # if i["target_atomwise_pred"]:
                 mean_atom = np.array(atomw).mean()
             # print ('grad',mean_grad)
             # print ('out',mean_out)
-            return mean_out, mean_atom, mean_grad
+            return mean_out, mean_atom, mean_grad, mean_stress
 
         best_loss = np.inf
         criterion = nn.L1Loss()
@@ -333,9 +344,6 @@ def train_dgl(
         for e in range(config.epochs):
             # optimizer.zero_grad()
             running_loss = 0
-            # graphlevel_loss=0
-            # atomlevel_loss=0
-            # gradlevel_loss=0
             train_result = []
             for dats in train_loader:
                 optimizer.zero_grad()
@@ -347,13 +355,13 @@ def train_dgl(
                 info["pred_atomwise_pred"] = []
                 info["target_grad"] = []
                 info["pred_grad"] = []
+                info["target_stress"] = []
+                info["pred_stress"] = []
 
-                # graphlevel_loss=0
-                # atomlevel_loss=0
-                # gradlevel_loss=0
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
+                loss4 = 0  # Such as stresses
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"], dats[2].to(device)
@@ -404,13 +412,28 @@ def train_dgl(
                     #        - result["grad"].cpu().detach().numpy()
                     #    )
                     # )
+                if config.model.stresswise_weight != 0:
+                    loss4 = config.model.stresswise_weight * criterion(
+                        result["stress"].to(device),
+                        dats[0].ndata["stresses"][0].to(device),
+                    )
+                    info["target_stress"] = (
+                        dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                    )
+                    info["pred_stress"] = (
+                        result["stress"].cpu().detach().numpy().tolist()
+                    )
+                    # print ("target_stress",info["target_stress"])
+                    # print ("pred_stress",info["pred_stress"])
                 train_result.append(info)
-                loss = loss1 + loss2 + loss3
+                loss = loss1 + loss2 + loss3 + loss4
                 loss.backward()
                 optimizer.step()
                 # optimizer.zero_grad()
                 running_loss += loss.item()
-            mean_out, mean_atom, mean_grad = get_batch_errors(train_result)
+            mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
+                train_result
+            )
             # dumpjson(filename="Train_results.json", data=train_result)
             scheduler.step()
             print(
@@ -425,8 +448,10 @@ def train_dgl(
                 mean_atom,
                 "grad",
                 mean_grad,
+                "stress",
+                mean_stress,
             )
-            history_train.append([mean_out, mean_atom, mean_grad])
+            history_train.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_train.json"),
                 data=history_train,
@@ -443,9 +468,12 @@ def train_dgl(
                 info["pred_atomwise_pred"] = []
                 info["target_grad"] = []
                 info["pred_grad"] = []
+                info["target_stress"] = []
+                info["pred_stress"] = []
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
+                loss4 = 0  # Such as stresses
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"], dats[2].to(device)
@@ -476,10 +504,23 @@ def train_dgl(
                     info["pred_grad"] = (
                         result["grad"].cpu().detach().numpy().tolist()
                     )
-                loss = loss1 + loss2 + loss3
+                if config.model.stresswise_weight != 0:
+                    loss4 = config.model.stresswise_weight * criterion(
+                        result["stress"].to(device),
+                        dats[0].ndata["stresses"][0].to(device),
+                    )
+                    info["target_stress"] = (
+                        dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                    )
+                    info["pred_stress"] = (
+                        result["stress"].cpu().detach().numpy().tolist()
+                    )
+                loss = loss1 + loss2 + loss3 + loss4
                 val_result.append(info)
                 val_loss += loss.item()
-            mean_out, mean_atom, mean_grad = get_batch_errors(val_result)
+            mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
+                val_result
+            )
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_model_name = "best_model.pt"
@@ -512,8 +553,10 @@ def train_dgl(
                 mean_atom,
                 "grad",
                 mean_grad,
+                "stress",
+                mean_stress,
             )
-            history_val.append([mean_out, mean_atom, mean_grad])
+            history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_val.json"),
                 data=history_val,
@@ -527,6 +570,7 @@ def train_dgl(
             loss1 = 0  # Such as energy
             loss2 = 0  # Such as bader charges
             loss3 = 0  # Such as forces
+            loss4 = 0  # Such as stresses
             info = {}
             if config.model.output_features is not None:
                 loss1 = config.model.graphwise_weight * criterion(
@@ -560,8 +604,19 @@ def train_dgl(
                 info["pred_grad"] = (
                     result["grad"].cpu().detach().numpy().tolist()
                 )
+            if config.model.stresswise_weight != 0:
+                loss4 = config.model.stresswise_weight * criterion(
+                    result["stress"][0].to(device),
+                    dats[0].ndata["stresses"].to(device),
+                )
+                info["target_stress"] = (
+                    dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                )
+                info["pred_stress"] = (
+                    result["stress"].cpu().detach().numpy().tolist()
+                )
             test_result.append(info)
-            loss = loss1 + loss2 + loss3
+            loss = loss1 + loss2 + loss3 + loss4
             test_loss += loss.item()
         print("TestLoss", e, test_loss)
         dumpjson(
