@@ -343,6 +343,7 @@ class ALIGNNAtomWise(nn.Module):
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
             if self.config.stresswise_weight != 0:
+                # Under development, use with caution
                 # 1 eV/Angstrom3 = 160.21766208 GPa
                 # 1 GPa = 10 kbar
                 # Following Virial stress formula, assuming inital velocity = 0

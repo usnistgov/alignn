@@ -49,6 +49,47 @@ parser.add_argument(
     "--epochs", default=None, help="Number of epochs, generally 300"
 )
 
+
+parser.add_argument(
+    "--target_key",
+    default="total_energy",
+    help="Name of the key for graph level data such as total_energy",
+)
+
+parser.add_argument(
+    "--force_key",
+    default="forces",
+    help="Name of the key for gradient level data such as forces, (Natoms x p)",
+)
+
+parser.add_argument(
+    "--atomwise_key",
+    default="forces",
+    help="Name of the key for atomwise level data such as forces, charges (Natoms x p)",
+)
+
+
+parser.add_argument(
+    "--stresswise_key",
+    default="stresses",
+    help="Name of the key for stress (3x3) level data such as forces",
+)
+
+
+parser.add_argument(
+    "--subtract_mean",
+    default=True,
+    help="Subtract mean of graph level data from all points",
+)
+
+
+parser.add_argument(
+    "--normalize_with_natoms",
+    default=True,
+    help="Normalize the graphlevel data with Natoms",
+)
+
+
 parser.add_argument(
     "--output_dir",
     default="./",
@@ -108,18 +149,14 @@ def train_for_folder(
     enp = []
     if subtract_mean:
         for i in dat:
-            i["energy_per_atom"] = i[
-                target_key
-            ]  # / len(i["atoms"]["elements"])
-            mem.append(i)
-            enp.append(i["energy_per_atom"])
+            enp.append(i[target_key])
         mean_energy = np.array(enp).mean()
         print("mean_energy", mean_energy)
     dataset = []
-    for i in mem:
+    for i in dat:
         info = {}
         if subtract_mean:
-            info["target"] = i["energy_per_atom"] - mean_energy
+            info["target"] = i[target_key] - mean_energy
         else:
             info["target"] = i[target_key]
         if normalize_with_natoms:
@@ -138,7 +175,7 @@ def train_for_folder(
         info["atoms"] = i["atoms"]
         info["jid"] = i["jid"]
         dataset.append(info)
-
+    print("len dataset", len(dataset))
     n_outputs = []
     multioutput = False
     lists_length_equal = True
@@ -234,5 +271,11 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         batch_size=(args.batch_size),
         epochs=(args.epochs),
+        target_key=(args.target_key),
+        atomwise_key=(args.atomwise_key),
+        gradwise_key=(args.force_key),
+        stresswise_key=(args.stresswise_key),
+        subtract_mean=(args.subtract_mean),
+        normalize_with_natoms=(args.normalize_with_natoms),
         file_format=(args.file_format),
     )
