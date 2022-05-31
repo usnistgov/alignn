@@ -2,13 +2,23 @@
 
 """Module to train for a folder with formatted dataset."""
 import os
-import numpy as np
+
+# import numpy as np
 import sys
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
+from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+
+# from alignn.models.alignn import ALIGNN, ALIGNNConfig
+import torch
+
+device = "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
 
 parser = argparse.ArgumentParser(
     description="Atomistic Line Graph Neural Network"
@@ -31,7 +41,7 @@ parser.add_argument(
 parser.add_argument(
     "--keep_data_order",
     default=False,
-    help="Whether to randomly shuffle samples, True/False",
+    help="Whether to randomly shuffle samples",
 )
 
 parser.add_argument(
@@ -59,13 +69,13 @@ parser.add_argument(
 parser.add_argument(
     "--force_key",
     default="forces",
-    help="Name of the key for gradient level data such as forces, (Natoms x p)",
+    help="Name of key for gradient level data such as forces, (Natoms x p)",
 )
 
 parser.add_argument(
     "--atomwise_key",
     default="forces",
-    help="Name of the key for atomwise level data such as forces, charges (Natoms x p)",
+    help="Name of key for atomwise level data: forces, charges (Natoms x p)",
 )
 
 
@@ -77,23 +87,16 @@ parser.add_argument(
 
 
 parser.add_argument(
-    "--subtract_mean",
-    default=True,
-    help="Subtract mean of graph level data from all points",
-)
-
-
-parser.add_argument(
-    "--normalize_with_natoms",
-    default=True,
-    help="Normalize the graphlevel data with Natoms",
-)
-
-
-parser.add_argument(
     "--output_dir",
     default="./",
     help="Folder to save outputs",
+)
+
+
+parser.add_argument(
+    "--restart_model_path",
+    default=None,
+    help="Checkpoint file path for model",
 )
 
 
@@ -109,14 +112,15 @@ def train_for_folder(
     gradwise_key="forces",
     stresswise_key="stresses",
     file_format="poscar",
-    subtract_mean=True,
-    normalize_with_natoms=False,
+    restart_model_path=None,
+    # subtract_mean=False,
+    # normalize_with_natoms=False,
     output_dir=None,
 ):
     """Train for a folder."""
     dat = loadjson(os.path.join(root_dir, "id_prop.json"))
-    config = loadjson(config_name)
-    config = TrainingConfig(**config)
+    config_dict = loadjson(config_name)
+    config = TrainingConfig(**config_dict)
     if type(config) is dict:
         try:
             config = TrainingConfig(**config)
@@ -132,12 +136,16 @@ def train_for_folder(
         config.batch_size = int(batch_size)
     if epochs is not None:
         config.epochs = int(epochs)
-    train_grad = True
-    train_stress = True
-    train_atom = True
-    target_atomwise = None  # "atomwise_target"
-    target_grad = None  # "atomwise_grad"
-    target_stress = None  # "stresses"
+
+    train_grad = False
+    train_stress = False
+    if config.model.gradwise_weight != 0:
+        train_grad = True
+    if config.model.stresswise_weight != 0:
+        train_stress = True
+    train_atom = False
+    if config.model.atomwise_weight != 0:
+        train_atom = True
 
     if config.model.atomwise_weight == 0:
         train_atom = False
@@ -145,23 +153,16 @@ def train_for_folder(
         train_grad = False
     if config.model.stresswise_weight == 0:
         train_stress = False
-    mem = []
-    enp = []
-    if subtract_mean:
-        for i in dat:
-            enp.append(i[target_key])
-        mean_energy = np.array(enp).mean()
-        print("mean_energy", mean_energy)
+    target_atomwise = None  # "atomwise_target"
+    target_grad = None  # "atomwise_grad"
+    target_stress = None  # "stresses"
+
+    # mem = []
+    # enp = []
     dataset = []
     for i in dat:
         info = {}
-        if subtract_mean:
-            info["target"] = i[target_key] - mean_energy
-        else:
-            info["target"] = i[target_key]
-        if normalize_with_natoms:
-            info["target"] = info["target"] / len(i["atoms"]["elements"])
-
+        info["target"] = i[target_key]
         if train_atom:
             target_atomwise = "atomwise_target"
             info["atomwise_target"] = i[atomwise_key]  # such as charges
@@ -185,6 +186,7 @@ def train_for_folder(
         # "alignn_layernorm",
         "alignn_atomwise",
     }
+
     if config.model.name == "clgn":
         line_graph = True
     if config.model.name == "cgcnn":
@@ -198,6 +200,44 @@ def train_for_folder(
         lists_length_equal = False not in [
             len(i) == len(n_outputs[0]) for i in n_outputs
         ]
+
+    model = None
+    if restart_model_path is not None:
+        print("Restarting the model training:", restart_model_path)
+        if config.model.name == "alignn_atomwise":
+            tmp = ALIGNNAtomWiseConfig(
+                name="alignn_atomwise",
+                output_features=config.model.output_features,
+                alignn_layers=config.model.alignn_layers,
+                atomwise_weight=config.model.atomwise_weight,
+                stresswise_weight=config.model.stresswise_weight,
+                graphwise_weight=config.model.graphwise_weight,
+                gcn_layers=config.model.gcn_layers,
+                atom_input_features=config.model.atom_input_features,
+                edge_input_features=config.model.edge_input_features,
+                triplet_input_features=config.model.triplet_input_features,
+                embedding_features=config.model.embedding_features,
+            )
+            # print("config", tmp)
+            # for i,j in config_dict['model'].items():
+            #    print ('i',i)
+            #    tmp.i=j
+            # print ('tmp1',tmp)
+            model = ALIGNNAtomWise(tmp)  # config.model)
+            # model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(
+            #    name="alignn_atomwise",
+            #    output_features=1,
+            #    graphwise_weight=1,
+            #    alignn_layers=4,
+            #    gradwise_weight=10,
+            #    stresswise_weight=0.01,
+            #    atomwise_weight=0,
+            #      )
+            #    )
+            model.load_state_dict(
+                torch.load(restart_model_path, map_location=device)
+            )
+            model.to(device)
 
     # print ('n_outputs',n_outputs[0])
     if multioutput and classification_threshold is not None:
@@ -250,6 +290,7 @@ def train_for_folder(
 
     train_dgl(
         config,
+        model=model,
         train_val_test_loaders=[
             train_loader,
             val_loader,
@@ -275,7 +316,8 @@ if __name__ == "__main__":
         atomwise_key=(args.atomwise_key),
         gradwise_key=(args.force_key),
         stresswise_key=(args.stresswise_key),
-        subtract_mean=(args.subtract_mean),
-        normalize_with_natoms=(args.normalize_with_natoms),
+        restart_model_path=(args.restart_model_path),
+        # subtract_mean=(args.subtract_mean),
+        # normalize_with_natoms=(args.normalize_with_natoms),
         file_format=(args.file_format),
     )

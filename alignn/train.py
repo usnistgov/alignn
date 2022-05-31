@@ -296,19 +296,34 @@ def train_dgl(
             mean_atom = 0
             mean_grad = 0
             mean_stress = 0
+            # natoms_batch=False
+            # print ('lendat',len(dat))
             for i in dat:
+                if i["target_grad"]:
+                    # if config.normalize_graph_level_loss:
+                    #      natoms_batch = 0
+                    for m, n in zip(i["target_grad"], i["pred_grad"]):
+                        x = np.abs(np.array(m) - np.array(n))
+                        grad.append(np.mean(x))
+                        # if config.normalize_graph_level_loss:
+                        #     natoms_batch += np.array(i["pred_grad"]).shape[0]
                 if i["target_out"]:
                     for j, k in zip(i["target_out"], i["pred_out"]):
+                        # if config.normalize_graph_level_loss and
+                        # natoms_batch:
+                        #   j=j/natoms_batch
+                        #   k=k/natoms_batch
+                        # if config.normalize_graph_level_loss and
+                        # not natoms_batch:
+                        # tmp = 'Add above in atomwise if not train grad.'
+                        #   raise ValueError(tmp)
+
                         target_out.append(j)
                         pred_out.append(k)
                 if i["target_stress"]:
                     for p, q in zip(i["target_stress"], i["pred_stress"]):
                         x = np.abs(np.array(p) - np.array(q))
                         stress.append(np.mean(x))
-                if i["target_grad"]:
-                    for m, n in zip(i["target_grad"], i["pred_grad"]):
-                        x = np.abs(np.array(m) - np.array(n))
-                        grad.append(np.mean(x))
                 if i["target_atomwise_pred"]:
                     for m, n in zip(
                         i["target_atomwise_pred"], i["pred_atomwise_pred"]
@@ -329,8 +344,10 @@ def train_dgl(
             if "target_atomwise_pred" in i:
                 # if i["target_atomwise_pred"]:
                 mean_atom = np.array(atomw).mean()
-            # print ('grad',mean_grad)
-            # print ('out',mean_out)
+            # print ('natoms_batch',natoms_batch)
+            # if natoms_batch!=0:
+            #   mean_out = mean_out/natoms_batch
+            # print ('dat',dat)
             return mean_out, mean_atom, mean_grad, mean_stress
 
         best_loss = np.inf

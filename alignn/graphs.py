@@ -626,10 +626,10 @@ class StructureDataset(torch.utils.data.Dataset):
             if (
                 self.target_stress is not None and self.target_stress != ""
             ):  # and "" not in  self.target_stress:
-                print(
-                    "self.labels_stress[i]",
-                    [self.labels_stress[i] for ii in range(len(z))],
-                )
+                # print(
+                #    "self.labels_stress[i]",
+                #    [self.labels_stress[i] for ii in range(len(z))],
+                # )
                 g.ndata[self.target_stress] = torch.tensor(
                     [self.labels_stress[i] for ii in range(len(z))]
                 ).type(torch.get_default_dtype())

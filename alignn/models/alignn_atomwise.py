@@ -7,14 +7,12 @@ from torch.autograd import grad
 import dgl
 import dgl.function as fn
 import numpy as np
-import torch
 from dgl.nn import AvgPooling
-
+import torch
 # from dgl.nn.functional import edge_softmax
 from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F
-
 from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
 
@@ -329,9 +327,16 @@ class ALIGNNAtomWise(nn.Module):
 
         if self.config.calculate_gradient:
             create_graph = True
+            # if config.normalize_graph_level_loss
+            # print ('out',out)
+            # print ('x',len(x))
+
+            # tmp_out = out*len(x)
+            # print ('tmp_out',tmp_out)
             dy = (
                 self.config.grad_multiplier
                 * grad(
+                    # tmp_out,
                     out,
                     r,
                     grad_outputs=torch.ones_like(out),
@@ -348,12 +353,17 @@ class ALIGNNAtomWise(nn.Module):
                 # 1 GPa = 10 kbar
                 # Following Virial stress formula, assuming inital velocity = 0
                 # Save volume as g.gdta['V']?
-                stress = (
+                stress = -1 * (
                     160.21766208
                     * torch.matmul(r.T, dy)
                     / (2 * g.ndata["V"][0])
-                    * 10
                 )
+                # virial = (
+                #    160.21766208
+                #    * 10
+                #    * torch.einsum("ij, ik->jk", result["r"], result["dy_dr"])
+                #    / 2
+                # )  # / ( g.ndata["V"][0])
         if self.link:
             out = self.link(out)
 
