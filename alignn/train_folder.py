@@ -87,7 +87,7 @@ def train_for_folder(
         config.batch_size = int(batch_size)
     if epochs is not None:
         config.epochs = int(epochs)
-    with open(id_prop_dat, "r") as f:
+    with open(id_prop_dat) as f:
         reader = csv.reader(f)
         data = [row for row in reader]
 

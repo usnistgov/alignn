@@ -161,7 +161,7 @@ parser.add_argument(
 parser.add_argument(
     "--cutoff",
     default=8,
-    help="Distance cut-off for graph constuction"
+    help="Distance cut-off for graph construction"
     + ", usually 8 for solids and 5 for molecules.",
 )
 

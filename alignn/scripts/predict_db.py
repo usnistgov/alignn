@@ -60,7 +60,7 @@ def predict_for_db(
                 + str(i["formula"])
                 + ","
                 + str(i["spacegroup_number"])
-                + str("\n")
+                + "\n"
             )
             f.write(line)
             # print (line)

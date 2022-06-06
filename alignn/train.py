@@ -599,7 +599,7 @@ def train_dgl(
                 target = target.cpu().numpy().flatten().tolist()
                 if len(target) == 1:
                     target = target[0]
-                f.write("%s, %6f, %6f\n" % (id, target, out_data))
+                f.write("{}, {:6f}, {:6f}\n".format(id, target, out_data))
                 targets.append(target)
                 predictions.append(out_data)
         f.close()
@@ -626,7 +626,7 @@ def train_dgl(
             # TODO: Add IDs
             f.write("target,prediction\n")
             for i, j in zip(x, y):
-                f.write("%6f, %6f\n" % (j, i))
+                f.write("{:6f}, {:6f}\n".format(j, i))
                 line = str(i) + "," + str(j) + "\n"
                 f.write(line)
             f.close()

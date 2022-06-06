@@ -39,7 +39,7 @@ def cli(
 
     elif config.is_file():
         model_dir = config.parent
-        with open(config, "r") as f:
+        with open(config) as f:
             config = json.load(f)
             config = TrainingConfig(**config)
 

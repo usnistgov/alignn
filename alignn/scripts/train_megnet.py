@@ -94,7 +94,7 @@ idp = os.path.join(root_dir, "id_prop.csv")
 structures = []
 targets = []
 
-with open(idp, "r") as f:
+with open(idp) as f:
     reader = csv.reader(f)
     data = [row for row in reader]
 

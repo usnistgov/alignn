@@ -17,7 +17,7 @@ for i in dft_3d:
         target = ",".join(map(str, target))
         atoms.write_poscar(poscar_name)
         # atoms.write_cif(cif_name)
-        f.write("%s,%s\n" % (poscar_name, target))
+        f.write("{},{}\n".format(poscar_name, target))
         count += 1
         if count == max_samples:
             break

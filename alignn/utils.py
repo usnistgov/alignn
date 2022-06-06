@@ -25,14 +25,14 @@ def plot_learning_curve(
     if isinstance(results_dir, str):
         results_dir = Path(results_dir)
 
-    with open(results_dir / "history_val.json", "r") as f:
+    with open(results_dir / "history_val.json") as f:
         val = json.load(f)
 
     p = plt.plot(val[key], label=results_dir.name)
 
     if plot_train:
         # plot the training trace in the same color, lower opacity
-        with open(results_dir / "history_train.json", "r") as f:
+        with open(results_dir / "history_train.json") as f:
             train = json.load(f)
 
         c = p[0].get_color()
