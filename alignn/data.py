@@ -26,8 +26,6 @@ from tqdm import tqdm
 # from typing import Dict, List, Optional, Set, Tuple
 
 
-
-
 # use pandas progress_apply
 tqdm.pandas()
 

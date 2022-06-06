@@ -236,7 +236,8 @@ def test_pretrained():
     print(prd)
     cmd1 = "python alignn/pretrained.py"
     os.system(cmd1)
-    get_multiple_predictions(atoms_array=[Si,Si])
+    get_multiple_predictions(atoms_array=[Si, Si])
+
 
 # test_minor_configs()
 # test_pretrained()

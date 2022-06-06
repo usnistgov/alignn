@@ -49,7 +49,7 @@ class SimpleGCN(nn.Module):
 
         if self.weight_edges:
             r = torch.norm(g.edata["bondlength"], dim=1)
-            edge_weights = torch.exp(-(r ** 2) / self.edge_lengthscale ** 2)
+            edge_weights = torch.exp(-(r**2) / self.edge_lengthscale**2)
         else:
             edge_weights = None
 

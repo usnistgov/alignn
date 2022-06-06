@@ -7,7 +7,7 @@ props = [
     "b3lyp_homo",
     "b3lyp_lumo",
     "b3lyp_gap",
-    'b3lyp_scharber_pce',
+    "b3lyp_scharber_pce",
     "b3lyp_scharber_voc",
     "b3lyp_scharber_jsc",
 ]
