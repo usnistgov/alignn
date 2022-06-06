@@ -1,21 +1,23 @@
 """Pydantic model for default configuration and validation."""
 
+import os
 import subprocess
 from typing import Optional, Union
-import os
+
 from pydantic import root_validator
 
 # vfrom pydantic import Field, root_validator, validator
 from pydantic.typing import Literal
-from alignn.utils import BaseSettings
-from alignn.models.modified_cgcnn import CGCNNConfig
-from alignn.models.icgcnn import ICGCNNConfig
-from alignn.models.gcn import SimpleGCNConfig
-from alignn.models.densegcn import DenseGCNConfig
+
 from alignn.models.alignn import ALIGNNConfig
-from alignn.models.dense_alignn import DenseALIGNNConfig
 from alignn.models.alignn_cgcnn import ACGCNNConfig
 from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
+from alignn.models.dense_alignn import DenseALIGNNConfig
+from alignn.models.densegcn import DenseGCNConfig
+from alignn.models.gcn import SimpleGCNConfig
+from alignn.models.icgcnn import ICGCNNConfig
+from alignn.models.modified_cgcnn import CGCNNConfig
+from alignn.utils import BaseSettings
 
 # from typing import List
 

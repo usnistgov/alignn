@@ -1,8 +1,9 @@
 """Helper function for high-throughput GNN trainings."""
-import matplotlib.pyplot as plt
-
 # import numpy as np
 import time
+
+import matplotlib.pyplot as plt
+
 from alignn.train import train_dgl
 
 # from sklearn.metrics import mean_absolute_error

@@ -1,23 +1,24 @@
 #!/usr/bin/env python
 
 """Module to download and load pre-trained ALIGNN models."""
-import requests
-import os
-import zipfile
-from tqdm import tqdm
-from alignn.models.alignn import ALIGNN, ALIGNNConfig
-from alignn.data import get_torch_dataset
-from torch.utils.data import DataLoader
-import tempfile
-import torch
-import sys
-
 # from jarvis.db.jsonutils import loadjson
 import argparse
+import os
+import sys
+import tempfile
+import zipfile
+
+import pandas as pd
+import requests
+import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
 from jarvis.db.jsonutils import dumpjson
-import pandas as pd
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from alignn.data import get_torch_dataset
+from alignn.models.alignn import ALIGNN, ALIGNNConfig
 
 tqdm.pandas()
 

@@ -1,7 +1,7 @@
 """Module to train electron/phonon DOS."""
 import os
-from jarvis.tasks.queue_jobs import Queue
 
+from jarvis.tasks.queue_jobs import Queue
 
 props = [
     "edos_up",

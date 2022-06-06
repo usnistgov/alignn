@@ -2,8 +2,8 @@
 import json
 from pathlib import Path
 from typing import Union
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
 from pydantic import BaseSettings as PydanticBaseSettings
 
 

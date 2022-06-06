@@ -1,14 +1,17 @@
 """Module to predict for all DB's form. enp and gap."""
+import time
+
+import numpy as np
 import torch
+from jarvis.db.jsonutils import loadjson
+
+# from jarvis.analysis.structure.spacegroup import Spacegroup3D
+# from jarvis.db.figshare import data
+from alignn.data import get_train_val_loaders, load_dataset
+
 # from jarvis.core.atoms import Atoms
 # from jarvis.core.graphs import Graph
 from alignn.models.alignn import ALIGNN
-# from jarvis.analysis.structure.spacegroup import Spacegroup3D
-# from jarvis.db.figshare import data
-from alignn.data import load_dataset, get_train_val_loaders
-from jarvis.db.jsonutils import loadjson
-import numpy as np
-import time
 
 gap_model_path = "JV15/jv_optb88vdw_bandgap_alignn/checkpoint_300.pt"
 form_model_path = "JV15/jv_formation_energy_peratom_alignn/checkpoint_300.pt"

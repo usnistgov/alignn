@@ -1,6 +1,6 @@
 """Module to generate example dataset."""
-from jarvis.db.figshare import data as jdata
 from jarvis.core.atoms import Atoms
+from jarvis.db.figshare import data as jdata
 
 dft_3d = jdata("dft_3d")
 prop = "optb88vdw_bandgap"

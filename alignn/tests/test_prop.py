@@ -1,13 +1,14 @@
 """Training script test suite."""
+import os
 import time
+
 import matplotlib.pyplot as plt
 import numpy as np
-from alignn.train import train_dgl
-from alignn.pretrained import get_prediction
-from alignn.pretrained import get_multiple_predictions
-from sklearn.metrics import mean_absolute_error
-import os
 from jarvis.core.atoms import Atoms
+from sklearn.metrics import mean_absolute_error
+
+from alignn.pretrained import get_multiple_predictions, get_prediction
+from alignn.train import train_dgl
 
 plt.switch_backend("agg")
 

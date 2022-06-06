@@ -1,6 +1,7 @@
 """Module to analyze early stopping."""
-from jarvis.db.jsonutils import loadjson
 import glob
+
+from jarvis.db.jsonutils import loadjson
 
 
 def check_early_stoppping_reached(

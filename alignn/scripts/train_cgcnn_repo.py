@@ -1,9 +1,10 @@
 """Module to train CGCNN model from repo."""
 import os
-from jarvis.db.figshare import data
-from jarvis.core.atoms import Atoms
 import time
 import warnings
+
+from jarvis.core.atoms import Atoms
+from jarvis.db.figshare import data
 
 warnings.filterwarnings("ignore")
 

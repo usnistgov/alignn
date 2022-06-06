@@ -2,10 +2,11 @@
 import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
-from alignn.models.alignn import ALIGNN
+
 # from jarvis.analysis.structure.spacegroup import Spacegroup3D
 from jarvis.db.figshare import data
 
+from alignn.models.alignn import ALIGNN
 
 model_path = "JV15/jv_optb88vdw_bandgap_alignn/checkpoint_300.pt"
 device = "cpu"

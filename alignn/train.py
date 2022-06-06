@@ -9,54 +9,60 @@ from functools import partial
 
 # from pathlib import Path
 from typing import Any, Dict, Union
+
 import ignite
 import torch
-
 from ignite.contrib.handlers import TensorboardLogger
+
 try:
     from ignite.contrib.handlers.stores import EpochOutputStore
+
     # For different version of pytorch-ignite
 except Exception as exp:
     from ignite.handlers.stores import EpochOutputStore
 
     pass
-from ignite.handlers import EarlyStopping
-from ignite.contrib.handlers.tensorboard_logger import (
-    global_step_from_engine,
-)
+import json
+import os
+import pickle as pk
+import pprint
+
+import numpy as np
+from ignite.contrib.handlers.tensorboard_logger import global_step_from_engine
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
+from ignite.contrib.metrics import ROC_AUC, RocCurve
 from ignite.engine import (
     Events,
     create_supervised_evaluator,
     create_supervised_trainer,
 )
-from ignite.contrib.metrics import ROC_AUC, RocCurve
+from ignite.handlers import (
+    Checkpoint,
+    DiskSaver,
+    EarlyStopping,
+    TerminateOnNan,
+)
 from ignite.metrics import (
     Accuracy,
+    ConfusionMatrix,
+    Loss,
+    MeanAbsoluteError,
     Precision,
     Recall,
-    ConfusionMatrix,
 )
-import pickle as pk
-import numpy as np
-from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
-from ignite.metrics import Loss, MeanAbsoluteError
+from jarvis.db.jsonutils import dumpjson
 from torch import nn
+
 from alignn import models
-from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
+from alignn.data import get_train_val_loaders
 from alignn.models.alignn import ALIGNN
+from alignn.models.alignn_cgcnn import ACGCNN
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
-from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
 from alignn.models.densegcn import DenseGCN
 from alignn.models.icgcnn import iCGCNN
-from alignn.models.alignn_cgcnn import ACGCNN
-from jarvis.db.jsonutils import dumpjson
-import json
-import pprint
-
-import os
+from alignn.models.modified_cgcnn import CGCNN
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -253,8 +259,9 @@ def train_dgl(
 
     net.to(device)
     if config.distributed:
-        import torch.distributed as dist
         import os
+
+        import torch.distributed as dist
 
         def setup(rank, world_size):
             os.environ["MASTER_ADDR"] = "localhost"

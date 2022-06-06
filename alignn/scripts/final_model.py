@@ -1,10 +1,11 @@
-from alignn.data import load_dataset
+import torch
+from jarvis.db.jsonutils import loadjson
+
 # from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
-from jarvis.db.jsonutils import loadjson
-from alignn.train import train_dgl
+from alignn.data import load_dataset
 from alignn.models.alignn import ALIGNN
-import torch
+from alignn.train import train_dgl
 
 device = "cpu"
 if torch.cuda.is_available():

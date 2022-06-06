@@ -1,7 +1,7 @@
 # from alignn.train_props import train_prop_model
 import os
-from jarvis.tasks.queue_jobs import Queue
 
+from jarvis.tasks.queue_jobs import Queue
 
 props = [
     "b3lyp_homo",
