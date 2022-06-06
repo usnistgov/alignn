@@ -398,7 +398,6 @@ def get_train_val_loaders(
                 print("New min", min(y_data))
             except Exception as exp:
                 print(exp)
-                pass
             # pc = PCA(n_components=output_features)
             # pipe = Pipeline(
             #    [
@@ -431,7 +430,6 @@ def get_train_val_loaders(
                     f.close()
                 except Exception as exp:
                     print("Cannot write mad", exp)
-                    pass
                 # Random model precited value
                 x_bar = np.mean(np.array([i[target] for i in dataset_train]))
                 baseline_mae = mean_absolute_error(
@@ -441,7 +439,6 @@ def get_train_val_loaders(
                 print("Baseline MAE:", baseline_mae)
             except Exception as exp:
                 print("Data error", exp)
-                pass
 
         train_data = get_torch_dataset(
             dataset=dataset_train,

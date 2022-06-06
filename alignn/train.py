@@ -21,7 +21,6 @@ try:
 except Exception:
     from ignite.handlers.stores import EpochOutputStore
 
-    pass
 import json
 import os
 import pickle as pk

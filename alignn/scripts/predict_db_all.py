@@ -109,4 +109,3 @@ for i, j in dataset_props.items():
                         del data_loader
         except Exception as exp:
             print(i, k, exp)
-            pass

@@ -3,9 +3,7 @@ import os
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
 from jarvis.core.atoms import Atoms
-from sklearn.metrics import mean_absolute_error
 
 from alignn.pretrained import get_multiple_predictions, get_prediction
 from alignn.train import train_dgl
@@ -19,7 +17,6 @@ config = {
     "n_train": 50,
     "n_test": 25,
     "n_val": 25,
-    "num_workers": 0,
     "atom_features": "cgcnn",
     "neighbor_strategy": "k-nearest",
     "epochs": 2,
@@ -52,7 +49,7 @@ def test_minor_configs():
     tmp["n_early_stopping"] = 2
     tmp["model"]["name"] = "alignn"
     config["write_predictions"] = True
-    result = train_dgl(tmp)
+    _ = train_dgl(tmp)
 
 
 def test_models():

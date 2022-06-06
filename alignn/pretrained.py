@@ -285,7 +285,6 @@ def get_multiple_predictions(
             raise ValueError(
                 'Check is the model name exists using "pretrained.py -h"', exp
             )
-            pass
 
     # Note cut-off is usually 8 for solids and 5 for molecules
     def atoms_to_graph(atoms):

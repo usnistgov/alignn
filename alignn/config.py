@@ -25,9 +25,8 @@ try:
     VERSION = (
         subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
     )
-except Exception as exp:
+except Exception:
     VERSION = "NA"
-    pass
 
 
 FEATURESET_SIZE = {"basic": 11, "atomic_number": 1, "cfid": 438, "cgcnn": 92}
