@@ -18,7 +18,7 @@ try:
     from ignite.contrib.handlers.stores import EpochOutputStore
 
     # For different version of pytorch-ignite
-except Exception as exp:
+except Exception:
     from ignite.handlers.stores import EpochOutputStore
 
     pass
@@ -532,7 +532,7 @@ def train_dgl(
                 top_p, top_class = torch.topk(torch.exp(out_data), k=1)
                 target = int(target.cpu().numpy().flatten().tolist()[0])
 
-                f.write("%s, %d, %d\n" % (id, (target), (top_class)))
+                f.write(f"{id}, {target}, {top_class}\n")
                 targets.append(target)
                 predictions.append(
                     top_class.cpu().numpy().flatten().tolist()[0]
@@ -606,7 +606,7 @@ def train_dgl(
                 target = target.cpu().numpy().flatten().tolist()
                 if len(target) == 1:
                     target = target[0]
-                f.write("{}, {:6f}, {:6f}\n".format(id, target, out_data))
+                f.write(f"{id}, {target:6f}, {out_data:6f}\n")
                 targets.append(target)
                 predictions.append(out_data)
         f.close()
@@ -633,7 +633,7 @@ def train_dgl(
             # TODO: Add IDs
             f.write("target,prediction\n")
             for i, j in zip(x, y):
-                f.write("{:6f}, {:6f}\n".format(j, i))
+                f.write(f"{j:6f}, {i:6f}\n")
                 line = str(i) + "," + str(j) + "\n"
                 f.write(line)
             f.close()

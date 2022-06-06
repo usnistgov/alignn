@@ -90,8 +90,8 @@ for i, j in dataset_props.items():
                                     target = target[0]
                                 diff = abs(target - out_data)
                                 f.write(
-                                    "%s, %6f, %6f, %6f\n"
-                                    % (id, target, out_data, diff)
+                                    f"{id}, {target:6f}, {out_data:6f}, "
+                                    f"{diff:6f}\n"
                                 )
                                 targets.append(target)
                                 predictions.append(out_data)

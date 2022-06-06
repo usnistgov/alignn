@@ -14,7 +14,7 @@ for i in dft_3d:
     target = i[prop]
     if target != "na":
         atoms.write_poscar(poscar_name)
-        f.write("{},{:6f}\n".format(poscar_name, target))
+        f.write(f"{poscar_name},{target:6f}\n")
         count += 1
         if count == max_samples:
             break
