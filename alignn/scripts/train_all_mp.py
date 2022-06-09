@@ -16,7 +16,7 @@ props = [
 ]
 cwd_home = os.getcwd()
 for i in props:
-    model_name = "mp_" + i + "_alignnn"
+    model_name = "mp_" + i + "_alignn"
     model_name = model_name.replace(" ", "")
     if not os.path.exists(model_name):
         os.makedirs(model_name)

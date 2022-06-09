@@ -96,11 +96,11 @@ all_models = {
         "https://figshare.com/ndownloader/files/31458676",
         1,
     ],
-    "mp_e_form_alignnn": [
+    "mp_e_form_alignn": [
         "https://figshare.com/ndownloader/files/31458811",
         1,
     ],
-    "mp_gappbe_alignnn": [
+    "mp_gappbe_alignn": [
         "https://figshare.com/ndownloader/files/31458814",
         1,
     ],
@@ -112,25 +112,25 @@ all_models = {
     "qm9_HOMO_alignn": ["https://figshare.com/ndownloader/files/31459042", 1],
     "qm9_LUMO_alignn": ["https://figshare.com/ndownloader/files/31459045", 1],
     "qm9_ZPVE_alignn": ["https://figshare.com/ndownloader/files/31459057", 1],
-    "hmof_co2_absp_alignnn": [
+    "hmof_co2_absp_alignn": [
         "https://figshare.com/ndownloader/files/31459198",
         5,
     ],
-    "hmof_max_co2_adsp_alignnn": [
+    "hmof_max_co2_adsp_alignn": [
         "https://figshare.com/ndownloader/files/31459207",
         1,
     ],
-    "hmof_surface_area_m2g_alignnn": [
+    "hmof_surface_area_m2g_alignn": [
         "https://figshare.com/ndownloader/files/31459222",
         1,
     ],
-    "hmof_surface_area_m2cm3_alignnn": [
+    "hmof_surface_area_m2cm3_alignn": [
         "https://figshare.com/ndownloader/files/31459219",
         1,
     ],
-    "hmof_pld_alignnn": ["https://figshare.com/ndownloader/files/31459216", 1],
-    "hmof_lcd_alignnn": ["https://figshare.com/ndownloader/files/31459201", 1],
-    "hmof_void_fraction_alignnn": [
+    "hmof_pld_alignn": ["https://figshare.com/ndownloader/files/31459216", 1],
+    "hmof_lcd_alignn": ["https://figshare.com/ndownloader/files/31459201", 1],
+    "hmof_void_fraction_alignn": [
         "https://figshare.com/ndownloader/files/31459228",
         1,
     ],
