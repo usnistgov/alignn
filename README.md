@@ -164,6 +164,14 @@ A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https:
 ALIGNN-FF
 -------------------------
 
+Currently, ALIGNN-FF is available in atomwise branch:
+
+```
+git clone https://github.com/usnistgov/alignn.git
+git checkout atomwise
+python setup.py develop
+```
+
 To train ALIGNN-FF use `train_folder_grad.py` script which uses `atomwise_alignn` model:
 
 AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data directory):
