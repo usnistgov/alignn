@@ -212,13 +212,14 @@ def train_for_folder(
                 atomwise_weight=config.model.atomwise_weight,
                 stresswise_weight=config.model.stresswise_weight,
                 graphwise_weight=config.model.graphwise_weight,
+                gradwise_weight=config.model.gradwise_weight,
                 gcn_layers=config.model.gcn_layers,
                 atom_input_features=config.model.atom_input_features,
                 edge_input_features=config.model.edge_input_features,
                 triplet_input_features=config.model.triplet_input_features,
                 embedding_features=config.model.embedding_features,
             )
-            # print("config", tmp)
+            print("Rest config", tmp)
             # for i,j in config_dict['model'].items():
             #    print ('i',i)
             #    tmp.i=j
@@ -234,6 +235,7 @@ def train_for_folder(
             #    atomwise_weight=0,
             #      )
             #    )
+            print("model", model)
             model.load_state_dict(
                 torch.load(restart_model_path, map_location=device)
             )

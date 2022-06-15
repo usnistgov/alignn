@@ -9,6 +9,7 @@ import dgl.function as fn
 import numpy as np
 from dgl.nn import AvgPooling
 import torch
+
 # from dgl.nn.functional import edge_softmax
 from pydantic.typing import Literal
 from torch import nn
@@ -319,7 +320,10 @@ class ALIGNNAtomWise(nn.Module):
             out = self.fc(h)
             out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
-        if self.config.atomwise_output_features is not None:
+        if (
+            self.config.atomwise_output_features is not None
+            and self.config.atomwise_weight != 0
+        ):
             atomwise_pred = self.fc_atomwise(x)
             # atomwise_pred = torch.squeeze(self.readout(g, atomwise_pred))
         gradient = torch.empty(1)
@@ -373,4 +377,5 @@ class ALIGNNAtomWise(nn.Module):
         result["grad"] = gradient
         result["stress"] = stress
         result["atomwise_pred"] = atomwise_pred
+        # print(result)
         return result
