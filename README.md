@@ -19,6 +19,7 @@
 * [Pre-trained models](#pretrained)
 * [Quick start using colab](#colab)
 * [JARVIS-ALIGNN webapp](#webapp)
+* [ALIGNN-FF](#alignnff)
 * [Peformances on a few datasets](#performances)
 * [Useful notes](#notes)
 * [References](#refs)
@@ -108,12 +109,6 @@ train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/exampl
 ```
 
 
-AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data directory):
-
-```
-train_folder_grad.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example_atomwise.json" --output_dir=temp
-```
-
 #### Classification example
 While the above example is for regression, the follwoing example shows a classification task for metal/non-metal based on the above bandgap values. We transform the dataset
 into 1 or 0 based on a threshold of 0.01 eV (controlled by the parameter, `classification_threshold`) and train a similar classification model. Currently, the script allows binary classification tasks only.
@@ -162,6 +157,33 @@ Web-app
 A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https://jarvis.nist.gov/jalignn/). Given atomistic structure in POSCAR format it predict formation energy, total energy per atom and bandgap using data trained on JARVIS-DFT dataset.
 
 ![JARVIS-ALIGNN](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jalignn.PNG)
+
+
+
+<a name="alignnff"></a>
+ALIGNN-FF
+-------------------------
+
+To train ALIGNN-FF use `train_folder_grad.py` script which uses `atomwise_alignn` model:
+
+AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data directory):
+
+```
+train_folder_grad.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example_atomwise.json" --output_dir=temp
+```
+
+A pretrained ALIGNN-FF (under active development right now) can be used for predicting several properties, such as:
+
+```
+run_alignn_ff.py --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp --task="ev_curve"
+```
+
+To know about other tasks, type.
+
+```
+run_alignn_ff.py -h
+```
+
 
 <a name="performances"></a>
 
