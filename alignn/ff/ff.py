@@ -5,6 +5,7 @@ import os
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
+
 # from jarvis.db.figshare import get_jid_data
 from jarvis.analysis.thermodynamics.energetics import unary_energy
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
@@ -311,7 +312,7 @@ class ForceField(object):
     def run_nvt_langevin(
         self,
         filename="ase_nvt_langevin",
-        interval=1,
+        interval=10,
         temperature_K=300,
         steps=1000,
         friction=1e-4,

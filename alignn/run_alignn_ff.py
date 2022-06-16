@@ -4,6 +4,7 @@
 import argparse
 import sys
 from jarvis.core.atoms import Atoms
+
 # from jarvis.core.graphs import Graph
 from alignn.ff.ff import (
     default_path,
@@ -28,6 +29,9 @@ parser.add_argument(
 )
 
 parser.add_argument("--temperature_K", default="300", help="Temperature in K")
+parser.add_argument(
+    "--initial_temperature_K", default="0.1", help="Intial Temperature in K"
+)
 parser.add_argument("--timestep", default="0.5", help="Timestep in fs")
 parser.add_argument("--on_relaxed_struct", default="No", help="Yes/No.")
 parser.add_argument(
@@ -40,7 +44,7 @@ parser.add_argument(
     "--task",
     default="optimize",
     help="Select task for ALIGNN-FF"
-    + " such as optimze/nvt_lagevin/nve_velocity_verlet/npt/"
+    + " such as unrelaxed_energy/optimze/nvt_lagevin/nve_velocity_verlet/npt/"
     + "npt_berendsen/nvt_berendsen/ev_curve/vacancy_energy/surface_energy",
 )
 
@@ -54,6 +58,7 @@ if __name__ == "__main__":
     file_format = args.file_format
     task = args.task
     temperature_K = float(args.temperature_K)
+    initial_temperature_K = float(args.initial_temperature_K)
     on_relaxed_struct_yn = args.on_relaxed_struct
     timestep = float(args.timestep)
     if on_relaxed_struct_yn.lower() == "yes":
@@ -74,6 +79,14 @@ if __name__ == "__main__":
         raise NotImplementedError("File format not implemented", file_format)
     if model_path == "na":
         model_path = default_path()
+
+    if task == "unrelaxed_energy":
+        ff = ForceField(
+            jarvis_atoms=atoms,
+            model_path=model_path,
+        )
+        energy = ff.unrelaxed_atoms()
+        print("Energy(eV)", energy)
     if task == "optimize":
         ff = ForceField(
             jarvis_atoms=atoms,
@@ -92,7 +105,11 @@ if __name__ == "__main__":
             model_path=model_path,
             timestep=timestep,
         )
-        lang = ff.run_nvt_langevin(steps=steps, temperature_K=temperature_K)
+        lang = ff.run_nvt_langevin(
+            steps=steps,
+            temperature_K=temperature_K,
+            initial_temperature_K=initial_temperature_K,
+        )
         print("final struct:")
         print(lang)
 
@@ -115,7 +132,11 @@ if __name__ == "__main__":
             model_path=model_path,
             timestep=timestep,
         )
-        nptt = ff.run_npt_nose_hoover(steps=steps, temperature_K=temperature_K)
+        nptt = ff.run_npt_nose_hoover(
+            steps=steps,
+            temperature_K=temperature_K,
+            initial_temperature_K=initial_temperature_K,
+        )
         print("final struct:")
         print(nptt)
     if task == "nvt_berendsen":
@@ -126,7 +147,11 @@ if __name__ == "__main__":
             model_path=model_path,
             timestep=timestep,
         )
-        nptt = ff.run_nvt_berendsen(steps=steps, temperature_K=temperature_K)
+        nptt = ff.run_nvt_berendsen(
+            steps=steps,
+            temperature_K=temperature_K,
+            initial_temperature_K=initial_temperature_K,
+        )
         print("final struct:")
         print(nptt)
     if task == "npt_berendsen":
@@ -137,7 +162,11 @@ if __name__ == "__main__":
             model_path=model_path,
             timestep=timestep,
         )
-        nptt = ff.run_npt_berendsen(steps=steps, temperature_K=temperature_K)
+        nptt = ff.run_npt_berendsen(
+            steps=steps,
+            temperature_K=temperature_K,
+            initial_temperature_K=initial_temperature_K,
+        )
         print("final struct:")
         print(nptt)
     if task == "ev_curve":
