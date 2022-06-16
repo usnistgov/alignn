@@ -3,8 +3,9 @@ from ase.md import MDLogger
 from jarvis.core.atoms import Atoms as JarvisAtoms
 import os
 from ase.md.nvtberendsen import NVTBerendsen
+from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
-from jarvis.db.figshare import get_jid_data
+# from jarvis.db.figshare import get_jid_data
 from jarvis.analysis.thermodynamics.energetics import unary_energy
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.optimize import BFGS
@@ -42,10 +43,12 @@ from jarvis.analysis.structure.spacegroup import (
 # from ase.neighborlist import NeighborList
 # from ase import Atoms
 
+__author__ = "Kamal Choudhary, Brian DeCost, Keith Butler, Lily Major"
+
 
 def default_path():
     dpath = os.path.abspath(str(os.path.join(os.path.dirname(__file__), ".")))
-    print("dpath", dpath)
+    print("model_path", dpath)
     return dpath
 
 
@@ -182,7 +185,9 @@ class ForceField(object):
         self.communicator = communicator
         self.logger = logger
         if self.timestep is None:
-            self.timestep = 0.5 * units.fs
+            self.timestep = 0.01
+        # Convert in appropriate units
+        self.timestep = self.timestep * units.fs
         self.logfile = logfile
         if self.print_format is None:
             self.print_format = self.example_print
@@ -232,6 +237,7 @@ class ForceField(object):
 
     def set_momentum_maxwell_boltzmann(self, temperature_K=10):
         """Set initial temperature."""
+        print("SETTING INITIAL TEMPERATURE K", temperature_K)
         MaxwellBoltzmannDistribution(self.atoms, temperature_K=temperature_K)
 
     def unrelaxed_atoms(self):
@@ -282,9 +288,14 @@ class ForceField(object):
         filename="ase_nve",
         interval=1,
         steps=1000,
+        initial_temperature_K=None,
     ):
         """Run NVE."""
         print("NVE VELOCITY VERLET")
+        if initial_temperature_K is not None:
+            self.set_momentum_maxwell_boltzmann(
+                temperature_K=initial_temperature_K
+            )
         self.dyn = VelocityVerlet(self.atoms, self.timestep)
         # Create monitors for logfile and a trajectory file
         # logfile = os.path.join(".", "%s.log" % filename)
@@ -304,9 +315,14 @@ class ForceField(object):
         temperature_K=300,
         steps=1000,
         friction=1e-4,
+        initial_temperature_K=None,
     ):
         """Run NVT."""
         print("NVT LANGEVIN")
+        if initial_temperature_K is not None:
+            self.set_momentum_maxwell_boltzmann(
+                temperature_K=initial_temperature_K
+            )
         self.dyn = Langevin(
             self.atoms,
             self.timestep,
@@ -332,9 +348,14 @@ class ForceField(object):
         temperature_K=300,
         steps=1000,
         andersen_prob=1e-1,
+        initial_temperature_K=None,
     ):
         """Run NVT."""
         print("NVT ANDERSEN")
+        if initial_temperature_K is not None:
+            self.set_momentum_maxwell_boltzmann(
+                temperature_K=initial_temperature_K
+            )
         self.dyn = Andersen(
             self.atoms,
             self.timestep,
@@ -360,9 +381,14 @@ class ForceField(object):
         temperature_K=300,
         steps=1000,
         taut=None,
+        initial_temperature_K=None,
     ):
         """Run NVT."""
         print("NVT BERENDSEN")
+        if initial_temperature_K is not None:
+            self.set_momentum_maxwell_boltzmann(
+                temperature_K=initial_temperature_K
+            )
         if taut is None:
             taut = 100 * self.timestep
         self.dyn = NVTBerendsen(
@@ -370,6 +396,45 @@ class ForceField(object):
             self.timestep,
             temperature_K=temperature_K,
             taut=taut,
+            communicator=self.communicator,
+        )
+        # Create monitors for logfile and a trajectory file
+        # logfile = os.path.join(".", "%s.log" % filename)
+        trajfile = os.path.join(".", "%s.traj" % filename)
+        trajectory = Trajectory(trajfile, "w", self.atoms)
+        # Attach monitors to trajectory
+        self.dyn.attach(self.logger, interval=interval)
+        self.dyn.attach(self.print_format, interval=interval)
+        self.dyn.attach(trajectory.write, interval=interval)
+        self.dyn.run(steps)
+        return ase_to_atoms(self.atoms)
+
+    def run_npt_berendsen(
+        self,
+        filename="ase_npt_berendsen",
+        interval=1,
+        temperature_K=300,
+        steps=1000,
+        taut=49.11347394232032,
+        taup=98.22694788464064,
+        pressure=None,
+        compressibility=None,
+        initial_temperature_K=None,
+    ):
+        """Run NPT."""
+        print("NPT BERENDSEN")
+        if initial_temperature_K is not None:
+            self.set_momentum_maxwell_boltzmann(
+                temperature_K=initial_temperature_K
+            )
+        self.dyn = NPTBerendsen(
+            self.atoms,
+            self.timestep,
+            temperature_K=temperature_K,
+            taut=taut,
+            taup=taup,
+            pressure=pressure,
+            compressibility=compressibility,
             communicator=self.communicator,
         )
         # Create monitors for logfile and a trajectory file
@@ -391,9 +456,14 @@ class ForceField(object):
         steps=1000,
         externalstress=0.0,
         taut=None,
+        initial_temperature_K=None,
     ):
         """Run NPT."""
         print("NPT: Combined Nose-Hoover and Parrinello-Rahman dynamics")
+        if initial_temperature_K is not None:
+            self.set_momentum_maxwell_boltzmann(
+                temperature_K=initial_temperature_K
+            )
         if taut is None:
             taut = 100 * self.timestep
         self.dyn = NPT(
@@ -608,35 +678,38 @@ def surface_energy(
     return mem
 
 
+"""
 if __name__ == "__main__":
 
-    atoms = Spacegroup3D(
-        JarvisAtoms.from_dict(
-            get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
-        )
-    ).conventional_standard_structure
+    # atoms = Spacegroup3D(
+    #    JarvisAtoms.from_dict(
+    #        get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    #    )
+    # ).conventional_standard_structure
+    atoms = JarvisAtoms.from_poscar("POSCAR")
+    print(atoms)
     model_path = default_path()
     print("model_path", model_path)
     # atoms = atoms.make_supercell_matrix([2, 2, 2])
     # atoms=atoms.strain_atoms(.05)
     # print(atoms)
-    ev = ev_curve(atoms=atoms, model_path=model_path)
-    surf = surface_energy(atoms=atoms, model_path=model_path)
-    print(surf)
-    vac = vacancy_formation(atoms=atoms, model_path=model_path)
-    print(vac)
+    # ev = ev_curve(atoms=atoms, model_path=model_path)
+    # surf = surface_energy(atoms=atoms, model_path=model_path)
+    # print(surf)
+    # vac = vacancy_formation(atoms=atoms, model_path=model_path)
+    # print(vac)
 
     ff = ForceField(
         jarvis_atoms=atoms,
         model_path=model_path,
     )
-    ff.unrelaxed_atoms()
-    # sys.exit()
-    ff.set_momentum_maxwell_boltzmann()
-    xx = ff.optimize_atoms(optimizer="FIRE")
-    print("optimized st", xx)
-    xx = ff.run_nve_velocity_verlet(steps=5)
-    xx = ff.run_nvt_langevin(steps=5)
-    xx = ff.run_nvt_andersen(steps=5)
-    # xx = ff.run_npt_nose_hoover(steps=5)
-    # print(xx)
+    # ff.unrelaxed_atoms()
+    ff.set_momentum_maxwell_boltzmann(temperature_K=300)
+    # xx = ff.optimize_atoms(optimizer="FIRE")
+    # print("optimized st", xx)
+    # xx = ff.run_nve_velocity_verlet(steps=5)
+    # xx = ff.run_nvt_langevin(steps=5)
+    # xx = ff.run_nvt_andersen(steps=5)
+    xx = ff.run_npt_nose_hoover(steps=20000, temperature_K=1800)
+    print(xx)
+"""

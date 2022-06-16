@@ -4,7 +4,7 @@
 import argparse
 import sys
 from jarvis.core.atoms import Atoms
-from jarvis.core.graphs import Graph
+# from jarvis.core.graphs import Graph
 from alignn.ff.ff import (
     default_path,
     ev_curve,
@@ -27,6 +27,8 @@ parser.add_argument(
     "--file_format", default="poscar", help="poscar/cif/xyz/pdb file format."
 )
 
+parser.add_argument("--temperature_K", default="300", help="Temperature in K")
+parser.add_argument("--timestep", default="0.5", help="Timestep in fs")
 parser.add_argument("--on_relaxed_struct", default="No", help="Yes/No.")
 parser.add_argument(
     "--file_path",
@@ -38,8 +40,8 @@ parser.add_argument(
     "--task",
     default="optimize",
     help="Select task for ALIGNN-FF"
-    + " such as optimze/nvt_lagevin/nve_velocity_verlet/"
-    + "ev_curve/vacancy_energy/surface_energy",
+    + " such as optimze/nvt_lagevin/nve_velocity_verlet/npt/"
+    + "npt_berendsen/nvt_berendsen/ev_curve/vacancy_energy/surface_energy",
 )
 
 parser.add_argument("--md_steps", default=100, help="Provide md steps.")
@@ -51,7 +53,9 @@ if __name__ == "__main__":
     file_path = args.file_path
     file_format = args.file_format
     task = args.task
+    temperature_K = float(args.temperature_K)
     on_relaxed_struct_yn = args.on_relaxed_struct
+    timestep = float(args.timestep)
     if on_relaxed_struct_yn.lower() == "yes":
         on_relaxed_struct = True
     else:
@@ -86,8 +90,9 @@ if __name__ == "__main__":
         ff = ForceField(
             jarvis_atoms=atoms,
             model_path=model_path,
+            timestep=timestep,
         )
-        lang = ff.run_nvt_langevin(steps=steps)
+        lang = ff.run_nvt_langevin(steps=steps, temperature_K=temperature_K)
         print("final struct:")
         print(lang)
 
@@ -97,10 +102,44 @@ if __name__ == "__main__":
         ff = ForceField(
             jarvis_atoms=atoms,
             model_path=model_path,
+            timestep=timestep,
         )
         vv = ff.run_nve_velocity_verlet(steps=steps)
         print("final struct:")
         print(vv)
+    if task == "npt":
+        print("initial struct:")
+        print(atoms)
+        ff = ForceField(
+            jarvis_atoms=atoms,
+            model_path=model_path,
+            timestep=timestep,
+        )
+        nptt = ff.run_npt_nose_hoover(steps=steps, temperature_K=temperature_K)
+        print("final struct:")
+        print(nptt)
+    if task == "nvt_berendsen":
+        print("initial struct:")
+        print(atoms)
+        ff = ForceField(
+            jarvis_atoms=atoms,
+            model_path=model_path,
+            timestep=timestep,
+        )
+        nptt = ff.run_nvt_berendsen(steps=steps, temperature_K=temperature_K)
+        print("final struct:")
+        print(nptt)
+    if task == "npt_berendsen":
+        print("initial struct:")
+        print(atoms)
+        ff = ForceField(
+            jarvis_atoms=atoms,
+            model_path=model_path,
+            timestep=timestep,
+        )
+        nptt = ff.run_npt_berendsen(steps=steps, temperature_K=temperature_K)
+        print("final struct:")
+        print(nptt)
     if task == "ev_curve":
         ff = ForceField(
             jarvis_atoms=atoms,
@@ -127,7 +166,7 @@ if __name__ == "__main__":
             jarvis_atoms=atoms,
             model_path=model_path,
         )
-        surf = surface_formation(
+        surf = surface_energy(
             atoms=atoms,
             model_path=model_path,
             on_relaxed_struct=on_relaxed_struct,

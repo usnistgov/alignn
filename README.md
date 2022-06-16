@@ -169,6 +169,7 @@ Currently, ALIGNN-FF is available in atomwise branch:
 ```
 git clone https://github.com/usnistgov/alignn.git
 git checkout atomwise
+cd  alignn
 python setup.py develop
 ```
 
