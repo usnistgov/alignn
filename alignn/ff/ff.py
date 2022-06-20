@@ -5,8 +5,8 @@ import os
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
-
-# from jarvis.db.figshare import get_jid_data
+from ase import Atoms as AseAtoms
+import matplotlib.pyplot as plt
 from jarvis.analysis.thermodynamics.energetics import unary_energy
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.optimize import BFGS
@@ -39,6 +39,10 @@ from jarvis.analysis.structure.spacegroup import (
     symmetrically_distinct_miller_indices,
 )
 
+# from jarvis.core.kpoints import Kpoints3D as Kpoints
+from jarvis.core.atoms import get_supercell_dims
+
+plt.switch_backend("agg")
 # from ase.optimize.optimize import Optimizer
 # from ase.io import Trajectory
 # from ase.neighborlist import NeighborList
@@ -48,6 +52,7 @@ __author__ = "Kamal Choudhary, Brian DeCost, Keith Butler, Lily Major"
 
 
 def default_path():
+    """Get defaukt model path."""
     dpath = os.path.abspath(str(os.path.join(os.path.dirname(__file__), ".")))
     print("model_path", dpath)
     return dpath
@@ -200,7 +205,7 @@ class ForceField(object):
                 stress=False,
                 peratom=False,
                 header=True,
-                mode="a",
+                mode="w",
             )
         # print ('STRUCTURE PROVIDED:')
         # print (ase_to_atoms(self.atoms))
@@ -244,9 +249,10 @@ class ForceField(object):
     def unrelaxed_atoms(self):
         """Get energy of a system."""
         pe = self.atoms.get_potential_energy()
+        fs = self.atoms.get_forces()
         # ke = self.atoms.get_kinetic_energy()
         # print("pe", pe)
-        return pe
+        return pe, fs
 
     def optimize_atoms(
         self,
@@ -282,7 +288,11 @@ class ForceField(object):
         )
         self.dyn.attach(self.print_format, interval=interval)
         self.dyn.run(fmax=fmax, steps=steps)
-        return ase_to_atoms(self.atoms)
+        return (
+            ase_to_atoms(self.atoms),
+            self.atoms.get_potential_energy(),
+            self.atoms.get_forces(),
+        )
 
     def run_nve_velocity_verlet(
         self,
@@ -500,7 +510,7 @@ def ev_curve(
             model_path=model_path,
             model_filename=model_filename,
         )
-        relaxed = ff.optimize_atoms()
+        relaxed, en, fs = ff.optimize_atoms()
     else:
         relaxed = atoms
     y = []
@@ -512,7 +522,7 @@ def ev_curve(
             model_path=model_path,
             model_filename=model_filename,
         )
-        energy = ff.unrelaxed_atoms()
+        energy, fs = ff.unrelaxed_atoms()
         y.append(energy)
         vol.append(s1.volume)
     x = np.array(dx)
@@ -552,7 +562,7 @@ def vacancy_formation(
             model_path=model_path,
             model_filename=model_filename,
         )
-        relaxed = ff.optimize_atoms()
+        relaxed, en, fs = ff.optimize_atoms()
     else:
         relaxed = atoms
 
@@ -580,7 +590,7 @@ def vacancy_formation(
             model_path=model_path,
             model_filename=model_filename,
         )
-        energy = ff.unrelaxed_atoms()
+        energy, fs = ff.unrelaxed_atoms()
         # Bulk EPA
         pred_bulk_energy = energy / bulk_atoms.num_atoms
         defective_atoms = strt
@@ -595,7 +605,7 @@ def vacancy_formation(
             model_path=model_path,
             model_filename=model_filename,
         )
-        pred_def_energy = ff.unrelaxed_atoms()
+        pred_def_energy, fs = ff.unrelaxed_atoms()
 
         chem_pot = unary_energy(j.to_dict()["symbol"].replace(" ", ""))
         # print('pred_def_energy',pred_def_energy)
@@ -630,7 +640,7 @@ def surface_energy(
             model_path=model_path,
             model_filename=model_filename,
         )
-        atoms = ff.optimize_atoms()
+        atoms, en, fs = ff.optimize_atoms()
 
     atoms_cvn = Spacegroup3D(atoms).conventional_standard_structure
     # energy = atom_to_energy(atoms=atoms_cvn, only_energy=only_energy)
@@ -644,7 +654,8 @@ def surface_energy(
         model_path=model_path,
         model_filename=model_filename,
     )
-    epa = ff.unrelaxed_atoms() / atoms_cvn.num_atoms
+    en, fs = ff.unrelaxed_atoms()
+    epa = en / atoms_cvn.num_atoms
     # epa = energy  # / atoms_cvn.num_atoms
     mem = []
     for j in indices:
@@ -662,7 +673,7 @@ def surface_energy(
             model_path=model_path,
             model_filename=model_filename,
         )
-        energy = ff.unrelaxed_atoms()  # / atoms_cvn.num_atoms
+        energy, fs = ff.unrelaxed_atoms()  # / atoms_cvn.num_atoms
 
         m = np.array(strt.lattice_mat)
         surf_area = np.linalg.norm(np.cross(m[0], m[1]))
@@ -679,13 +690,170 @@ def surface_energy(
     return mem
 
 
+def phonons(
+    atoms=None,
+    enforce_c_size=8,
+    line_density=5,
+    model_path=".",
+    model_filename="best_model.pt",
+    on_relaxed_struct=False,
+):
+    """Make Phonon calculation setup."""
+    if on_relaxed_struct:
+        ff = ForceField(
+            jarvis_atoms=atoms,
+            model_path=model_path,
+            model_filename=model_filename,
+        )
+        atoms, en, fs = ff.optimize_atoms()
+    from phonopy import Phonopy
+    from phonopy.file_IO import (
+        #    parse_FORCE_CONSTANTS,
+        write_FORCE_CONSTANTS,
+    )
+
+    # kpoints = Kpoints().kpath(atoms, line_density=line_density)
+    spg = Spacegroup3D(atoms=atoms)  # .spacegroup_data()
+    cvn = spg.conventional_standard_structure
+    dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
+    atoms = cvn.make_supercell([dim[0], dim[1], dim[2]])
+    bulk = atoms.phonopy_converter()
+    phonon = Phonopy(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
+    phonon.generate_displacements(distance=0.03)
+    print("Len dis", len(phonon.supercells_with_displacements))
+    # disps = phonon.get_displacements()
+    supercells = phonon.get_supercells_with_displacements()
+    # Force calculations by calculator
+    set_of_forces = []
+    disp = 0
+
+    for scell in supercells:
+        ase_atoms = AseAtoms(
+            symbols=scell.get_chemical_symbols(),
+            scaled_positions=scell.get_scaled_positions(),
+            cell=scell.get_cell(),
+            pbc=True,
+        )
+        j_atoms = ase_to_atoms(ase_atoms)
+        disp = disp + 1
+
+        # parameters["control_file"] = "run0.mod"
+
+        ff = ForceField(
+            jarvis_atoms=j_atoms,
+            model_path=model_path,
+            model_filename=model_filename,
+        )
+        st, energy, forces = ff.optimize_atoms(optimize_lattice=False)
+        forces = forces * -1
+        # print("forces=", forces)
+        drift_force = forces.sum(axis=0)
+        # print("drift forces=", drift_force)
+        # Simple translational invariance
+        for force in forces:
+            force -= drift_force / forces.shape[0]
+        set_of_forces.append(forces)
+    phonon.produce_force_constants(forces=set_of_forces)
+    write_FORCE_CONSTANTS(
+        phonon.get_force_constants(), filename="FORCE_CONSTANTS"
+    )
+    phonon.run_mesh([20, 20, 20])
+    phonon.run_total_dos()
+    tdos = phonon._total_dos
+
+    # print('tods',tdos._frequencies.shape)
+    freqs, ds = tdos.get_dos()
+    plt.close()
+    plt.plot(freqs, ds)
+    # print('freqs',freqs)
+    plt.close("dos.png")
+    # print('tods',tdos.get_dos())
+    # dosfig=phonon.plot_total_dos()
+    # dosfig.savefig('dos.png')
+    # dosfig.close()
+
+
+def phonons3(
+    atoms=None,
+    enforce_c_size=8,
+    line_density=5,
+    model_path=".",
+    model_filename="best_model.pt",
+    on_relaxed_struct=False,
+):
+    """Make Phonon3 calculation setup."""
+    if on_relaxed_struct:
+        ff = ForceField(
+            jarvis_atoms=atoms,
+            model_path=model_path,
+            model_filename=model_filename,
+        )
+        atoms, en, fs = ff.optimize_atoms()
+    from phono3py import Phono3py
+
+    # kpoints = Kpoints().kpath(atoms, line_density=line_density)
+    spg = Spacegroup3D(atoms=atoms)  # .spacegroup_data()
+    cvn = spg.conventional_standard_structure
+    dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
+    atoms = cvn.make_supercell([dim[0], dim[1], dim[2]])
+    bulk = atoms.phonopy_converter()
+    phonon = Phono3py(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
+    phonon.generate_displacements(distance=0.03)
+    # disps = phonon.generate_displacements()
+    supercells = phonon.supercells_with_displacements
+    print(
+        "Len dis", len(phonon.supercells_with_displacements), len(supercells)
+    )
+    # Force calculations by calculator
+    set_of_forces = []
+    disp = 0
+
+    for ii, scell in enumerate(supercells):
+        print("scell=", ii)
+        ase_atoms = AseAtoms(
+            symbols=scell.get_chemical_symbols(),
+            scaled_positions=scell.get_scaled_positions(),
+            cell=scell.get_cell(),
+            pbc=True,
+        )
+        j_atoms = ase_to_atoms(ase_atoms)
+        disp = disp + 1
+
+        # parameters["control_file"] = "run0.mod"
+
+        ff = ForceField(
+            jarvis_atoms=j_atoms,
+            model_path=model_path,
+            model_filename=model_filename,
+        )
+        st, energy, forces = ff.optimize_atoms(optimize_lattice=False)
+        forces = forces * -1
+        # print("forces=", forces)
+        drift_force = forces.sum(axis=0)
+        # print("drift forces=", drift_force)
+        # Simple translational invariance
+        for force in forces:
+            force -= drift_force / forces.shape[0]
+        set_of_forces.append(forces)
+    # phonon.save("phono3py_disp.yaml")
+    forces = forces.reshape(-1, len(phonon.supercell), 3)
+    phonon.forces = forces
+    phonon.produce_fc3()
+    phonon.mesh_numbers = 30
+    phonon.init_phph_interaction()
+    phonon.run_thermal_conductivity(
+        temperatures=range(0, 1001, 10), write_kappa=True
+    )
+
+
 """
 if __name__ == "__main__":
 
+    # from jarvis.db.figshare import get_jid_data
     # atoms = Spacegroup3D(
-    #    JarvisAtoms.from_dict(
-    #        get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
-    #    )
+    #   JarvisAtoms.from_dict(
+    #       get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    #   )
     # ).conventional_standard_structure
     atoms = JarvisAtoms.from_poscar("POSCAR")
     print(atoms)
@@ -704,13 +872,17 @@ if __name__ == "__main__":
         jarvis_atoms=atoms,
         model_path=model_path,
     )
-    # ff.unrelaxed_atoms()
-    ff.set_momentum_maxwell_boltzmann(temperature_K=300)
+    # en,fs = ff.unrelaxed_atoms()
+    # print ('en',en)
+    # print('fs',fs)
+    phonons(atoms=atoms)
+    # phonons3(atoms=atoms)
+    # ff.set_momentum_maxwell_boltzmann(temperature_K=300)
     # xx = ff.optimize_atoms(optimizer="FIRE")
     # print("optimized st", xx)
     # xx = ff.run_nve_velocity_verlet(steps=5)
     # xx = ff.run_nvt_langevin(steps=5)
     # xx = ff.run_nvt_andersen(steps=5)
-    xx = ff.run_npt_nose_hoover(steps=20000, temperature_K=1800)
-    print(xx)
+    # xx = ff.run_npt_nose_hoover(steps=20000, temperature_K=1800)
+    # print(xx)
 """

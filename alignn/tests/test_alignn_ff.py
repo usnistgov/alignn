@@ -6,6 +6,8 @@ from alignn.ff.ff import (
     surface_energy,
     vacancy_formation,
     ForceField,
+    phonons,
+    phonons3
 )
 
 
