@@ -1,8 +1,9 @@
 """Module to visualize networkx graph."""
-from jarvis.db.figshare import get_jid_data
+import networkx as nx
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
-import networkx as nx
+from jarvis.db.figshare import get_jid_data
+
 # import matplotlib.pyplot as plt
 
 # %matplotlib inline

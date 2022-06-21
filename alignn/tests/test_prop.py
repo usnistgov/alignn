@@ -1,13 +1,12 @@
 """Training script test suite."""
-import time
-import matplotlib.pyplot as plt
-import numpy as np
-from alignn.train import train_dgl
-from alignn.pretrained import get_prediction
-from alignn.pretrained import get_multiple_predictions
-from sklearn.metrics import mean_absolute_error
 import os
+import time
+
+import matplotlib.pyplot as plt
 from jarvis.core.atoms import Atoms
+
+from alignn.pretrained import get_multiple_predictions, get_prediction
+from alignn.train import train_dgl
 
 plt.switch_backend("agg")
 
@@ -18,7 +17,6 @@ config = {
     "n_train": 50,
     "n_test": 25,
     "n_val": 25,
-    "num_workers": 0,
     "atom_features": "cgcnn",
     "neighbor_strategy": "k-nearest",
     "epochs": 2,
@@ -51,7 +49,7 @@ def test_minor_configs():
     tmp["n_early_stopping"] = 2
     tmp["model"]["name"] = "alignn"
     config["write_predictions"] = True
-    result = train_dgl(tmp)
+    _ = train_dgl(tmp)
 
 
 def test_models():
@@ -235,7 +233,8 @@ def test_pretrained():
     print(prd)
     cmd1 = "python alignn/pretrained.py"
     os.system(cmd1)
-    get_multiple_predictions(atoms_array=[Si,Si])
+    get_multiple_predictions(atoms_array=[Si, Si])
+
 
 # test_minor_configs()
 # test_pretrained()

@@ -1,8 +1,8 @@
 """Train multiple properties using CGCNN."""
 # For comparison purposes only
 import os
-from jarvis.tasks.queue_jobs import Queue
 
+from jarvis.tasks.queue_jobs import Queue
 
 props = [
     "avg_elec_mass",

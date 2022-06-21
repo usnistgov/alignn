@@ -1,12 +1,13 @@
 """Module to compare JARVIS-CFID results."""
 # from jarvis.ai.pkgs.utils import get_ml_data
 # from jarvis.ai.pkgs.utils import regr_scores
-from jarvis.db.figshare import data as jdata
-import random
-import numpy as np
 import math
+import random
+
 import lightgbm as lgb
+import numpy as np
 from jarvis.ai.pkgs.utils import regr_scores
+from jarvis.db.figshare import data as jdata
 
 props = [
     "formation_energy_peratom",

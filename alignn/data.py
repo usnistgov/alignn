@@ -1,29 +1,30 @@
 """Jarvis-dgl data loaders and DGLGraph utilities."""
 
+import math
+import os
+
+# from sklearn.pipeline import Pipeline
+import pickle as pk
 import random
 from pathlib import Path
 from typing import Optional
 
-# from typing import Dict, List, Optional, Set, Tuple
-
-import os
-import torch
 import dgl
 import numpy as np
 import pandas as pd
+import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-import math
 from jarvis.db.jsonutils import dumpjson
-
-# from sklearn.pipeline import Pipeline
-import pickle as pk
 
 # from sklearn.decomposition import PCA  # ,KernelPCA
 from sklearn.preprocessing import StandardScaler
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+# from typing import Dict, List, Optional, Set, Tuple
+
 
 # use pandas progress_apply
 tqdm.pandas()
@@ -397,7 +398,6 @@ def get_train_val_loaders(
                 print("New min", min(y_data))
             except Exception as exp:
                 print(exp)
-                pass
             # pc = PCA(n_components=output_features)
             # pipe = Pipeline(
             #    [
@@ -430,7 +430,6 @@ def get_train_val_loaders(
                     f.close()
                 except Exception as exp:
                     print("Cannot write mad", exp)
-                    pass
                 # Random model precited value
                 x_bar = np.mean(np.array([i[target] for i in dataset_train]))
                 baseline_mae = mean_absolute_error(
@@ -440,7 +439,6 @@ def get_train_val_loaders(
                 print("Baseline MAE:", baseline_mae)
             except Exception as exp:
                 print("Data error", exp)
-                pass
 
         train_data = get_torch_dataset(
             dataset=dataset_train,

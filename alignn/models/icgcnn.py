@@ -1,6 +1,7 @@
 """CGCNN: dgl implementation."""
 
 from typing import Tuple
+
 import dgl
 import dgl.function as fn
 

@@ -1,23 +1,24 @@
 #!/usr/bin/env python
 
 """Module to download and load pre-trained ALIGNN models."""
-import requests
-import os
-import zipfile
-from tqdm import tqdm
-from alignn.models.alignn import ALIGNN, ALIGNNConfig
-from alignn.data import get_torch_dataset
-from torch.utils.data import DataLoader
-import tempfile
-import torch
-import sys
-
 # from jarvis.db.jsonutils import loadjson
 import argparse
+import os
+import sys
+import tempfile
+import zipfile
+
+import pandas as pd
+import requests
+import torch
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
 from jarvis.db.jsonutils import dumpjson
-import pandas as pd
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from alignn.data import get_torch_dataset
+from alignn.models.alignn import ALIGNN, ALIGNNConfig
 
 tqdm.pandas()
 
@@ -95,11 +96,11 @@ all_models = {
         "https://figshare.com/ndownloader/files/31458676",
         1,
     ],
-    "mp_e_form_alignnn": [
+    "mp_e_form_alignn": [
         "https://figshare.com/ndownloader/files/31458811",
         1,
     ],
-    "mp_gappbe_alignnn": [
+    "mp_gappbe_alignn": [
         "https://figshare.com/ndownloader/files/31458814",
         1,
     ],
@@ -111,25 +112,25 @@ all_models = {
     "qm9_HOMO_alignn": ["https://figshare.com/ndownloader/files/31459042", 1],
     "qm9_LUMO_alignn": ["https://figshare.com/ndownloader/files/31459045", 1],
     "qm9_ZPVE_alignn": ["https://figshare.com/ndownloader/files/31459057", 1],
-    "hmof_co2_absp_alignnn": [
+    "hmof_co2_absp_alignn": [
         "https://figshare.com/ndownloader/files/31459198",
         5,
     ],
-    "hmof_max_co2_adsp_alignnn": [
+    "hmof_max_co2_adsp_alignn": [
         "https://figshare.com/ndownloader/files/31459207",
         1,
     ],
-    "hmof_surface_area_m2g_alignnn": [
+    "hmof_surface_area_m2g_alignn": [
         "https://figshare.com/ndownloader/files/31459222",
         1,
     ],
-    "hmof_surface_area_m2cm3_alignnn": [
+    "hmof_surface_area_m2cm3_alignn": [
         "https://figshare.com/ndownloader/files/31459219",
         1,
     ],
-    "hmof_pld_alignnn": ["https://figshare.com/ndownloader/files/31459216", 1],
-    "hmof_lcd_alignnn": ["https://figshare.com/ndownloader/files/31459201", 1],
-    "hmof_void_fraction_alignnn": [
+    "hmof_pld_alignn": ["https://figshare.com/ndownloader/files/31459216", 1],
+    "hmof_lcd_alignn": ["https://figshare.com/ndownloader/files/31459201", 1],
+    "hmof_void_fraction_alignn": [
         "https://figshare.com/ndownloader/files/31459228",
         1,
     ],
@@ -161,7 +162,7 @@ parser.add_argument(
 parser.add_argument(
     "--cutoff",
     default=8,
-    help="Distance cut-off for graph constuction"
+    help="Distance cut-off for graph construction"
     + ", usually 8 for solids and 5 for molecules.",
 )
 
@@ -284,7 +285,6 @@ def get_multiple_predictions(
             raise ValueError(
                 'Check is the model name exists using "pretrained.py -h"', exp
             )
-            pass
 
     # Note cut-off is usually 8 for solids and 5 for molecules
     def atoms_to_graph(atoms):

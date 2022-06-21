@@ -1,13 +1,14 @@
 # conda activate megnet
-from megnet.models import MEGNetModel
-from megnet.data.crystal import CrystalGraph
-import numpy as np
-from pymatgen.core.structure import Structure
 import csv
 import os
 import random
-from sklearn.metrics import mean_absolute_error
 import warnings
+
+import numpy as np
+from megnet.data.crystal import CrystalGraph
+from megnet.models import MEGNetModel
+from pymatgen.core.structure import Structure
+from sklearn.metrics import mean_absolute_error
 
 warnings.filterwarnings(
     "ignore",
@@ -94,7 +95,7 @@ idp = os.path.join(root_dir, "id_prop.csv")
 structures = []
 targets = []
 
-with open(idp, "r") as f:
+with open(idp) as f:
     reader = csv.reader(f)
     data = [row for row in reader]
 

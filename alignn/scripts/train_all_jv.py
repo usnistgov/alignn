@@ -1,6 +1,7 @@
 """Module to train JARVIS-DFT DB properties."""
 # from alignn.train_props import train_prop_model
 import os
+
 from jarvis.tasks.queue_jobs import Queue
 
 # d=data('dft_3d')

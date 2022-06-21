@@ -1,7 +1,7 @@
 """Module to generate example dataset."""
 
-from jarvis.db.figshare import data as jdata
 from jarvis.core.atoms import Atoms
+from jarvis.db.figshare import data as jdata
 
 dft_3d = jdata("edos_pdos")
 max_samples = 50
@@ -17,7 +17,7 @@ for i in dft_3d:
         target = ",".join(map(str, target))
         atoms.write_poscar(poscar_name)
         # atoms.write_cif(cif_name)
-        f.write("%s,%s\n" % (poscar_name, target))
+        f.write(f"{poscar_name},{target}\n")
         count += 1
         if count == max_samples:
             break

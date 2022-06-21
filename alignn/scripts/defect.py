@@ -1,13 +1,14 @@
 """Module to check if V_Ef is approx. correct."""
 import torch
+from jarvis.analysis.defects.vacancy import Vacancy
+from jarvis.analysis.thermodynamics.energetics import unary_energy
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
-from alignn.models.alignn import ALIGNN
 
 # from jarvis.analysis.structure.spacegroup import Spacegroup3D
 from jarvis.db.figshare import get_jid_data
-from jarvis.analysis.defects.vacancy import Vacancy
-from jarvis.analysis.thermodynamics.energetics import unary_energy
+
+from alignn.models.alignn import ALIGNN
 
 device = "cpu"
 if torch.cuda.is_available():

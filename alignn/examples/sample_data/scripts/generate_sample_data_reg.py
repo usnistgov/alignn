@@ -1,6 +1,6 @@
 """Module to generate example dataset."""
-from jarvis.db.figshare import data as jdata
 from jarvis.core.atoms import Atoms
+from jarvis.db.figshare import data as jdata
 
 dft_3d = jdata("dft_3d")
 prop = "optb88vdw_bandgap"
@@ -14,7 +14,7 @@ for i in dft_3d:
     target = i[prop]
     if target != "na":
         atoms.write_poscar(poscar_name)
-        f.write("%s,%6f\n" % (poscar_name, target))
+        f.write(f"{poscar_name},{target:6f}\n")
         count += 1
         if count == max_samples:
             break

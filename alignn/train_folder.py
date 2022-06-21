@@ -1,16 +1,18 @@
 #!/usr/bin/env python
 
 """Module to train for a folder with formatted dataset."""
+import argparse
 import csv
 import os
 import sys
 import time
+
 from jarvis.core.atoms import Atoms
+from jarvis.db.jsonutils import loadjson
+
+from alignn.config import TrainingConfig
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
-from alignn.config import TrainingConfig
-from jarvis.db.jsonutils import loadjson
-import argparse
 
 parser = argparse.ArgumentParser(
     description="Atomistic Line Graph Neural Network"
@@ -87,7 +89,7 @@ def train_for_folder(
         config.batch_size = int(batch_size)
     if epochs is not None:
         config.epochs = int(epochs)
-    with open(id_prop_dat, "r") as f:
+    with open(id_prop_dat) as f:
         reader = csv.reader(f)
         data = [row for row in reader]
 
