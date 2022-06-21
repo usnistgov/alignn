@@ -92,7 +92,7 @@ if __name__ == "__main__":
             jarvis_atoms=atoms,
             model_path=model_path,
         )
-        opt = ff.optimize_atoms()
+        opt, en, fs = ff.optimize_atoms()
         print("initial struct:")
         print(atoms)
         print("final struct:")
@@ -121,7 +121,9 @@ if __name__ == "__main__":
             model_path=model_path,
             timestep=timestep,
         )
-        vv = ff.run_nve_velocity_verlet(steps=steps)
+        vv = ff.run_nve_velocity_verlet(
+            steps=steps, initial_temperature_K=initial_temperature_K
+        )
         print("final struct:")
         print(vv)
     if task == "npt":

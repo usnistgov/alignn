@@ -215,7 +215,7 @@ class ForceField(object):
                 path=self.model_path,
                 include_stress=self.include_stress,
                 model_filename=self.model_filename,
-                device="cuda" if torch.cuda.is_available() else "cpu",
+                # device="cuda" if torch.cuda.is_available() else "cpu",
             )
         )
 
@@ -322,7 +322,7 @@ class ForceField(object):
     def run_nvt_langevin(
         self,
         filename="ase_nvt_langevin",
-        interval=10,
+        interval=1,
         temperature_K=300,
         steps=1000,
         friction=1e-4,
@@ -763,14 +763,13 @@ def phonons(
 
     # print('tods',tdos._frequencies.shape)
     freqs, ds = tdos.get_dos()
-    plt.close()
-    plt.plot(freqs, ds)
-    # print('freqs',freqs)
-    plt.close("dos.png")
     # print('tods',tdos.get_dos())
-    # dosfig=phonon.plot_total_dos()
-    # dosfig.savefig('dos.png')
-    # dosfig.close()
+    dosfig = phonon.plot_total_dos()
+    dosfig.savefig("dos1.png")
+    dosfig.close()
+
+    plt.plot(freqs, ds)
+    plt.close("dos2.png")
 
 
 def phonons3(
@@ -836,7 +835,7 @@ def phonons3(
             force -= drift_force / forces.shape[0]
         set_of_forces.append(forces)
     # phonon.save("phono3py_disp.yaml")
-    forces = forces.reshape(-1, len(phonon.supercell), 3)
+    forces = np.array(set_of_forces).reshape(-1, len(phonon.supercell), 3)
     phonon.forces = forces
     phonon.produce_fc3()
     phonon.mesh_numbers = 30
@@ -846,7 +845,7 @@ def phonons3(
     )
 
 
-"""
+# """
 if __name__ == "__main__":
 
     # from jarvis.db.figshare import get_jid_data
@@ -856,10 +855,10 @@ if __name__ == "__main__":
     #   )
     # ).conventional_standard_structure
     atoms = JarvisAtoms.from_poscar("POSCAR")
+    atoms = atoms.make_supercell_matrix([2, 2, 2])
     print(atoms)
     model_path = default_path()
     print("model_path", model_path)
-    # atoms = atoms.make_supercell_matrix([2, 2, 2])
     # atoms=atoms.strain_atoms(.05)
     # print(atoms)
     # ev = ev_curve(atoms=atoms, model_path=model_path)
@@ -876,7 +875,7 @@ if __name__ == "__main__":
     # print ('en',en)
     # print('fs',fs)
     phonons(atoms=atoms)
-    # phonons3(atoms=atoms)
+    phonons3(atoms=atoms)
     # ff.set_momentum_maxwell_boltzmann(temperature_K=300)
     # xx = ff.optimize_atoms(optimizer="FIRE")
     # print("optimized st", xx)
@@ -885,4 +884,4 @@ if __name__ == "__main__":
     # xx = ff.run_nvt_andersen(steps=5)
     # xx = ff.run_npt_nose_hoover(steps=20000, temperature_K=1800)
     # print(xx)
-"""
+# """
