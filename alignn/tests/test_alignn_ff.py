@@ -45,5 +45,6 @@ def test_alignnff():
         get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
     )
     intf = get_interface_energy(
-        film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
+        film_atoms=atoms_al, subs_atoms=atoms_al, model_path=model_path,film_thickness=10,subs_thickness=10
+        #film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
     )

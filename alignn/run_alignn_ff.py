@@ -55,8 +55,10 @@ parser.add_argument("--md_steps", default=100, help="Provide md steps.")
 intf_line = (
     "Provide POSCAR_for_film POSCAR_for_subs "
     + "miller_index_film(e.g.111) "
-    + "miller_index_subs(e.g.001) separation(e.g.3.0)"
-    + "e.g. POSCAR-film.vasp POSCAR-subs.vasp 111 001 3.0"
+    + "miller_index_subs(e.g.001) "
+    + "film_thickness(e.g.25)"
+    + " subs_thickness(e.g.25) separation(e.g.3.0)"
+    + "e.g. POSCAR-film.vasp POSCAR-subs.vasp 111 001 25.0 25.0 3.0"
 )
 parser.add_argument("--interface_info", default=None, help=intf_line)
 
@@ -224,7 +226,9 @@ if __name__ == "__main__":
             [i for i in re.split("(\d)", interface_info[3]) if i != ""],
             dtype="int",
         )
-        seperation = float(interface_info[4])
+        film_thickness = float(interface_info[4])
+        subs_thickness = float(interface_info[5])
+        seperation = float(interface_info[6])
         intf = get_interface_energy(
             film_atoms=film_atoms,
             subs_atoms=subs_atoms,
@@ -232,6 +236,8 @@ if __name__ == "__main__":
             film_index=film_index,
             subs_index=subs_index,
             seperation=seperation,
+            film_thickness=film_thickness,
+            subs_thickness=subs_thickness,
         )
         print("Film:\n")
         print(intf["film_sl"])

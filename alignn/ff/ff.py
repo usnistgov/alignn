@@ -853,6 +853,8 @@ def get_interface_energy(
     subs_atoms=None,
     film_index=[1, 1, 1],
     subs_index=[0, 0, 1],
+    film_thickness=25,
+    subs_thickness=25,
     model_path="",
     seperation=3.0,
     vacuum=8.0,
@@ -861,19 +863,32 @@ def get_interface_energy(
     ltol=0.05,
     atol=1,
     apply_strain=False,
+    from_conventional_structure=True,
 ):
-    film_surf = Surface(film_atoms, indices=film_index).make_surface()
-    subs_surf = Surface(subs_atoms, indices=subs_index).make_surface()
+    film_surf = Surface(
+        film_atoms,
+        indices=film_index,
+        from_conventional_structure=from_conventional_structure,
+        thickness=film_thickness,
+        vacuum=vacuum,
+    ).make_surface()
+    subs_surf = Surface(
+        subs_atoms,
+        indices=subs_index,
+        from_conventional_structure=from_conventional_structure,
+        thickness=subs_thickness,
+        vacuum=vacuum,
+    ).make_surface()
     het = make_interface(
         film=film_surf,
         subs=subs_surf,
-        seperation=3.0,
-        vacuum=8.0,
-        max_area_ratio_tol=1.00,
-        max_area=500,
-        ltol=0.05,
-        atol=1,
-        apply_strain=False,
+        seperation=seperation,
+        vacuum=vacuum,
+        max_area_ratio_tol=max_area_ratio_tol,
+        max_area=max_area,
+        ltol=ltol,
+        atol=atol,
+        apply_strain=apply_strain,
     )
 
     ff = ForceField(
