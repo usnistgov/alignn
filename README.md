@@ -184,6 +184,7 @@ train_folder_grad.py --root_dir "alignn/examples/sample_data" --config "alignn/e
 A pretrained ALIGNN-FF (under active development right now) can be used for predicting several properties, such as:
 
 ```
+run_alignn_ff.py --task=interface --interface_info="alignn/tests/POSCAR-Al alignn/tests/POSCAR-Al2O3 111 001 3"
 run_alignn_ff.py --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp --task="ev_curve"
 ```
 

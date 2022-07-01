@@ -7,7 +7,8 @@ from alignn.ff.ff import (
     vacancy_formation,
     ForceField,
     phonons,
-    phonons3
+    phonons3,
+    get_interface_energy,
 )
 
 
@@ -37,3 +38,12 @@ def test_alignnff():
     xx = ff.run_nvt_langevin(steps=5)
     xx = ff.run_nvt_andersen(steps=5)
     # xx = ff.run_npt_nose_hoover(steps=5)
+    atoms_al = JAtoms.from_dict(
+        get_jid_data(dataset="dft_3d", jid="JVASP-816")["atoms"]
+    )
+    atoms_al2o3 = JAtoms.from_dict(
+        get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
+    )
+    intf = get_interface_energy(
+        film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
+    )

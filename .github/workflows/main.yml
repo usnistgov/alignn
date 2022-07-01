@@ -25,9 +25,9 @@ jobs:
     - name: Lint
       run: |
         pip install flake8 pytest pycodestyle pydocstyle
-        pycodestyle --ignore E203,W503 --exclude=tests alignn
+        pycodestyle --ignore E203,W503,W605 --exclude=tests alignn
         pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count alignn
-        flake8 --ignore E203,W503 --exclude=tests --statistics --count --exit-zero alignn
+        flake8 --ignore E203,W503,W605 --exclude=tests --statistics --count --exit-zero alignn
     - name: Test with pytest
       run: |
         export DGLBACKEND=pytorch

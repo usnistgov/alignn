@@ -4,6 +4,7 @@
 import argparse
 import sys
 from jarvis.core.atoms import Atoms
+import re
 
 # from jarvis.core.graphs import Graph
 from alignn.ff.ff import (
@@ -12,8 +13,9 @@ from alignn.ff.ff import (
     surface_energy,
     vacancy_formation,
     ForceField,
+    get_interface_energy,
 )
-
+import numpy as np
 
 parser = argparse.ArgumentParser(
     description="Atomistic Line Graph Neural Network Force-field"
@@ -45,11 +47,18 @@ parser.add_argument(
     default="optimize",
     help="Select task for ALIGNN-FF"
     + " such as unrelaxed_energy/optimze/nvt_lagevin/nve_velocity_verlet/npt/"
-    + "npt_berendsen/nvt_berendsen/ev_curve/vacancy_energy/surface_energy",
+    + "npt_berendsen/nvt_berendsen/ev_curve/vacancy_energy/surface_energy/"
+    + "interface",
 )
 
 parser.add_argument("--md_steps", default=100, help="Provide md steps.")
-
+intf_line = (
+    "Provide POSCAR_for_film POSCAR_for_subs "
+    + "miller_index_film(e.g.111) "
+    + "miller_index_subs(e.g.001) separation(e.g.3.0)"
+    + "e.g. POSCAR-film.vasp POSCAR-subs.vasp 111 001 3.0"
+)
+parser.add_argument("--interface_info", default=None, help=intf_line)
 
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
@@ -203,3 +212,32 @@ if __name__ == "__main__":
             on_relaxed_struct=on_relaxed_struct,
         )
         print(surf)
+    if task == "interface":
+        interface_info = args.interface_info.split()
+        film_atoms = Atoms.from_poscar(interface_info[0])
+        subs_atoms = Atoms.from_poscar(interface_info[1])
+        film_index = np.array(
+            [i for i in re.split("(\d)", interface_info[2]) if i != ""],
+            dtype="int",
+        )
+        subs_index = np.array(
+            [i for i in re.split("(\d)", interface_info[3]) if i != ""],
+            dtype="int",
+        )
+        seperation = float(interface_info[4])
+        intf = get_interface_energy(
+            film_atoms=film_atoms,
+            subs_atoms=subs_atoms,
+            model_path=model_path,
+            film_index=film_index,
+            subs_index=subs_index,
+            seperation=seperation,
+        )
+        print("Film:\n")
+        print(intf["film_sl"])
+        print("Substrate:\n")
+        print(intf["subs_sl"])
+        print("Interface:\n")
+        print(intf["interface"])
+        print("Interface energy(J/m2):\n")
+        print(intf["interface_energy"])

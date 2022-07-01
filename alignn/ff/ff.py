@@ -26,18 +26,21 @@ from ase.md.npt import NPT
 from ase.md.andersen import Andersen
 import ase.calculators.calculator
 from ase.stress import full_3x3_to_voigt_6_stress
-import numpy as np
 import torch
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
 from jarvis.analysis.defects.vacancy import Vacancy
-from jarvis.analysis.defects.surface import Surface
+import numpy as np
+
+# from jarvis.analysis.defects.surface import Surface
 from jarvis.analysis.structure.spacegroup import (
     Spacegroup3D,
     symmetrically_distinct_miller_indices,
 )
+from jarvis.analysis.interface.zur import make_interface
+from jarvis.analysis.defects.surface import Surface
 
 # from jarvis.core.kpoints import Kpoints3D as Kpoints
 from jarvis.core.atoms import get_supercell_dims
@@ -845,18 +848,75 @@ def phonons3(
     )
 
 
+def get_interface_energy(
+    film_atoms=None,
+    subs_atoms=None,
+    film_index=[1, 1, 1],
+    subs_index=[0, 0, 1],
+    model_path="",
+    seperation=3.0,
+    vacuum=8.0,
+    max_area_ratio_tol=1.00,
+    max_area=500,
+    ltol=0.05,
+    atol=1,
+    apply_strain=False,
+):
+    film_surf = Surface(film_atoms, indices=film_index).make_surface()
+    subs_surf = Surface(subs_atoms, indices=subs_index).make_surface()
+    het = make_interface(
+        film=film_surf,
+        subs=subs_surf,
+        seperation=3.0,
+        vacuum=8.0,
+        max_area_ratio_tol=1.00,
+        max_area=500,
+        ltol=0.05,
+        atol=1,
+        apply_strain=False,
+    )
+
+    ff = ForceField(
+        jarvis_atoms=het["film_sl"],
+        model_path=model_path,
+    )
+    film_dat = ff.optimize_atoms(optimizer="FIRE", optimize_lattice=False)
+    film_en = film_dat[1]
+
+    ff = ForceField(
+        jarvis_atoms=het["subs_sl"],
+        model_path=model_path,
+    )
+    subs_dat = ff.optimize_atoms(optimizer="FIRE", optimize_lattice=False)
+    subs_en = subs_dat[1]
+
+    ff = ForceField(
+        jarvis_atoms=het["interface"],
+        model_path=model_path,
+    )
+    intf_dat = ff.optimize_atoms(optimizer="FIRE", optimize_lattice=False)
+    intf_en = intf_dat[1]
+    m = het["interface"].lattice.matrix
+    area = np.linalg.norm(np.cross(m[0], m[1]))
+    intf_energy = 16 * (intf_en - subs_en - film_en) / (area)  # J/m2
+    het["interface_energy"] = intf_energy
+    return het
+
+
 # """
 if __name__ == "__main__":
 
-    # from jarvis.db.figshare import get_jid_data
+    from jarvis.db.figshare import get_jid_data
+    from jarvis.core.atoms import Atoms
+
     # atoms = Spacegroup3D(
     #   JarvisAtoms.from_dict(
     #       get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
     #   )
     # ).conventional_standard_structure
-    atoms = JarvisAtoms.from_poscar("POSCAR")
-    atoms = atoms.make_supercell_matrix([2, 2, 2])
-    print(atoms)
+    # atoms = JarvisAtoms.from_poscar("POSCAR")
+    # atoms = atoms.make_supercell_matrix([2, 2, 2])
+    # print(atoms)
     model_path = default_path()
     print("model_path", model_path)
     # atoms=atoms.strain_atoms(.05)
@@ -867,15 +927,15 @@ if __name__ == "__main__":
     # vac = vacancy_formation(atoms=atoms, model_path=model_path)
     # print(vac)
 
-    ff = ForceField(
-        jarvis_atoms=atoms,
-        model_path=model_path,
-    )
+    # ff = ForceField(
+    #    jarvis_atoms=atoms,
+    #    model_path=model_path,
+    # )
     # en,fs = ff.unrelaxed_atoms()
     # print ('en',en)
     # print('fs',fs)
-    phonons(atoms=atoms)
-    phonons3(atoms=atoms)
+    # phonons(atoms=atoms)
+    # phonons3(atoms=atoms)
     # ff.set_momentum_maxwell_boltzmann(temperature_K=300)
     # xx = ff.optimize_atoms(optimizer="FIRE")
     # print("optimized st", xx)
@@ -884,4 +944,14 @@ if __name__ == "__main__":
     # xx = ff.run_nvt_andersen(steps=5)
     # xx = ff.run_npt_nose_hoover(steps=20000, temperature_K=1800)
     # print(xx)
+    atoms_al = Atoms.from_dict(
+        get_jid_data(dataset="dft_3d", jid="JVASP-816")["atoms"]
+    )
+    atoms_al2o3 = Atoms.from_dict(
+        get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
+    )
+    intf = get_interface_energy(
+        film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
+    )
+    print(intf)
 # """
