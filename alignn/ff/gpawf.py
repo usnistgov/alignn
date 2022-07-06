@@ -638,24 +638,12 @@ def vacancy_formation(
 
 def surface_energy(
     atoms=None,
-    jid="",
-    on_conventional_cell=True,
-    dataset="dft_3d",
-    max_index=None,
-    miller_index=[1, 1, 1],
+    max_index=1,
     on_relaxed_struct=True,
     model_path=".",
-    thickness=25,
     model_filename="best_model.pt",
 ):
     """Get surface energy."""
-    if atoms is None:
-        from jarvis.db.figshare import data
-
-        dft_3d = data(dataset)
-        for i in dft_3d:
-            if i["jid"] == jid:
-                atoms = JarvisAtoms.from_dict(i["atoms"])
     if on_relaxed_struct:
         ff = ForceField(
             jarvis_atoms=atoms,
@@ -663,32 +651,26 @@ def surface_energy(
             model_filename=model_filename,
         )
         atoms, en, fs = ff.optimize_atoms()
-    if on_conventional_cell:
-        atoms_cvn = Spacegroup3D(atoms).conventional_standard_structure
-    else:
-        atoms_cvn = atoms
+
+    atoms_cvn = Spacegroup3D(atoms).conventional_standard_structure
     # energy = atom_to_energy(atoms=atoms_cvn, only_energy=only_energy)
-    if max_index is not None:
-        indices = symmetrically_distinct_miller_indices(
-            max_index=max_index, cvn_atoms=atoms_cvn
-        )
-    else:
-        indices = [miller_index]
+
+    indices = symmetrically_distinct_miller_indices(
+        max_index=max_index, cvn_atoms=atoms_cvn
+    )
     # indices = [[0, 0, 1]]
     ff = ForceField(
         jarvis_atoms=atoms_cvn,
         model_path=model_path,
         model_filename=model_filename,
     )
-    # en, fs = ff.unrelaxed_atoms()
+    #en, fs = ff.unrelaxed_atoms()
     relaxed, en, fs = ff.optimize_atoms()
     epa = en / atoms_cvn.num_atoms
     # epa = energy  # / atoms_cvn.num_atoms
     mem = []
     for j in indices:
-        strt = Surface(
-            atoms=atoms_cvn, indices=j, thickness=thickness
-        ).make_surface()
+        strt = Surface(atoms=atoms_cvn, indices=j).make_surface()
 
         name = (
             str(strt.composition.reduced_formula)
@@ -702,7 +684,7 @@ def surface_energy(
             model_path=model_path,
             model_filename=model_filename,
         )
-        # energy, fs = ff.unrelaxed_atoms()  # / atoms_cvn.num_atoms
+        #energy, fs = ff.unrelaxed_atoms()  # / atoms_cvn.num_atoms
         relaxed, energy, fs = ff.optimize_atoms()
 
         m = np.array(strt.lattice_mat)
@@ -893,7 +875,6 @@ def get_interface_energy(
     from_conventional_structure=True,
     gpaw_verify=False,
 ):
-    """Get work of adhesion"""
     film_surf = Surface(
         film_atoms,
         indices=film_index,
@@ -936,10 +917,9 @@ def get_interface_energy(
     c = get_prediction(
         atoms=het["interface"], model_name="jv_optb88vdw_total_energy_alignn"
     )[0]
-    print(het["interface"])
     m = het["interface"].lattice.matrix
     area = np.linalg.norm(np.cross(m[0], m[1]))
-    wa = -16 * (c - b - a) / area
+    wa = 16 * (c - b - a) / area
     print("Only alignn", wa)
     ff = ForceField(
         jarvis_atoms=het["film_sl"],
@@ -963,13 +943,8 @@ def get_interface_energy(
     intf_en = intf_dat[1]
     m = het["interface"].lattice.matrix
     area = np.linalg.norm(np.cross(m[0], m[1]))
-    # should be positive Wad
-    intf_energy = -16 * (intf_en - subs_en - film_en) / (area)  # J/m2
-    info = {}
-
-    info["interface_energy"] = intf_energy
-    info["unoptimized_interface"] = het["interface"].to_dict()
-    info["optimized_interface"] = intf_dat[0].to_dict()
+    intf_energy = 16 * (intf_en - subs_en - film_en) / (area)  # J/m2
+    het["interface_energy"] = intf_energy
     if gpaw_verify:
         name = "film"
         calc = GPAW(
@@ -1003,14 +978,12 @@ def get_interface_energy(
         intf_ase.calc = calc
         intf_en_gpaw = intf_ase.get_potential_energy()
         print("intf_en_gpaw", subs_en)
-        intf_gpaw = -16 * (intf_en_gpaw - subs_en - film_en) / (area)  # J/m2
+        intf_gpaw = 16 * (intf_en_gpaw - subs_en - film_en) / (area)  # J/m2
         print("Wad gpaw", intf_gpaw)
-    info["film_sl"] = het["film_sl"].to_dict()
-    info["subs_sl"] = het["subs_sl"].to_dict()
-    return info
+    return het["interface_energy"]
 
 
-"""
+# """
 if __name__ == "__main__":
 
     from jarvis.db.figshare import get_jid_data
@@ -1055,22 +1028,22 @@ if __name__ == "__main__":
         get_jid_data(dataset="dft_3d", jid="JVASP-816")["atoms"]
     )
     surf = surface_energy(atoms=atoms_al, model_path=model_path)
-    # atoms_al2o3 = Atoms.from_dict(
+    #atoms_al2o3 = Atoms.from_dict(
     #    get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
-    # )
-    # atoms_sio2 = Atoms.from_dict(
+    #)
+    #atoms_sio2 = Atoms.from_dict(
     #    get_jid_data(dataset="dft_3d", jid="JVASP-58349")["atoms"]
-    # )
-    # atoms_cu = Atoms.from_dict(
+    #)
+    #atoms_cu = Atoms.from_dict(
     #    get_jid_data(dataset="dft_3d", jid="JVASP-867")["atoms"]
-    # )
-    # atoms_cu2o = Atoms.from_dict(
+    #)
+    #atoms_cu2o = Atoms.from_dict(
     #    get_jid_data(dataset="dft_3d", jid="JVASP-1216")["atoms"]
-    # )
-    # atoms_graph = Atoms.from_dict(
+    #)
+    #atoms_graph = Atoms.from_dict(
     #    get_jid_data(dataset="dft_3d", jid="JVASP-48")["atoms"]
-    # )
-    # intf = get_interface_energy(
+    #)
+    #intf = get_interface_energy(
     #    film_atoms=atoms_cu,
     #    subs_atoms=atoms_cu2o,
     #    film_thickness=25,
@@ -1079,7 +1052,7 @@ if __name__ == "__main__":
     #    seperation=4.5,
     #    subs_index=[1, 1, 1],
     #    film_index=[1, 1, 1],
-    # )
-    # print(intf)
+    #)
+    #print(intf)
     print(surf)
-"""
+# """
