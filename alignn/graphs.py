@@ -124,6 +124,42 @@ def nearest_neighbor_edges(
     return edges
 
 
+def build_undirected_edgedata_new(
+    frac_coords=[], new_nb_edg=[], lattice_mat=[]
+):
+    """Build graph withih forward function."""
+    u, v, r = [], [], []
+    for ii, i in enumerate(new_nb_edg):
+        for jj, j in enumerate(i):
+            # print (ii,jj,j)
+            src_id = ii
+            dst_id = jj
+            for k in list(j):
+                a = torch.tensor(k)
+                b = torch.tensor(np.array([-999.0, -999.0, -999.0]))
+                # print('k',torch.tensor(k),torch.tensor(np.array([-999., -999., -999.])))
+                if not (torch.equal(a, b)):
+                    dst_image = k
+                    dst_coord = frac_coords[dst_id] + dst_image
+                    # cartesian displacement vector pointing from src -> dst
+                    tmp = dst_coord - frac_coords[src_id]
+                    d = np.dot(
+                        np.array(tmp), lattice_mat[dst_id]
+                    )  # dst_id or src_id??
+
+                    for uu, vv, dd in [
+                        (src_id, dst_id, d),
+                        (dst_id, src_id, -d),
+                    ]:
+                        u.append(uu)
+                        v.append(vv)
+                        r.append(dd)
+    u = torch.tensor(u)
+    v = torch.tensor(v)
+    r = torch.tensor(r).type(torch.get_default_dtype())
+    return u, v, r
+
+
 def build_undirected_edgedata(
     atoms=None,
     edges={},
@@ -223,21 +259,65 @@ class Graph(object):
 
         # build up atom attribute tensor
         sps_features = []
+        atomc_numbers = []
         for ii, s in enumerate(atoms.elements):
             feat = list(get_node_attributes(s, atom_features=atom_features))
             # if include_prdf_angles:
             #    feat=feat+list(prdf[ii])+list(adf[ii])
             sps_features.append(feat)
+            atomc_numbers.append(Specie(s).Z)
         sps_features = np.array(sps_features)
         node_features = torch.tensor(sps_features).type(
             torch.get_default_dtype()
         )
+
+        # Extra work to make graph in forward function
+        frac_coords = atoms.frac_coords
+        cart_coords = atoms.cart_coords
+        lattice_mat = atoms.lattice_mat
+        # to make sparse edge in shape of num_atoms
+        sparse_edges = {}
+        for i in range(atoms.num_atoms):
+            for j in range(atoms.num_atoms):
+                sparse_edges[(i, j)] = []
+        for i, j in edges.items():
+            sparse_edges[i] = j
+
+        nb_edge = []
+        for ii in range(atoms.num_atoms):
+            tmp = []
+            for i, j in sparse_edges.items():
+                if ii == i[0]:
+                    tmp.append(list(j))
+            nb_edge.append(tmp)
+        new_nb_edg = (
+            np.zeros(
+                (
+                    atoms.num_atoms,
+                    atoms.num_atoms,
+                    max([len(i[1]) for i in nb_edge]),
+                    3,
+                )
+            )
+            + (-999)
+        )
+        for i, ii in enumerate(nb_edge):
+            for j, jj in enumerate(ii):
+                if jj:
+                    for k, kk in enumerate(jj):
+                        new_nb_edg[i][j][k] = np.array(list(nb_edge[i][j][k]))
+        #
+
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
+        g.ndata["atom_numbers"] = torch.tensor(atomc_numbers)
+        g.ndata["frac_coords"] = torch.tensor(atoms.frac_coords)
+        g.ndata["cart_coords"] = torch.tensor(atoms.cart_coords)
         g.ndata["lattice_mat"] = torch.tensor(
-            [atoms.lattice_mat for ii in range(atoms.num_atoms)]
+            [np.array(atoms.lattice_mat) for ii in range(atoms.num_atoms)]
         )
         g.edata["r"] = r
+        g.ndata["new_nb_edg"] = torch.tensor(new_nb_edg)
         g.ndata["V"] = torch.tensor(
             [atoms.volume for ii in range(atoms.num_atoms)]
         )

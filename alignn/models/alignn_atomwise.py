@@ -17,6 +17,76 @@ from torch.nn import functional as F
 from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
 
+# from alignn.graph import build_undirected_edgedata_new
+
+
+def compute_bond_cosines(edges):
+    """Compute bond angle cosines from bond displacement vectors."""
+    # line graph edge: (a, b), (b, c)
+    # `a -> b -> c`
+    # use law of cosines to compute angles cosines
+    # negate src bond so displacements are like `a <- b -> c`
+    # cos(theta) = ba \dot bc / (||ba|| ||bc||)
+    r1 = -edges.src["r"]
+    r2 = edges.dst["r"]
+    bond_cosine = torch.sum(r1 * r2, dim=1) / (
+        torch.norm(r1, dim=1) * torch.norm(r2, dim=1)
+    )
+    bond_cosine = torch.clamp(bond_cosine, -1, 1)
+    # bond_cosine = torch.arccos((torch.clamp(bond_cosine, -1, 1)))
+    # print (r1,r1.shape)
+    # print (r2,r2.shape)
+    # print (bond_cosine,bond_cosine.shape)
+    return {"h": bond_cosine}
+
+
+def build_undirected_edgedata_new(
+    cart_coords=[], new_nb_edg=[], lattice_mat=[]
+):
+    """Build graph withih forward function."""
+    frac_coords = torch.flatten(
+        torch.matmul(cart_coords[:, None], torch.linalg.inv(lattice_mat)),
+        start_dim=1,
+    )
+
+    u, v, r = [], [], []
+
+    for ii, i in enumerate(new_nb_edg):
+        for jj, j in enumerate(i):
+            # print (ii,jj,j)
+            src_id = ii
+            dst_id = jj
+            for k in list(j):
+                a = torch.tensor(np.array(k), requires_grad=True)
+                b = torch.tensor(
+                    np.array([-999.0, -999.0, -999.0]), requires_grad=True
+                )
+                # print('k',torch.tensor(k),torch.tensor(np.array([-999., -999., -999.])))
+                if not (torch.equal(a, b)):
+                    dst_image = k
+                    dst_coord = frac_coords[dst_id] + torch.tensor(
+                        np.array(dst_image), requires_grad=True
+                    )
+                    # cartesian displacement vector pointing from src -> dst
+                    tmp = dst_coord - frac_coords[src_id]
+                    # print ('tmp,lattice_mat',tmp, lattice_mat[dst_id])
+                    d = torch.matmul(
+                        tmp, lattice_mat[dst_id]
+                    )  # dst_id or src_id??
+
+                    for uu, vv, dd in [
+                        (src_id, dst_id, d),
+                        (dst_id, src_id, -d),
+                    ]:
+                        u.append(uu)
+                        v.append(vv)
+                        r.append(dd)
+
+    u = torch.tensor(u)
+    v = torch.tensor(v)
+    r = torch.stack(r).type(torch.get_default_dtype())
+    return u, v, r
+
 
 class ALIGNNAtomWiseConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.alignn."""
@@ -294,15 +364,32 @@ class ALIGNNAtomWise(nn.Module):
             z = self.angle_embedding(lg.edata.pop("h"))
 
         g = g.local_var()
-        result = {}
-
-        # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
         r = g.edata["r"]
+        # print("r1", r, r.shape)
+        vol = g.ndata["V"][0]
+        lattice_mat = g.ndata["lattice_mat"]
+        result = {}
+        # frac_coords = g.ndata['frac_coords']
+        cart_coords = g.ndata["cart_coords"]
+        new_nb_edg = g.ndata["new_nb_edg"]
+
+        # cart_coords = torch.flatten(torch.matmul(frac_coords[:,None],lattice_mat),start_dim=1)
         if self.config.calculate_gradient:
-            r.requires_grad_(True)
-        # r = g.edata["r"].clone().detach().requires_grad_(True)
+            lattice_mat.requires_grad_(True)
+            cart_coords.requires_grad_(True)
+
+        u, v, r = build_undirected_edgedata_new(
+            cart_coords=cart_coords,
+            new_nb_edg=new_nb_edg,
+            lattice_mat=lattice_mat,
+        )
+        g = dgl.graph((u, v))
+        g.edata["r"] = r
+        lg = g.line_graph(shared=True)
+        lg.apply_edges(compute_bond_cosines)
+        z = self.angle_embedding(lg.edata.pop("h"))
         bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
 
@@ -331,48 +418,39 @@ class ALIGNNAtomWise(nn.Module):
 
         if self.config.calculate_gradient:
             create_graph = True
-            # if config.normalize_graph_level_loss
-            # print ('out',out)
-            # print ('x',len(x))
-
-            # tmp_out = out*len(x)
-            # print ('tmp_out',tmp_out)
-            dy = (
-                self.config.grad_multiplier
-                * grad(
-                    # tmp_out,
-                    out,
-                    r,
-                    grad_outputs=torch.ones_like(out),
-                    create_graph=create_graph,
-                    retain_graph=True,
-                )[0]
-            )
-            g.edata["dy_dr"] = dy
-            g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
-            gradient = torch.squeeze(g.ndata["gradient"])
+            dy = self.config.grad_multiplier * grad(
+                # tmp_out,
+                out,
+                cart_coords,
+                grad_outputs=torch.ones_like(out),
+                create_graph=create_graph,
+                retain_graph=True,
+            )[0]
+            gradient = torch.squeeze(dy)
             if self.config.stresswise_weight != 0:
                 # Under development, use with caution
                 # 1 eV/Angstrom3 = 160.21766208 GPa
                 # 1 GPa = 10 kbar
                 # Following Virial stress formula, assuming inital velocity = 0
                 # Save volume as g.gdta['V']?
-                stress = -1 * (
+                stress = (
                     160.21766208
-                    * torch.matmul(r.T, dy)
-                    / (2 * g.ndata["V"][0])
+                    * grad(
+                        out,
+                        lattice_mat,
+                        grad_outputs=torch.ones_like(out),
+                        create_graph=create_graph,
+                        retain_graph=True,
+                    )[0]
+                    / (2 * vol)
                 )
-                # virial = (
-                #    160.21766208
-                #    * 10
-                #    * torch.einsum("ij, ik->jk", result["r"], result["dy_dr"])
-                #    / 2
-                # )  # / ( g.ndata["V"][0])
+                stress = torch.sum(stress, 0)
         if self.link:
             out = self.link(out)
 
         if self.classification:
             out = self.softmax(out)
+        # print ('out',out)
         result["out"] = out
         result["grad"] = gradient
         result["stress"] = stress
