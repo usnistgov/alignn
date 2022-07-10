@@ -68,8 +68,8 @@ import os
 torch.set_default_dtype(torch.float32)
 
 device = "cpu"
-if torch.cuda.is_available():
-    device = torch.device("cuda")
+# if torch.cuda.is_available():
+#    device = torch.device("cuda")
 
 
 def activated_output_transform(output):
@@ -308,18 +308,20 @@ def train_dgl(
                         # if config.normalize_graph_level_loss:
                         #     natoms_batch += np.array(i["pred_grad"]).shape[0]
                 if i["target_out"]:
-                    for j, k in zip(i["target_out"], i["pred_out"]):
-                        # if config.normalize_graph_level_loss and
-                        # natoms_batch:
-                        #   j=j/natoms_batch
-                        #   k=k/natoms_batch
-                        # if config.normalize_graph_level_loss and
-                        # not natoms_batch:
-                        # tmp = 'Add above in atomwise if not train grad.'
-                        #   raise ValueError(tmp)
+                    target_out.append(np.sum(np.array(i["target_out"])))
+                    pred_out.append(i["pred_out"])
+                    # for j, k in zip(i["target_out"], i["pred_out"]):
+                    # if config.normalize_graph_level_loss and
+                    # natoms_batch:
+                    #   j=j/natoms_batch
+                    #   k=k/natoms_batch
+                    # if config.normalize_graph_level_loss and
+                    # not natoms_batch:
+                    # tmp = 'Add above in atomwise if not train grad.'
+                    #   raise ValueError(tmp)
 
-                        target_out.append(j)
-                        pred_out.append(k)
+                    #   target_out.append(j)
+                    #   pred_out.append(k)
                 if i["target_stress"]:
                     for p, q in zip(i["target_stress"], i["pred_stress"]):
                         x = np.abs(np.array(p) - np.array(q))

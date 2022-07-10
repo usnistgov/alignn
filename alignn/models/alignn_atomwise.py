@@ -367,6 +367,27 @@ class ALIGNNAtomWise(nn.Module):
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
         r = g.edata["r"]
+
+        """
+
+        bondlength = torch.norm(r, dim=1)
+        y = self.edge_embedding(bondlength)
+
+        # ALIGNN updates: update node, edge, triplet features
+        for alignn_layer in self.alignn_layers:
+            x, y, z = alignn_layer(g, lg, x, y, z)
+
+        # gated GCN updates: update node, edge features
+        for gcn_layer in self.gcn_layers:
+            x, y = gcn_layer(g, x, y)
+        out1 = torch.empty(1)
+        if self.config.output_features is not None:
+            h = self.readout(g, x)
+            out1 = self.fc(h)
+            out1 = torch.squeeze(out1)
+        #print('out1',out1,torch.sum(out1))
+        """
+
         # print("r1", r, r.shape)
         vol = g.ndata["V"][0]
         lattice_mat = g.ndata["lattice_mat"]
@@ -387,6 +408,7 @@ class ALIGNNAtomWise(nn.Module):
         )
         g = dgl.graph((u, v))
         g.edata["r"] = r
+        g.ndata["atom_features"] = x
         lg = g.line_graph(shared=True)
         lg.apply_edges(compute_bond_cosines)
         z = self.angle_embedding(lg.edata.pop("h"))
@@ -450,7 +472,6 @@ class ALIGNNAtomWise(nn.Module):
 
         if self.classification:
             out = self.softmax(out)
-        # print ('out',out)
         result["out"] = out
         result["grad"] = gradient
         result["stress"] = stress
