@@ -13,6 +13,7 @@ import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from sklearn.metrics import mean_absolute_error
+import time
 
 try:
     from ignite.contrib.handlers.stores import EpochOutputStore
@@ -361,6 +362,7 @@ def train_dgl(
         history_train = []
         history_val = []
         for e in range(config.epochs):
+            time_start = time.time()
             # optimizer.zero_grad()
             running_loss = 0
             train_result = []
@@ -473,6 +475,8 @@ def train_dgl(
                 "stress",
                 mean_stress,
             )
+            time_end = time.time()
+            print("Time taken", time_end - time_start)
             history_train.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_train.json"),

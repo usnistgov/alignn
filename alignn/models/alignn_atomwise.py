@@ -10,12 +10,18 @@ import numpy as np
 from dgl.nn import AvgPooling
 import torch
 
+# import time
 # from dgl.nn.functional import edge_softmax
 from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F
 from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
+from jarvis.core.specie import (
+    Specie,
+    get_node_attributes,
+    atomic_numbers_to_symbols,
+)
 
 # from alignn.graph import build_undirected_edgedata_new
 
@@ -395,20 +401,38 @@ class ALIGNNAtomWise(nn.Module):
         # frac_coords = g.ndata['frac_coords']
         cart_coords = g.ndata["cart_coords"]
         new_nb_edg = g.ndata["new_nb_edg"]
+        z = g.ndata["atom_numbers"]
 
         # cart_coords = torch.flatten(torch.matmul(frac_coords[:,None],lattice_mat),start_dim=1)
         if self.config.calculate_gradient:
             lattice_mat.requires_grad_(True)
             cart_coords.requires_grad_(True)
-
         u, v, r = build_undirected_edgedata_new(
             cart_coords=cart_coords,
             new_nb_edg=new_nb_edg,
             lattice_mat=lattice_mat,
         )
         g = dgl.graph((u, v))
+        elements = atomic_numbers_to_symbols(z.numpy())
+
+        sps_features = []
+        atomc_numbers = []
+        atom_features = "cgcnn"
+        for ii, s in enumerate(elements):
+            feat = list(get_node_attributes(s, atom_features=atom_features))
+            # if include_prdf_angles:
+            #    feat=feat+list(prdf[ii])+list(adf[ii])
+            sps_features.append(feat)
+            atomc_numbers.append(Specie(s).Z)
+        sps_features = np.array(sps_features)
+        node_features = torch.tensor(sps_features).type(
+            torch.get_default_dtype()
+        )
+        g.ndata["atom_features"] = node_features
+        x = self.atom_embedding(node_features)
+
         g.edata["r"] = r
-        g.ndata["atom_features"] = x
+        # g.ndata["atom_features"] = x
         lg = g.line_graph(shared=True)
         lg.apply_edges(compute_bond_cosines)
         z = self.angle_embedding(lg.edata.pop("h"))
@@ -438,6 +462,7 @@ class ALIGNNAtomWise(nn.Module):
         gradient = torch.empty(1)
         stress = torch.empty(1)
 
+        # time_start=time.time()
         if self.config.calculate_gradient:
             create_graph = True
             dy = self.config.grad_multiplier * grad(
@@ -467,6 +492,8 @@ class ALIGNNAtomWise(nn.Module):
                     / (2 * vol)
                 )
                 stress = torch.sum(stress, 0)
+        # time_end=time.time()
+        # print ('Time build',time_end-time_start)
         if self.link:
             out = self.link(out)
 
