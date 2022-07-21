@@ -244,6 +244,6 @@ if __name__ == "__main__":
         print("Substrate:\n")
         print(intf["subs_sl"])
         print("Interface:\n")
-        print(intf["interface"])
+        print(intf["optimized_interface"])
         print("Interface energy(J/m2):\n")
         print(intf["interface_energy"])
