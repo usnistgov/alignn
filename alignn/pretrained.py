@@ -21,7 +21,7 @@ import pandas as pd
 
 tqdm.pandas()
 
-# Name of the model, figshare link, number of outputs
+# Name of the model, figshare link, number of outputs, extra config params (optional)
 all_models = {
     "jv_formation_energy_peratom_alignn": [
         "https://figshare.com/ndownloader/files/31458679",
@@ -133,6 +133,8 @@ all_models = {
         "https://figshare.com/ndownloader/files/31459228",
         1,
     ],
+    "jv_pdos_alignn": ['https://figshare.com/ndownloader/files/36757005', 66,
+                       {'alignn_layers' : 6, 'gcn_layers' : 6}]
 }
 
 
@@ -165,6 +167,13 @@ parser.add_argument(
     + ", usually 8 for solids and 5 for molecules.",
 )
 
+parser.add_argument(
+    "--max_neighbors",
+    default=12,
+    help="Maximum number of nearest neighbors in the periodic atomistic graph"
+    + " construction.",
+)
+
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -183,6 +192,10 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
     tmp = all_models[model_name]
     url = tmp[0]
     output_features = tmp[1]
+    try:
+        config_params = tmp[2]
+    except:
+        config_params = {}
     zfile = model_name + ".zip"
     path = str(os.path.join(os.path.dirname(__file__), zfile))
     if not os.path.isfile(path):
@@ -209,7 +222,7 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
     # print("Loading the zipfile...", zipfile.ZipFile(path).namelist())
     data = zipfile.ZipFile(path).read(tmp)
     model = ALIGNN(
-        ALIGNNConfig(name="alignn", output_features=output_features)
+        ALIGNNConfig(name="alignn", output_features=output_features, **config_params)
     )
     new_file, filename = tempfile.mkstemp()
     with open(filename, "wb") as f:
@@ -226,11 +239,14 @@ def get_prediction(
     model_name="jv_formation_energy_peratom_alignn",
     atoms=None,
     cutoff=8,
+    max_neighbors=12,
 ):
     """Get model prediction on a single structure."""
     model = get_figshare_model(model_name)
     # print("Loading completed.")
-    g, lg = Graph.atom_dgl_multigraph(atoms, cutoff=float(cutoff))
+    g, lg = Graph.atom_dgl_multigraph(atoms, cutoff=float(cutoff),\
+                                      max_neighbors=max_neighbors,
+                                      )
     out_data = (
         model([g.to(device), lg.to(device)])
         .detach()
@@ -355,6 +371,7 @@ if __name__ == "__main__":
     file_path = args.file_path
     file_format = args.file_format
     cutoff = args.cutoff
+    max_neighbors = args.max_neighbors
     if file_format == "poscar":
         atoms = Atoms.from_poscar(file_path)
     elif file_format == "cif":
@@ -367,7 +384,8 @@ if __name__ == "__main__":
         raise NotImplementedError("File format not implemented", file_format)
 
     out_data = get_prediction(
-        model_name=model_name, cutoff=float(cutoff), atoms=atoms
+        model_name=model_name, cutoff=float(cutoff), \
+            max_neighbors = int(max_neighbors), atoms=atoms
     )
 
     print("Predicted value:", model_name, file_path, out_data)
