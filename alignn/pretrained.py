@@ -21,7 +21,10 @@ import pandas as pd
 
 tqdm.pandas()
 
-# Name of the model, figshare link, number of outputs, extra config params (optional)
+"""
+Name of the model, figshare link, number of outputs,
+extra config params (optional)
+"""
 all_models = {
     "jv_formation_energy_peratom_alignn": [
         "https://figshare.com/ndownloader/files/31458679",
@@ -195,9 +198,9 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
     tmp = all_models[model_name]
     url = tmp[0]
     output_features = tmp[1]
-    try:
+    if len(tmp) > 2:
         config_params = tmp[2]
-    except:
+    else:
         config_params = {}
     zfile = model_name + ".zip"
     path = str(os.path.join(os.path.dirname(__file__), zfile))
