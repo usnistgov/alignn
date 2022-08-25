@@ -13,17 +13,17 @@ import ignite
 import torch
 
 from ignite.contrib.handlers import TensorboardLogger
+
 try:
     from ignite.contrib.handlers.stores import EpochOutputStore
+
     # For different version of pytorch-ignite
 except Exception as exp:
     from ignite.handlers.stores import EpochOutputStore
 
     pass
 from ignite.handlers import EarlyStopping
-from ignite.contrib.handlers.tensorboard_logger import (
-    global_step_from_engine,
-)
+from ignite.contrib.handlers.tensorboard_logger import global_step_from_engine
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import (
     Events,
@@ -121,9 +121,7 @@ def setup_optimizer(params, config: TrainingConfig):
     """Set up optimizer for param groups."""
     if config.optimizer == "adamw":
         optimizer = torch.optim.AdamW(
-            params,
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
+            params, lr=config.learning_rate, weight_decay=config.weight_decay,
         )
     elif config.optimizer == "sgd":
         optimizer = torch.optim.SGD(
@@ -297,9 +295,7 @@ def train_dgl(
         )
     elif config.scheduler == "step":
         # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer,
-        )
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer,)
 
     # select configured loss function
     criteria = {

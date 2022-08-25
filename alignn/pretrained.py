@@ -133,8 +133,11 @@ all_models = {
         "https://figshare.com/ndownloader/files/31459228",
         1,
     ],
-    "jv_pdos_alignn": ['https://figshare.com/ndownloader/files/36757005', 66,
-                       {'alignn_layers' : 6, 'gcn_layers' : 6}]
+    "jv_pdos_alignn": [
+        "https://figshare.com/ndownloader/files/36757005",
+        66,
+        {"alignn_layers": 6, "gcn_layers": 6},
+    ],
 }
 
 
@@ -222,7 +225,9 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
     # print("Loading the zipfile...", zipfile.ZipFile(path).namelist())
     data = zipfile.ZipFile(path).read(tmp)
     model = ALIGNN(
-        ALIGNNConfig(name="alignn", output_features=output_features, **config_params)
+        ALIGNNConfig(
+            name="alignn", output_features=output_features, **config_params
+        )
     )
     new_file, filename = tempfile.mkstemp()
     with open(filename, "wb") as f:
@@ -244,9 +249,9 @@ def get_prediction(
     """Get model prediction on a single structure."""
     model = get_figshare_model(model_name)
     # print("Loading completed.")
-    g, lg = Graph.atom_dgl_multigraph(atoms, cutoff=float(cutoff),\
-                                      max_neighbors=max_neighbors,
-                                      )
+    g, lg = Graph.atom_dgl_multigraph(
+        atoms, cutoff=float(cutoff), max_neighbors=max_neighbors,
+    )
     out_data = (
         model([g.to(device), lg.to(device)])
         .detach()
@@ -384,8 +389,10 @@ if __name__ == "__main__":
         raise NotImplementedError("File format not implemented", file_format)
 
     out_data = get_prediction(
-        model_name=model_name, cutoff=float(cutoff), \
-            max_neighbors = int(max_neighbors), atoms=atoms
+        model_name=model_name,
+        cutoff=float(cutoff),
+        max_neighbors=int(max_neighbors),
+        atoms=atoms,
     )
 
     print("Predicted value:", model_name, file_path, out_data)

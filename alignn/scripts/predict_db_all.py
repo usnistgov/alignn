@@ -1,8 +1,10 @@
 """Module to predict for all DB's form. enp and gap."""
 import torch
+
 # from jarvis.core.atoms import Atoms
 # from jarvis.core.graphs import Graph
 from alignn.models.alignn import ALIGNN
+
 # from jarvis.analysis.structure.spacegroup import Spacegroup3D
 # from jarvis.db.figshare import data
 from alignn.data import load_dataset, get_train_val_loaders

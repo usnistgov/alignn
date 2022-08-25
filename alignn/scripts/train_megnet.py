@@ -10,8 +10,7 @@ from sklearn.metrics import mean_absolute_error
 import warnings
 
 warnings.filterwarnings(
-    "ignore",
-    ".*do not.*",
+    "ignore", ".*do not.*",
 )
 
 
@@ -99,9 +98,7 @@ with open(idp, "r") as f:
     data = [row for row in reader]
 
 
-id_train, id_val, id_test = get_id_train_val_test(
-    total_size=len(data),
-)
+id_train, id_val, id_test = get_id_train_val_test(total_size=len(data),)
 
 print("Loading structures.")
 for i in id_train:
@@ -148,7 +145,6 @@ for i in id_test:
     pred_target = model.predict_structure(s)
     preds.append(pred_target)
 print(
-    "Test MAE:",
-    mean_absolute_error(np.array(new_targets), np.array(preds)),
+    "Test MAE:", mean_absolute_error(np.array(new_targets), np.array(preds)),
 )
 # print (pred_target,type(pred_target[0]))
