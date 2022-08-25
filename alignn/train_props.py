@@ -62,7 +62,7 @@ def train_prop_model(
         "write_predictions": write_predictions,
         "num_workers": num_workers,
         "classification_threshold": classification_threshold,
-        "model": {"name": name, },   
+        "model": {"name": name, },
     }
     if n_early_stopping is not None:
         config["n_early_stopping"] = n_early_stopping
