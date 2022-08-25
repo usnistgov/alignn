@@ -3,6 +3,7 @@ from jarvis.db.figshare import get_jid_data
 from jarvis.core.atoms import Atoms
 from jarvis.core.graphs import Graph
 import networkx as nx
+
 # import matplotlib.pyplot as plt
 
 # %matplotlib inline
