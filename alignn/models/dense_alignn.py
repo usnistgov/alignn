@@ -401,9 +401,7 @@ class DenseALIGNN(nn.Module):
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
-                vmin=-np.pi,
-                vmax=np.pi,
-                bins=config.triplet_input_features,
+                vmin=-np.pi, vmax=np.pi, bins=config.triplet_input_features,
             ),
             MLPLayer(
                 config.triplet_input_features, config.embedding_features, norm
