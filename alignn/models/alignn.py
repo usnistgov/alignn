@@ -39,6 +39,7 @@ class ALIGNNConfig(BaseSettings):
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
     classification: bool = False
+    num_classes: int = 2
 
     class Config:
         """Configure model settings behavior."""
@@ -231,7 +232,7 @@ class ALIGNN(nn.Module):
         self.readout = AvgPooling()
 
         if self.classification:
-            self.fc = nn.Linear(config.hidden_features, 2)
+            self.fc = nn.Linear(config.hidden_features, config.num_classes)
             self.softmax = nn.LogSoftmax(dim=1)
         else:
             self.fc = nn.Linear(config.hidden_features, config.output_features)
