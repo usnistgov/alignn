@@ -988,8 +988,8 @@ def train_dgl(
         predictions = []
         with torch.no_grad():
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
+            #this loader loads one point at a time?
+            for (g, lg, target), i in zip(test_loader, ids):
                 out_data = net([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
@@ -1002,7 +1002,7 @@ def train_dgl(
                 target = target.cpu().numpy().flatten().tolist()
                 if len(target) == 1:
                     target = target[0]
-                f.write("%s, %6f, %6f\n" % (id, target, out_data))
+                f.write("%s, %6f, %6f\n" % (i, target, out_data))
                 targets.append(target)
                 predictions.append(out_data)
         f.close()
@@ -1011,55 +1011,52 @@ def train_dgl(
             "Test MAE:",
             mean_absolute_error(np.array(targets), np.array(predictions)),
         )
-        if config.store_outputs and not classification:
-            x = []
-            y = []
-            for i in history["EOS"]:
-                x.append(i[0].cpu().numpy().tolist())
-                y.append(i[1].cpu().numpy().tolist())
-            x = np.array(x, dtype="float").flatten()
-            y = np.array(y, dtype="float").flatten()
-            f = open(
-                os.path.join(
-                    config.output_dir, "prediction_results_train_set.csv"
-                ),
-                "w",
-            )
-            # TODO: Add IDs
-            f.write("target,prediction\n")
-            for i, j in zip(x, y):
-                f.write("%6f, %6f\n" % (j, i))
-                line = str(i) + "," + str(j) + "\n"
-                f.write(line)
-            f.close()
+        # if config.store_outputs and not classification:
+        #     x = []
+        #     y = []
+        #     # This this stores the validation results?
+        #     for i in history["EOS"]:
+        #         x.append(i[0].cpu().numpy().tolist())
+        #         y.append(i[1].cpu().numpy().tolist())
+        #     x = np.array(x, dtype="float").flatten()
+        #     y = np.array(y, dtype="float").flatten()
+        #     f = open(
+        #         os.path.join(
+        #             config.output_dir, "prediction_results_train_set.csv"
+        #         ),
+        #         "w",
+        #     )
+        #     # TODO: Add IDs
+        #     f.write("target,prediction\n")
+        #     for i, j in zip(x, y):
+        #         #f.write("%6f, %6f\n" % (j, i)) redundant and wrong?
+        #         line = str(i) + "," + str(j) + "\n"
+        #         f.write(line)
+        #     f.close()
 
-    # TODO: Fix IDs for train loader
-    """
     if config.write_train_predictions:
         net.eval()
-        f = open("train_prediction_results.csv", "w")
+        f = open(
+            os.path.join(config.output_dir, "prediction_results_train_set.csv"),
+            "w",
+        )
         f.write("id,target,prediction\n")
+        targets = []
+        predictions = []
         with torch.no_grad():
-            ids = train_loader.dataset.dataset.ids[
-                train_loader.dataset.indices
-            ]
-            print("lens", len(ids), len(train_loader.dataset.dataset))
-            x = []
-            y = []
-
-            for dat, id in zip(train_loader, ids):
-                g, lg, target = dat
+            ids = train_loader.dataset.ids
+            #this loader loads the whole train set?
+            for g, lg, target in train_loader:
                 out_data = net([g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 target = target.cpu().numpy().flatten().tolist()
-                for i, j in zip(out_data, target):
-                    x.append(i)
-                    y.append(j)
-            for i, j, k in zip(ids, x, y):
+                for i, j in zip(target, out_data):
+                    targets.append(i)
+                    predictions.append(j)
+            for i, j, k in zip(ids, targets, predictions):
                 f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
 
-    """
     return history
 
 
