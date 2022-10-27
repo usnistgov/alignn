@@ -10,7 +10,7 @@ with open("README.org", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2022.09.22",
+    version="2022.10.23",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
