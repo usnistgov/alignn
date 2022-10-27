@@ -187,6 +187,7 @@ class TrainingConfig(BaseSettings):
     save_dataloader: bool = False
     write_checkpoint: bool = True
     write_predictions: bool = True
+    write_train_predictions: bool = True
     store_outputs: bool = True
     progress: bool = True
     log_tensorboard: bool = False
