@@ -13,15 +13,8 @@ import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from sklearn.metrics import mean_absolute_error
+from ignite.handlers.stores import EpochOutputStore
 
-try:
-    from ignite.contrib.handlers.stores import EpochOutputStore
-
-    # For different version of pytorch-ignite
-except Exception:
-    from ignite.handlers.stores import EpochOutputStore
-
-    pass
 from ignite.handlers import EarlyStopping
 from ignite.contrib.handlers.tensorboard_logger import (
     global_step_from_engine,
