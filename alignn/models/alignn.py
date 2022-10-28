@@ -250,7 +250,7 @@ class ALIGNN(nn.Module):
             self.link = torch.sigmoid
 
     def forward(
-        self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
+        self, g: Tuple[str, Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]]
     ):
         """ALIGNN : start with `atom_features`.
 
@@ -259,11 +259,13 @@ class ALIGNN(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
-            g, lg = g
+            _, g, lg = g
             lg = lg.local_var()
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
+        else:
+            _, g = g
 
         g = g.local_var()
 
