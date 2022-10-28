@@ -513,15 +513,13 @@ def train_dgl(
         targets = []
         predictions = []
         with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+            for ind, g, lg, target in test_loader:
+                out_data = net([ind, g.to(device), lg.to(device)])
                 # out_data = torch.exp(out_data.cpu())
                 top_p, top_class = torch.topk(torch.exp(out_data), k=1)
                 target = int(target.cpu().numpy().flatten().tolist()[0])
 
-                f.write("%s, %d, %d\n" % (id, (target), (top_class)))
+                f.write("%s, %d, %d\n" % (ind, (target), (top_class)))
                 targets.append(target)
                 predictions.append(
                     top_class.cpu().numpy().flatten().tolist()[0]
@@ -544,10 +542,8 @@ def train_dgl(
         net.eval()
         mem = []
         with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+            for ind, g, lg, target in test_loader:
+                out_data = net([ind, g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(open("sc.pkl", "rb"))
@@ -556,7 +552,7 @@ def train_dgl(
                     )  # [0][0]
                 target = target.cpu().numpy().flatten().tolist()
                 info = {}
-                info["id"] = id
+                info["id"] = ind
                 info["target"] = target
                 info["predictions"] = out_data
                 mem.append(info)
@@ -580,10 +576,10 @@ def train_dgl(
         targets = []
         predictions = []
         with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            #this loader loads one point at a time?
-            for (g, lg, target), i in zip(test_loader, ids):
-                out_data = net([g.to(device), lg.to(device)])
+            # this loader loads batches of one, but could do more
+            # in which case, this loop is not equipped to handle the writing
+            for ind, g, lg, target in test_loader:
+                out_data = net([ind, g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
@@ -595,7 +591,7 @@ def train_dgl(
                 target = target.cpu().numpy().flatten().tolist()
                 if len(target) == 1:
                     target = target[0]
-                f.write("%s, %6f, %6f\n" % (i, target, out_data))
+                f.write("%s, %6f, %6f\n" % (ind, target, out_data))
                 targets.append(target)
                 predictions.append(out_data)
         f.close()
@@ -635,19 +631,21 @@ def train_dgl(
             "w",
         )
         f.write("id,target,prediction\n")
+        inds = []
         targets = []
         predictions = []
         with torch.no_grad():
-            ids = train_loader.dataset.ids
-            #this loader loads the whole train set?
-            for g, lg, target in train_loader:
-                out_data = net([g.to(device), lg.to(device)])
+            # this loader loads train set batches
+            for ind, g, lg, target in train_loader:
+                out_data = net([ind, g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 target = target.cpu().numpy().flatten().tolist()
-                for i, j in zip(target, out_data):
-                    targets.append(i)
-                    predictions.append(j)
-            for i, j, k in zip(ids, targets, predictions):
+                # collect all batches
+                for i, j, k in zip(ind, target, out_data):
+                    inds.append(i)
+                    targets.append(j)
+                    predictions.append(k)
+            for i, j, k in zip(inds, targets, predictions):
                 f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
 
