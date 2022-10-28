@@ -13,15 +13,8 @@ import ignite
 import torch
 
 from ignite.contrib.handlers import TensorboardLogger
+from ignite.handlers.stores import EpochOutputStore
 
-try:
-    from ignite.contrib.handlers.stores import EpochOutputStore
-
-    # For different version of pytorch-ignite
-except Exception as exp:
-    from ignite.handlers.stores import EpochOutputStore
-
-    pass
 from ignite.handlers import EarlyStopping
 from ignite.contrib.handlers.tensorboard_logger import global_step_from_engine
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
