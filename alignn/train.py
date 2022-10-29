@@ -50,6 +50,7 @@ import json
 import pprint
 
 import os
+from itertools import chain
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -405,9 +406,9 @@ def train_dgl(
         # log_results handler will save epoch output
         # in history["EOS"]
         eos = EpochOutputStore()
-        eos.attach(evaluator)
+        eos.attach(evaluator, "val_out")
         train_eos = EpochOutputStore()
-        train_eos.attach(train_evaluator)
+        train_eos.attach(train_evaluator, "tr_out")
 
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -596,30 +597,25 @@ def train_dgl(
         )
 
         if config.store_outputs and not classification:
-            inds = []
-            targets = []
-            predictions = []
-
-            x = []
-            y = []
-            # This this stores the validation results?
-            for i in history["EOS"]:
-                x.append(i[0].cpu().numpy().tolist())
-                y.append(i[1].cpu().numpy().tolist())
-            x = np.array(x, dtype="float").flatten()
-            y = np.array(y, dtype="float").flatten()
             f = open(
                 os.path.join(
                     config.output_dir, "prediction_results_val_set.csv"
                 ),
                 "w",
             )
-            # TODO: Add IDs
-            f.write("target,prediction\n")
-            for i, j in zip(x, y):
-                #f.write("%6f, %6f\n" % (j, i)) redundant and wrong?
-                line = str(i) + "," + str(j) + "\n"
-                f.write(line)
+            f.write("id,target,prediction\n")
+            inds = []
+            targets = []
+            predictions = []
+            for (ind, _, _, _), valtpl in zip(val_loader, evaluator.state.val_out):
+                inds.append(ind)
+                targets.append(valtpl[1].cpu().numpy().tolist())
+                predictions.append(valtpl[0].cpu().numpy().tolist())
+            inds = chain.from_iterable(inds)
+            targets = chain.from_iterable(targets)
+            predictions = chain.from_iterable(predictions)
+            for i, j, k in zip(inds, targets, predictions):
+                f.write("%s, %6f, %6f\n" % (i, j, k))
             f.close()
 
     if config.write_train_predictions:
@@ -633,7 +629,6 @@ def train_dgl(
         targets = []
         predictions = []
         with torch.no_grad():
-            # this loader loads train set batches
             for ind, g, lg, target in train_loader:
                 out_data = net([ind, g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
