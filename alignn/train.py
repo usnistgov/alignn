@@ -1024,11 +1024,11 @@ def train_dgl(
             predictions = []
             for xtpl, y, yp in evaluator.state.inout:
                 inds.append(xtpl[0])
-                targets.append(y.cpu().numpy().tolist())
-                predictions.append(yp.cpu().numpy().tolist())
-            inds = chain.from_iterable(inds)
-            targets = chain.from_iterable(targets)
-            predictions = chain.from_iterable(predictions)
+                targets.append(y.cpu().numpy().ravel().tolist())
+                predictions.append(yp.cpu().numpy().ravel().tolist())
+            inds = list(chain.from_iterable(inds))
+            targets = list(chain.from_iterable(targets))
+            predictions = list(chain.from_iterable(predictions))
             for i, j, k in zip(inds, targets, predictions):
                 f.write("%s, %6f, %6f\n" % (i, j, k))
             f.close()
@@ -1044,11 +1044,11 @@ def train_dgl(
         predictions = []
         for xtpl, y, yp  in train_evaluator.state.inout:
             inds.append(xtpl[0])
-            targets.append(y.cpu().numpy().tolist())
-            predictions.append(yp.cpu().numpy().tolist())
-        inds = chain.from_iterable(inds)
-        targets = chain.from_iterable(targets)
-        predictions = chain.from_iterable(predictions)
+            targets.append(y.cpu().numpy().ravel().tolist())
+            predictions.append(yp.cpu().numpy().ravel().tolist())
+        inds = list(chain.from_iterable(inds))
+        targets = list(chain.from_iterable(targets))
+        predictions = list(chain.from_iterable(predictions))
         for i, j, k in zip(inds, targets, predictions):
             f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
