@@ -310,7 +310,6 @@ def train_dgl(
         )
     }
     if config.model.output_features > 1 and config.standard_scalar_and_pca:
-        # metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
         metrics = {
             "loss": Loss(
                 criterion, output_transform=make_standard_scalar_and_pca
@@ -442,6 +441,7 @@ def train_dgl(
             history["validation"][metric].append(vm)
 
         if config.store_outputs:
+            # TODO: make these animation frame write-outs .append
             history["EOS"] = eos.data
             history["trainEOS"] = train_eos.data
             dumpjson(
@@ -574,27 +574,29 @@ def train_dgl(
             "w",
         )
         f.write("id,target,prediction\n")
+        inds = []
         targets = []
         predictions = []
         with torch.no_grad():
-            # this loader loads batches of one, but could do more
-            # in which case, this loop is not equipped to handle the writing
             for ind, g, lg, target in test_loader:
                 out_data = net([ind, g.to(device), lg.to(device)])
-                out_data = out_data.cpu().numpy().tolist()
+
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
                         open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
                     )
-                    out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
-                        0
-                    ][0]
-                target = target.cpu().numpy().flatten().tolist()
-                if len(target) == 1:
-                    target = target[0]
-                f.write("%s, %6f, %6f\n" % (ind, target, out_data))
-                targets.append(target)
-                predictions.append(out_data)
+                    out_data = sc.transform(
+                        np.array(out_data).reshape(-1, 1)
+                    )[0][0]
+
+                inds.append(ind)
+                targets.append(target.cpu().numpy().ravel().tolist())
+                predictions.append(out_data.cpu().numpy().ravel().tolist())
+            inds = list(chain.from_iterable(inds))
+            targets = list(chain.from_iterable(targets))
+            predictions = list(chain.from_iterable(predictions))
+            for i, j, k in zip(inds, targets, predictions):
+                f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
         from sklearn.metrics import mean_absolute_error
 
