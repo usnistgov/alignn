@@ -68,7 +68,7 @@ if torch.cuda.is_available():
 
 def activated_output_transform(output):
     """Exponentiate output."""
-    y_pred, y = output
+    _, y, y_pred = output
     y_pred = torch.exp(y_pred)
     y_pred = y_pred[:, 1]
     return y_pred, y
@@ -77,7 +77,7 @@ def activated_output_transform(output):
 def make_standard_scalar_and_pca(output):
     """Use standard scalar and PCS for multi-output data."""
     sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
-    y_pred, y = output
+    _, y, y_pred = output
     y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
     y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
     # pc = pk.load(open("pca.pkl", "rb"))
@@ -92,7 +92,7 @@ def make_standard_scalar_and_pca(output):
 
 def thresholded_output_transform(output):
     """Round off output."""
-    y_pred, y = output
+    _, y, y_pred = output
     y_pred = torch.round(torch.exp(y_pred))
     # print ('output',y_pred)
     return y_pred, y
@@ -702,7 +702,14 @@ def train_dgl(
     criterion = criteria[config.criterion]
 
     # set up training engine and evaluators
-    metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
+    metrics = {
+        "loss": Loss(
+            criterion, output_transform=lambda tpl: (tpl[2],tpl[1])
+        ),
+        "mae": MeanAbsoluteError(
+            output_transform=lambda tpl: (tpl[2],tpl[1])
+        )
+    }
     if config.model.output_features > 1 and config.standard_scalar_and_pca:
         # metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
         metrics = {
@@ -716,9 +723,9 @@ def train_dgl(
 
     if config.criterion == "zig":
 
-        def zig_prediction_transform(x):
-            output, y = x
-            return criterion.predict(output), y
+        def zig_prediction_transform(output):
+            _, y, y_pred = output
+            return criterion.predict(y_pred), y
 
         metrics = {
             "loss": Loss(criterion),
@@ -759,6 +766,7 @@ def train_dgl(
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
+        output_transform=lambda x,y,yp: (x,y,yp),
         # output_transform=make_standard_scalar_and_pca,
     )
 
@@ -767,6 +775,7 @@ def train_dgl(
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
+        output_transform=lambda x,y,yp: (x,y,yp),
         # output_transform=make_standard_scalar_and_pca,
     )
 
@@ -807,9 +816,9 @@ def train_dgl(
         # log_results handler will save epoch output
         # in history["EOS"]
         eos = EpochOutputStore()
-        eos.attach(evaluator, "val_out")
+        eos.attach(evaluator, "inout")
         train_eos = EpochOutputStore()
-        train_eos.attach(train_evaluator, "tr_out")
+        train_eos.attach(train_evaluator, "inout")
 
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -832,10 +841,6 @@ def train_dgl(
 
             history["train"][metric].append(tm)
             history["validation"][metric].append(vm)
-
-        # for metric in metrics.keys():
-        #    history["train"][metric].append(tmetrics[metric])
-        #    history["validation"][metric].append(vmetrics[metric])
 
         if config.store_outputs:
             history["EOS"] = eos.data
@@ -963,6 +968,8 @@ def train_dgl(
             ),
             data=mem,
         )
+        # TODO: get classifier validation/train predictions
+
     if (
         config.write_predictions
         and not classification
@@ -1013,10 +1020,10 @@ def train_dgl(
             inds = []
             targets = []
             predictions = []
-            for (ind, _, _, _), valtpl in zip(val_loader, evaluator.state.val_out):
-                inds.append(ind)
-                targets.append(valtpl[1].cpu().numpy().tolist())
-                predictions.append(valtpl[0].cpu().numpy().tolist())
+            for xtpl, y, yp in evaluator.state.inout:
+                inds.append(xtpl[0])
+                targets.append(y.cpu().numpy().tolist())
+                predictions.append(yp.cpu().numpy().tolist())
             inds = chain.from_iterable(inds)
             targets = chain.from_iterable(targets)
             predictions = chain.from_iterable(predictions)
@@ -1025,7 +1032,6 @@ def train_dgl(
             f.close()
 
     if config.write_train_predictions:
-        net.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_train_set.csv"),
             "w",
@@ -1034,18 +1040,15 @@ def train_dgl(
         inds = []
         targets = []
         predictions = []
-        with torch.no_grad():
-            for ind, g, lg, target in train_loader:
-                out_data = net([ind, g.to(device), lg.to(device)])
-                out_data = out_data.cpu().numpy().tolist()
-                target = target.cpu().numpy().flatten().tolist()
-                # collect all batches
-                for i, j, k in zip(ind, target, out_data):
-                    inds.append(i)
-                    targets.append(j)
-                    predictions.append(k)
-            for i, j, k in zip(inds, targets, predictions):
-                f.write("%s, %6f, %6f\n" % (i, j, k))
+        for xtpl, y, yp  in train_evaluator.state.inout:
+            inds.append(xtpl[0])
+            targets.append(y.cpu().numpy().tolist())
+            predictions.append(yp.cpu().numpy().tolist())
+        inds = chain.from_iterable(inds)
+        targets = chain.from_iterable(targets)
+        predictions = chain.from_iterable(predictions)
+        for i, j, k in zip(inds, targets, predictions):
+            f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
 
     return history
