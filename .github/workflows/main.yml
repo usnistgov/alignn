@@ -31,7 +31,7 @@ jobs:
     - name: Test with pytest
       run: |
         export DGLBACKEND=pytorch
-        export CUDA_VISIBLE_DEVICES=""
+        export CUDA_VISIBLE_DEVICES="-1"
         pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage 
         echo 'PIP freeze'
         pip freeze
