@@ -5,6 +5,7 @@
 ![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/usnistgov/alignn)
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/usnistgov/alignn)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/usnistgov/alignn)
+[![Downloads](https://pepy.tech/badge/alignn)](https://pepy.tech/project/alignn)
 <!--
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/formation-energy-on-materials-project)](https://paperswithcode.com/sota/formation-energy-on-materials-project?p=atomistic-line-graph-neural-network-for)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/band-gap-on-materials-project)](https://paperswithcode.com/sota/band-gap-on-materials-project?p=atomistic-line-graph-neural-network-for)
@@ -12,7 +13,6 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/formation-energy-on-jarvis-dft-formation)](https://paperswithcode.com/sota/formation-energy-on-jarvis-dft-formation?p=atomistic-line-graph-neural-network-for)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/band-gap-on-jarvis-dft)](https://paperswithcode.com/sota/band-gap-on-jarvis-dft?p=atomistic-line-graph-neural-network-for)
 -->
-[![Downloads](https://pepy.tech/badge/alignn)](https://pepy.tech/project/alignn)
 
 # Table of Contents
 * [Introduction](#intro)

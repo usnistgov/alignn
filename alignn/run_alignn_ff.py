@@ -160,11 +160,13 @@ if __name__ == "__main__":
         film_atoms = Atoms.from_poscar(interface_info[0])
         subs_atoms = Atoms.from_poscar(interface_info[1])
         film_index = np.array(
-            [i for i in re.split("(\d)", interface_info[2]) if i != ""],
+            [i for i in re.split("_", interface_info[2]) if i != ""],
+            # [i for i in re.split("(\d)", interface_info[2]) if i != ""],
             dtype="int",
         )
         subs_index = np.array(
-            [i for i in re.split("(\d)", interface_info[3]) if i != ""],
+            [i for i in re.split("_", interface_info[3]) if i != ""],
+            # [i for i in re.split("(\d)", interface_info[3]) if i != ""],
             dtype="int",
         )
         film_thickness = float(interface_info[4])

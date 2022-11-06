@@ -5,7 +5,8 @@ import os
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
-from ase import Atoms as AseAtoms
+
+# from ase import Atoms as AseAtoms
 import matplotlib.pyplot as plt
 from jarvis.analysis.thermodynamics.energetics import unary_energy
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
@@ -44,7 +45,7 @@ from jarvis.analysis.interface.zur import make_interface
 from jarvis.analysis.defects.surface import Surface
 
 # from jarvis.core.kpoints import Kpoints3D as Kpoints
-from jarvis.core.atoms import get_supercell_dims
+# from jarvis.core.atoms import get_supercell_dims
 
 try:
     from gpaw import GPAW, PW
@@ -538,9 +539,11 @@ def ev_curve(
     eos = EquationOfState(vol, y, eos="murnaghan")
     v0, e0, B = eos.fit()
     kv = B / kJ * 1.0e24  # , 'GPa')
-    print("KV", kv)
+    # print("KV", kv)
     # eos.plot(show=True)
     eos.plot(fig_name)
+    print("E", y)
+    print("V", vol)
     return x, y, eos, kv
 
 
