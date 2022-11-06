@@ -33,7 +33,7 @@ jobs:
         export DGLBACKEND=pytorch
         #export CUDA_VISIBLE_DEVICES="-1"
         pip install flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage 
-        pip uninstall nvidia-cublas-cu11 nvidia-cuda-nvrtc-cu11 nvidia-cuda-runtime-cu11 nvidia-cudnn-cu11
+        pip uninstall -y nvidia-cublas-cu11 nvidia-cuda-nvrtc-cu11 nvidia-cuda-runtime-cu11 nvidia-cudnn-cu11
         echo 'PIP freeze'
         pip freeze
         coverage run -m pytest
