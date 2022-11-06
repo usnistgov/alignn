@@ -27,7 +27,6 @@ from ase.md.npt import NPT
 from ase.md.andersen import Andersen
 import ase.calculators.calculator
 from ase.stress import full_3x3_to_voigt_6_stress
-import torch
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
@@ -95,7 +94,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         include_stress=True,
         atoms=None,
         directory=".",
-        device="cpu",
+        device=None,
         path=".",
         model_filename="best_model.pt",
         config_filename="config.json",
@@ -110,7 +109,6 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         super(AlignnAtomwiseCalculator, self).__init__(
             restart, ignore_bad_restart_file, label, atoms, directory, **kwargs
         )
-
         self.device = device
         self.include_stress = include_stress
 
@@ -140,10 +138,18 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
         config.model.output_features = 1
 
+        import torch
+
+        if self.device is None:
+            self.device = torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            )
         model = ALIGNNAtomWise(config.model)
         model.state_dict()
         model.load_state_dict(
-            torch.load(os.path.join(path, model_filename), map_location=device)
+            torch.load(
+                os.path.join(path, model_filename), map_location=self.device
+            )
         )
         model.to(device)
         model.eval()
