@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2022.10.23",
+    version="2022.11.05",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -31,9 +31,15 @@ setuptools.setup(
         "pycodestyle>=2.7.0",
         "pydocstyle>=6.0.0",
         "pyparsing>=2.2.1,<3",
+        "ase",
     ],
     # scripts=["alignn/alignn_train_folder.py"],
-    scripts=["alignn/pretrained.py", "alignn/train_folder.py"],
+    scripts=[
+        "alignn/pretrained.py",
+        "alignn/train_folder.py",
+        "alignn/train_folder_ff.py",
+        "alignn/run_alignn_ff.py",
+    ],
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/usnistgov/alignn",

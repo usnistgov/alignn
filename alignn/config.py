@@ -4,8 +4,6 @@ import subprocess
 from typing import Optional, Union
 import os
 from pydantic import root_validator
-
-# vfrom pydantic import Field, root_validator, validator
 from pydantic.typing import Literal
 from alignn.utils import BaseSettings
 from alignn.models.modified_cgcnn import CGCNNConfig
@@ -13,6 +11,7 @@ from alignn.models.icgcnn import ICGCNNConfig
 from alignn.models.gcn import SimpleGCNConfig
 from alignn.models.densegcn import DenseGCNConfig
 from alignn.models.alignn import ALIGNNConfig
+from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
 from alignn.models.dense_alignn import DenseALIGNNConfig
 from alignn.models.alignn_cgcnn import ACGCNNConfig
 from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
@@ -23,7 +22,7 @@ try:
     VERSION = (
         subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
     )
-except Exception as exp:
+except Exception:
     VERSION = "NA"
     pass
 
@@ -196,6 +195,7 @@ class TrainingConfig(BaseSettings):
     cutoff: float = 8.0
     max_neighbors: int = 12
     keep_data_order: bool = False
+    normalize_graph_level_loss: bool = False
     distributed: bool = False
     n_early_stopping: Optional[int] = None  # typically 50
     output_dir: str = os.path.abspath(".")  # typically 50
@@ -213,6 +213,7 @@ class TrainingConfig(BaseSettings):
         SimpleGCNConfig,
         DenseGCNConfig,
         ALIGNNConfig,
+        ALIGNNAtomWiseConfig,
         ALIGNN_LN_Config,
         DenseALIGNNConfig,
         ACGCNNConfig,

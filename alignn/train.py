@@ -11,19 +11,21 @@ from functools import partial
 from typing import Any, Dict, Union
 import ignite
 import torch
-
 from ignite.contrib.handlers import TensorboardLogger
+from sklearn.metrics import mean_absolute_error
 
 try:
     from ignite.contrib.handlers.stores import EpochOutputStore
 
     # For different version of pytorch-ignite
-except Exception as exp:
+except Exception:
     from ignite.handlers.stores import EpochOutputStore
 
     pass
 from ignite.handlers import EarlyStopping
-from ignite.contrib.handlers.tensorboard_logger import global_step_from_engine
+from ignite.contrib.handlers.tensorboard_logger import (
+    global_step_from_engine,
+)
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import (
     Events,
@@ -46,6 +48,7 @@ from alignn import models
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
+from alignn.models.alignn_atomwise import ALIGNNAtomWise
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
 from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
@@ -121,7 +124,9 @@ def setup_optimizer(params, config: TrainingConfig):
     """Set up optimizer for param groups."""
     if config.optimizer == "adamw":
         optimizer = torch.optim.AdamW(
-            params, lr=config.learning_rate, weight_decay=config.weight_decay,
+            params,
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
         )
     elif config.optimizer == "sgd":
         optimizer = torch.optim.SGD(
@@ -240,6 +245,7 @@ def train_dgl(
         "icgcnn": iCGCNN,
         "densegcn": DenseGCN,
         "alignn": ALIGNN,
+        "alignn_atomwise": ALIGNNAtomWise,
         "dense_alignn": DenseALIGNN,
         "alignn_cgcnn": ACGCNN,
         "alignn_layernorm": ALIGNN_LN,
@@ -250,28 +256,6 @@ def train_dgl(
         net = model
 
     net.to(device)
-    if config.distributed:
-        import torch.distributed as dist
-        import os
-
-        def setup(rank, world_size):
-            os.environ["MASTER_ADDR"] = "localhost"
-            os.environ["MASTER_PORT"] = "12355"
-
-            # initialize the process group
-            dist.init_process_group("gloo", rank=rank, world_size=world_size)
-
-        def cleanup():
-            dist.destroy_process_group()
-
-        setup(2, 2)
-        # local_rank = 0
-        # net=torch.nn.parallel.DataParallel(net
-        # ,device_ids=[local_rank, ],output_device=local_rank)
-        net = torch.nn.parallel.DistributedDataParallel(
-            net
-        )  # ,device_ids=[local_rank, ],output_device=local_rank)
-
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
@@ -295,8 +279,425 @@ def train_dgl(
         )
     elif config.scheduler == "step":
         # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer,)
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer,
+        )
 
+    if config.model.name == "alignn_atomwise":
+
+        def get_batch_errors(dat=[]):
+            """Get errors for samples."""
+            target_out = []
+            pred_out = []
+            grad = []
+            atomw = []
+            stress = []
+            mean_out = 0
+            mean_atom = 0
+            mean_grad = 0
+            mean_stress = 0
+            # natoms_batch=False
+            # print ('lendat',len(dat))
+            for i in dat:
+                if i["target_grad"]:
+                    # if config.normalize_graph_level_loss:
+                    #      natoms_batch = 0
+                    for m, n in zip(i["target_grad"], i["pred_grad"]):
+                        x = np.abs(np.array(m) - np.array(n))
+                        grad.append(np.mean(x))
+                        # if config.normalize_graph_level_loss:
+                        #     natoms_batch += np.array(i["pred_grad"]).shape[0]
+                if i["target_out"]:
+                    for j, k in zip(i["target_out"], i["pred_out"]):
+                        # if config.normalize_graph_level_loss and
+                        # natoms_batch:
+                        #   j=j/natoms_batch
+                        #   k=k/natoms_batch
+                        # if config.normalize_graph_level_loss and
+                        # not natoms_batch:
+                        # tmp = 'Add above in atomwise if not train grad.'
+                        #   raise ValueError(tmp)
+
+                        target_out.append(j)
+                        pred_out.append(k)
+                if i["target_stress"]:
+                    for p, q in zip(i["target_stress"], i["pred_stress"]):
+                        x = np.abs(np.array(p) - np.array(q))
+                        stress.append(np.mean(x))
+                if i["target_atomwise_pred"]:
+                    for m, n in zip(
+                        i["target_atomwise_pred"], i["pred_atomwise_pred"]
+                    ):
+                        x = np.abs(np.array(m) - np.array(n))
+                        atomw.append(np.mean(x))
+            if "target_out" in i:
+                # if i["target_out"]:
+                target_out = np.array(target_out)
+                pred_out = np.array(pred_out)
+                mean_out = mean_absolute_error(target_out, pred_out)
+            if "target_stress" in i:
+                # if i["target_stress"]:
+                mean_stress = np.array(stress).mean()
+            if "target_grad" in i:
+                # if i["target_grad"]:
+                mean_grad = np.array(grad).mean()
+            if "target_atomwise_pred" in i:
+                # if i["target_atomwise_pred"]:
+                mean_atom = np.array(atomw).mean()
+            # print ('natoms_batch',natoms_batch)
+            # if natoms_batch!=0:
+            #   mean_out = mean_out/natoms_batch
+            # print ('dat',dat)
+            return mean_out, mean_atom, mean_grad, mean_stress
+
+        best_loss = np.inf
+        criterion = nn.L1Loss()
+        # criterion = nn.MSELoss()
+        params = group_decay(net)
+        optimizer = setup_optimizer(params, config)
+        # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+        history_train = []
+        history_val = []
+        for e in range(config.epochs):
+            # optimizer.zero_grad()
+            running_loss = 0
+            train_result = []
+            for dats in train_loader:
+                optimizer.zero_grad()
+                result = net([dats[0].to(device), dats[1].to(device)])
+                info = {}
+                info["target_out"] = []
+                info["pred_out"] = []
+                info["target_atomwise_pred"] = []
+                info["pred_atomwise_pred"] = []
+                info["target_grad"] = []
+                info["pred_grad"] = []
+                info["target_stress"] = []
+                info["pred_stress"] = []
+
+                loss1 = 0  # Such as energy
+                loss2 = 0  # Such as bader charges
+                loss3 = 0  # Such as forces
+                loss4 = 0  # Such as stresses
+                if config.model.output_features is not None:
+                    loss1 = config.model.graphwise_weight * criterion(
+                        result["out"], dats[2].to(device)
+                    )
+                    info["target_out"] = dats[2].cpu().numpy().tolist()
+                    info["pred_out"] = (
+                        result["out"].cpu().detach().numpy().tolist()
+                    )
+                    # graphlevel_loss += np.mean(
+                    #    np.abs(
+                    #        dats[2].cpu().numpy()
+                    #        - result["out"].cpu().detach().numpy()
+                    #    )
+                    # )
+
+                if (
+                    config.model.atomwise_output_features is not None
+                    and config.model.atomwise_weight != 0
+                ):
+                    loss2 = config.model.atomwise_weight * criterion(
+                        result["atomwise_pred"].to(device),
+                        dats[0].ndata["atomwise_target"].to(device),
+                    )
+                    info["target_atomwise_pred"] = (
+                        dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
+                    )
+                    info["pred_atomwise_pred"] = (
+                        result["atomwise_pred"].cpu().detach().numpy().tolist()
+                    )
+                    # atomlevel_loss += np.mean(
+                    #    np.abs(
+                    #        dats[0].ndata["atomwise_target"].cpu().numpy()
+                    #        - result["atomwise_pred"].cpu().detach().numpy()
+                    #    )
+                    # )
+
+                if config.model.calculate_gradient:
+                    loss3 = config.model.gradwise_weight * criterion(
+                        result["grad"].to(device),
+                        dats[0].ndata["atomwise_grad"].to(device),
+                    )
+                    info["target_grad"] = (
+                        dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
+                    )
+                    info["pred_grad"] = (
+                        result["grad"].cpu().detach().numpy().tolist()
+                    )
+                    # gradlevel_loss += np.mean(
+                    #    np.abs(
+                    #        dats[0].ndata["atomwise_grad"].cpu().numpy()
+                    #        - result["grad"].cpu().detach().numpy()
+                    #    )
+                    # )
+                if config.model.stresswise_weight != 0:
+                    loss4 = config.model.stresswise_weight * criterion(
+                        result["stress"].to(device),
+                        dats[0].ndata["stresses"][0].to(device),
+                    )
+                    info["target_stress"] = (
+                        dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                    )
+                    info["pred_stress"] = (
+                        result["stress"].cpu().detach().numpy().tolist()
+                    )
+                    # print ("target_stress",info["target_stress"])
+                    # print ("pred_stress",info["pred_stress"])
+                train_result.append(info)
+                loss = loss1 + loss2 + loss3 + loss4
+                loss.backward()
+                optimizer.step()
+                # optimizer.zero_grad()
+                running_loss += loss.item()
+            mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
+                train_result
+            )
+            # dumpjson(filename="Train_results.json", data=train_result)
+            scheduler.step()
+            print(
+                "TrainLoss",
+                "Epoch",
+                e,
+                "total",
+                running_loss,
+                "out",
+                mean_out,
+                "atom",
+                mean_atom,
+                "grad",
+                mean_grad,
+                "stress",
+                mean_stress,
+            )
+            history_train.append([mean_out, mean_atom, mean_grad, mean_stress])
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_train.json"),
+                data=history_train,
+            )
+            val_loss = 0
+            val_result = []
+            for dats in val_loader:
+                optimizer.zero_grad()
+                result = net([dats[0].to(device), dats[1].to(device)])
+                info = {}
+                info["target_out"] = []
+                info["pred_out"] = []
+                info["target_atomwise_pred"] = []
+                info["pred_atomwise_pred"] = []
+                info["target_grad"] = []
+                info["pred_grad"] = []
+                info["target_stress"] = []
+                info["pred_stress"] = []
+                loss1 = 0  # Such as energy
+                loss2 = 0  # Such as bader charges
+                loss3 = 0  # Such as forces
+                loss4 = 0  # Such as stresses
+                if config.model.output_features is not None:
+                    loss1 = config.model.graphwise_weight * criterion(
+                        result["out"], dats[2].to(device)
+                    )
+                    info["target_out"] = dats[2].cpu().numpy().tolist()
+                    info["pred_out"] = (
+                        result["out"].cpu().detach().numpy().tolist()
+                    )
+                if (
+                    config.model.atomwise_output_features is not None
+                    and config.model.atomwise_weight != 0
+                ):
+                    loss2 = config.model.atomwise_weight * criterion(
+                        result["atomwise_pred"].to(device),
+                        dats[0].ndata["atomwise_target"].to(device),
+                    )
+                    info["target_atomwise_pred"] = (
+                        dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
+                    )
+                    info["pred_atomwise_pred"] = (
+                        result["atomwise_pred"].cpu().detach().numpy().tolist()
+                    )
+                if config.model.calculate_gradient:
+                    loss3 = config.model.gradwise_weight * criterion(
+                        result["grad"].to(device),
+                        dats[0].ndata["atomwise_grad"].to(device),
+                    )
+                    info["target_grad"] = (
+                        dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
+                    )
+                    info["pred_grad"] = (
+                        result["grad"].cpu().detach().numpy().tolist()
+                    )
+                if config.model.stresswise_weight != 0:
+                    loss4 = config.model.stresswise_weight * criterion(
+                        result["stress"].to(device),
+                        dats[0].ndata["stresses"][0].to(device),
+                    )
+                    info["target_stress"] = (
+                        dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                    )
+                    info["pred_stress"] = (
+                        result["stress"].cpu().detach().numpy().tolist()
+                    )
+                loss = loss1 + loss2 + loss3 + loss4
+                val_result.append(info)
+                val_loss += loss.item()
+            mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
+                val_result
+            )
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_model_name = "best_model.pt"
+                torch.save(
+                    net.state_dict(),
+                    os.path.join(config.output_dir, best_model_name),
+                )
+                print("Saving data for epoch:", e)
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "Train_results.json"
+                    ),
+                    data=train_result,
+                )
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "Val_results.json"
+                    ),
+                    data=val_result,
+                )
+            print(
+                "ValLoss",
+                "Epoch",
+                e,
+                "total",
+                val_loss,
+                "out",
+                mean_out,
+                "atom",
+                mean_atom,
+                "grad",
+                mean_grad,
+                "stress",
+                mean_stress,
+            )
+            history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
+            dumpjson(
+                filename=os.path.join(config.output_dir, "history_val.json"),
+                data=history_val,
+            )
+
+        test_loss = 0
+        test_result = []
+        for dats in test_loader:
+            optimizer.zero_grad()
+            result = net([dats[0].to(device), dats[1].to(device)])
+            loss1 = 0  # Such as energy
+            loss2 = 0  # Such as bader charges
+            loss3 = 0  # Such as forces
+            loss4 = 0  # Such as stresses
+            info = {}
+            if config.model.output_features is not None:
+                loss1 = config.model.graphwise_weight * criterion(
+                    result["out"], dats[2].to(device)
+                )
+                info["target_out"] = dats[2].cpu().numpy().tolist()
+                info["pred_out"] = (
+                    result["out"].cpu().detach().numpy().tolist()
+                )
+
+            if config.model.atomwise_output_features is not None:
+                loss2 = config.model.atomwise_weight * criterion(
+                    result["atomwise_pred"].to(device),
+                    dats[0].ndata["atomwise_target"].to(device),
+                )
+                info["target_atomwise_pred"] = (
+                    dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
+                )
+                info["pred_atomwise_pred"] = (
+                    result["atomwise_pred"].cpu().detach().numpy().tolist()
+                )
+
+            if config.model.calculate_gradient:
+                loss3 = config.model.gradwise_weight * criterion(
+                    result["grad"].to(device),
+                    dats[0].ndata["atomwise_grad"].to(device),
+                )
+                info["target_grad"] = (
+                    dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
+                )
+                info["pred_grad"] = (
+                    result["grad"].cpu().detach().numpy().tolist()
+                )
+            if config.model.stresswise_weight != 0:
+                loss4 = config.model.stresswise_weight * criterion(
+                    result["stress"][0].to(device),
+                    dats[0].ndata["stresses"].to(device),
+                )
+                info["target_stress"] = (
+                    dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                )
+                info["pred_stress"] = (
+                    result["stress"].cpu().detach().numpy().tolist()
+                )
+            test_result.append(info)
+            loss = loss1 + loss2 + loss3 + loss4
+            test_loss += loss.item()
+        print("TestLoss", e, test_loss)
+        dumpjson(
+            filename=os.path.join(config.output_dir, "Test_results.json"),
+            data=test_result,
+        )
+        return test_result
+
+    if config.distributed:
+        import torch.distributed as dist
+        import os
+
+        def setup(rank, world_size):
+            os.environ["MASTER_ADDR"] = "localhost"
+            os.environ["MASTER_PORT"] = "12355"
+
+            # initialize the process group
+            dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+        def cleanup():
+            dist.destroy_process_group()
+
+        setup(2, 2)
+        # local_rank = 0
+        # net=torch.nn.parallel.DataParallel(net
+        # ,device_ids=[local_rank, ],output_device=local_rank)
+        net = torch.nn.parallel.DistributedDataParallel(
+            net
+        )  # ,device_ids=[local_rank, ],output_device=local_rank)
+    """
+    # group parameters to skip weight decay for bias and batchnorm
+    params = group_decay(net)
+    optimizer = setup_optimizer(params, config)
+
+    if config.scheduler == "none":
+        # always return multiplier of 1 (i.e. do nothing)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer, lambda epoch: 1.0
+        )
+
+    elif config.scheduler == "onecycle":
+        steps_per_epoch = len(train_loader)
+        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=config.learning_rate,
+            epochs=config.epochs,
+            steps_per_epoch=steps_per_epoch,
+            # pct_start=pct_start,
+            pct_start=0.3,
+        )
+    elif config.scheduler == "step":
+        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer,
+        )
+
+    """
     # select configured loss function
     criteria = {
         "mse": nn.MSELoss(),
@@ -599,7 +1000,6 @@ def train_dgl(
                 targets.append(target)
                 predictions.append(out_data)
         f.close()
-        from sklearn.metrics import mean_absolute_error
 
         print(
             "Test MAE:",
