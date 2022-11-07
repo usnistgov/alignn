@@ -5,12 +5,14 @@
 ![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/usnistgov/alignn)
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/usnistgov/alignn)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/usnistgov/alignn)
+[![Downloads](https://pepy.tech/badge/alignn)](https://pepy.tech/project/alignn)
+<!--
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/formation-energy-on-materials-project)](https://paperswithcode.com/sota/formation-energy-on-materials-project?p=atomistic-line-graph-neural-network-for)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/band-gap-on-materials-project)](https://paperswithcode.com/sota/band-gap-on-materials-project?p=atomistic-line-graph-neural-network-for)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/formation-energy-on-qm9)](https://paperswithcode.com/sota/formation-energy-on-qm9?p=atomistic-line-graph-neural-network-for)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/formation-energy-on-jarvis-dft-formation)](https://paperswithcode.com/sota/formation-energy-on-jarvis-dft-formation?p=atomistic-line-graph-neural-network-for)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/band-gap-on-jarvis-dft)](https://paperswithcode.com/sota/band-gap-on-jarvis-dft?p=atomistic-line-graph-neural-network-for)
-[![Downloads](https://pepy.tech/badge/alignn)](https://pepy.tech/project/alignn)
+-->
 
 # Table of Contents
 * [Introduction](#intro)
@@ -19,6 +21,7 @@
 * [Pre-trained models](#pretrained)
 * [Quick start using colab](#colab)
 * [JARVIS-ALIGNN webapp](#webapp)
+* [ALIGNN-FF](#alignnff)
 * [Peformances on a few datasets](#performances)
 * [Useful notes](#notes)
 * [References](#refs)
@@ -154,6 +157,35 @@ Web-app
 A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https://jarvis.nist.gov/jalignn/). Given atomistic structure in POSCAR format it predict formation energy, total energy per atom and bandgap using data trained on JARVIS-DFT dataset.
 
 ![JARVIS-ALIGNN](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/jalignn.PNG)
+
+
+
+<a name="alignnff"></a>
+ALIGNN-FF
+-------------------------
+
+To train ALIGNN-FF use `train_folder_ff.py` script which uses `atomwise_alignn` model:
+
+AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data_ff directory):
+
+```
+train_folder_ff.py --root_dir "alignn/examples/sample_data_ff" --config "alignn/examples/sample_data_ff/config_example_atomwise.json" --output_dir=temp
+```
+
+A pretrained ALIGNN-FF (under active development right now) can be used for predicting several properties, such as:
+
+```
+run_alignn_ff.py --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp --task="unrelaxed_energy"
+run_alignn_ff.py --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp --task="optimize"
+run_alignn_ff.py --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp --task="ev_curve"
+```
+
+To know about other tasks, type.
+
+```
+run_alignn_ff.py -h
+```
+
 
 <a name="performances"></a>
 
@@ -292,6 +324,16 @@ Useful notes (based on some of the queries we received)
 <a name="refs"></a>
 References
 -----------------
+
+1) [Atomistic Line Graph Neural Network for improved materials property predictions](https://www.nature.com/articles/s41524-021-00650-1)
+2) [Prediction of the Electron Density of States for Crystalline Compounds with Atomistic Line Graph Neural Networks (ALIGNN)](https://link.springer.com/article/10.1007/s11837-022-05199-y)
+3) [Recent advances and applications of deep learning methods in materials science](https://www.nature.com/articles/s41524-022-00734-6)
+4) [Designing High-Tc Superconductors with BCS-inspired Screening, Density Functional Theory and Deep-learning](https://arxiv.org/abs/2205.00060)
+5) [A Deep-learning Model for Fast Prediction of Vacancy Formation in Diverse Materials](https://arxiv.org/abs/2205.08366)
+6) [Graph neural network predictions of metal organic framework CO2 adsorption properties](https://www.sciencedirect.com/science/article/pii/S092702562200163X)
+7) [Rapid Prediction of Phonon Structure and Properties using an Atomistic Line Graph Neural Network (ALIGNN)](https://arxiv.org/abs/2207.12510)
+8) [Unified graph neural network force-field for the periodic table](https://arxiv.org/abs/2209.05554)
+
 
 Please see detailed publications list [here](https://jarvis-tools.readthedocs.io/en/master/publications.html).
 
