@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2022.11.05",
+    version="2022.11.06",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -18,7 +18,7 @@ setuptools.setup(
         "numpy>=1.19.5",
         "scipy>=1.6.1",
         "jarvis-tools>=2021.07.19",
-        "torch==1.12.1",
+        "torch==1.12.0",
         "dgl>=0.6.0",
         "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",

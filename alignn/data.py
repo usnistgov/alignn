@@ -197,7 +197,7 @@ def get_torch_dataset(
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
     # df['natoms']=df['atoms'].apply(lambda x: len(x['elements']))
-    print(" data df", df)
+    # print(" data df", df)
     vals = np.array([ii[target] for ii in dataset])  # df[target].values
     print("data range", np.max(vals), np.min(vals))
     f = open(os.path.join(output_dir, tmp_name + "_data_range"), "w")
