@@ -19,7 +19,6 @@ setuptools.setup(
         "scipy>=1.6.1",
         "jarvis-tools>=2021.07.19",
         "torch==1.12.1",
-        # "dgl-cu101>=0.6.0",
         "dgl>=0.6.0",
         "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",
@@ -32,6 +31,7 @@ setuptools.setup(
         "pydocstyle>=6.0.0",
         "pyparsing>=2.2.1,<3",
         "ase",
+        # "dgl-cu101>=0.6.0",
     ],
     # scripts=["alignn/alignn_train_folder.py"],
     scripts=[
