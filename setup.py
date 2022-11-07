@@ -25,7 +25,7 @@ setuptools.setup(
         "matplotlib>=3.4.1",
         "tqdm>=4.60.0",
         "pandas>=1.2.3",
-        "pytorch-ignite>=0.4.7",
+        "pytorch-ignite==0.5.0.dev20221024",
         "pydantic>=1.8.1",
         "flake8>=3.9.1",
         "pycodestyle>=2.7.0",
