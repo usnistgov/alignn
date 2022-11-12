@@ -39,6 +39,7 @@ class ALIGNNConfig(BaseSettings):
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
     classification: bool = False
+    num_classes: int = 2
 
     class Config:
         """Configure model settings behavior."""
@@ -134,7 +135,9 @@ class ALIGNNConv(nn.Module):
     """Line graph update."""
 
     def __init__(
-        self, in_features: int, out_features: int,
+        self,
+        in_features: int,
+        out_features: int,
     ):
         """Set up ALIGNN parameters."""
         super().__init__()
@@ -201,13 +204,19 @@ class ALIGNN(nn.Module):
         )
 
         self.edge_embedding = nn.Sequential(
-            RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_input_features,),
+            RBFExpansion(
+                vmin=0,
+                vmax=8.0,
+                bins=config.edge_input_features,
+            ),
             MLPLayer(config.edge_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
-                vmin=-1, vmax=1.0, bins=config.triplet_input_features,
+                vmin=-1,
+                vmax=1.0,
+                bins=config.triplet_input_features,
             ),
             MLPLayer(config.triplet_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
@@ -215,7 +224,10 @@ class ALIGNN(nn.Module):
 
         self.alignn_layers = nn.ModuleList(
             [
-                ALIGNNConv(config.hidden_features, config.hidden_features,)
+                ALIGNNConv(
+                    config.hidden_features,
+                    config.hidden_features,
+                )
                 for idx in range(config.alignn_layers)
             ]
         )
@@ -231,7 +243,7 @@ class ALIGNN(nn.Module):
         self.readout = AvgPooling()
 
         if self.classification:
-            self.fc = nn.Linear(config.hidden_features, 2)
+            self.fc = nn.Linear(config.hidden_features, config.num_classes)
             self.softmax = nn.LogSoftmax(dim=1)
         else:
             self.fc = nn.Linear(config.hidden_features, config.output_features)
@@ -249,7 +261,8 @@ class ALIGNN(nn.Module):
             self.link = torch.sigmoid
 
     def forward(
-        self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
+        self,
+        g: Tuple[str, Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]],
     ):
         """ALIGNN : start with `atom_features`.
 
@@ -258,11 +271,13 @@ class ALIGNN(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
-            g, lg = g
+            _, g, lg = g
             lg = lg.local_var()
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
+        else:
+            _, g = g
 
         g = g.local_var()
 
