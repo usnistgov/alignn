@@ -262,7 +262,7 @@ def get_prediction(
         max_neighbors=max_neighbors,
     )
     out_data = (
-        model([g.to(device), lg.to(device)])
+        model([None, g.to(device), lg.to(device)])
         .detach()
         .cpu()
         .numpy()
