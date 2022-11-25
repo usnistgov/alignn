@@ -30,7 +30,9 @@ config = {
     "optimizer": "adamw",
     "scheduler": "onecycle",
     "num_workers": 4,
-    "model": {"name": "alignn",},
+    "model": {
+        "name": "alignn",
+    },
 }
 
 

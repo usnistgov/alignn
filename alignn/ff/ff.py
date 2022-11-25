@@ -542,6 +542,9 @@ def ev_curve(
         vol.append(s1.volume)
     x = np.array(dx)
     y = np.array(y)
+    for xx, yy in zip(x, y):
+
+        print(xx, yy)
     eos = EquationOfState(vol, y, eos="murnaghan")
     v0, e0, B = eos.fit()
     kv = B / kJ * 1.0e24  # , 'GPa')

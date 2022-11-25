@@ -59,6 +59,7 @@
         "atomwise_weight": 0.0,
         "link": "identity",
         "zero_inflated": false,
+        "use_cutoff_function": false,
         "classification": false
     }
 }

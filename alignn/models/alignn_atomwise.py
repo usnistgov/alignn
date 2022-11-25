@@ -44,11 +44,22 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
     classification: bool = False
+    use_cutoff_function: bool = True
+    inner_cutoff: float = 4  # Ansgtron
 
     class Config:
         """Configure model settings behavior."""
 
         env_prefix = "jv_model"
+
+
+def cutoff_function_based_edges(r=[], inner_cutoff=4):
+    ratio = r / inner_cutoff
+    return torch.where(
+        ratio <= 1,
+        1 - 6 * ratio**5 + 15 * ratio**4 - 10 * ratio**3,
+        torch.zeros_like(r),
+    )
 
 
 class EdgeGatedGraphConv(nn.Module):
@@ -303,7 +314,13 @@ class ALIGNNAtomWise(nn.Module):
         if self.config.calculate_gradient:
             r.requires_grad_(True)
         # r = g.edata["r"].clone().detach().requires_grad_(True)
+
         bondlength = torch.norm(r, dim=1)
+        if self.config.use_cutoff_function:
+            bondlength = cutoff_function_based_edges(
+                r=bondlength, inner_cutoff=self.config.inner_cutoff
+            )
+
         y = self.edge_embedding(bondlength)
 
         # ALIGNN updates: update node, edge, triplet features
