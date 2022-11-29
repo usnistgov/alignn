@@ -11,8 +11,6 @@ from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-
-# from alignn.models.alignn import ALIGNN, ALIGNNConfig
 import torch
 
 device = "cpu"
