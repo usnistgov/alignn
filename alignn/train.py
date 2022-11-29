@@ -49,6 +49,7 @@ from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
+from alignn.models.alignn_atomwise_torch import ALIGNNAtomWiseTorch
 from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
 from alignn.models.modified_cgcnn import CGCNN
 from alignn.models.dense_alignn import DenseALIGNN
@@ -181,6 +182,7 @@ def train_dgl(
     line_graph = False
     alignn_models = {
         "alignn",
+        "alignn_atomwise_torch",
         "dense_alignn",
         "alignn_cgcnn",
         "alignn_layernorm",
@@ -190,6 +192,8 @@ def train_dgl(
     if config.model.name == "cgcnn":
         line_graph = True
     if config.model.name == "icgcnn":
+        line_graph = True
+    if config.model.name == "alignn_atomwise_torch":
         line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
         line_graph = True
@@ -246,6 +250,7 @@ def train_dgl(
         "densegcn": DenseGCN,
         "alignn": ALIGNN,
         "alignn_atomwise": ALIGNNAtomWise,
+        "alignn_atomwise_torch": ALIGNNAtomWiseTorch,
         "dense_alignn": DenseALIGNN,
         "alignn_cgcnn": ACGCNN,
         "alignn_layernorm": ALIGNN_LN,
@@ -283,7 +288,7 @@ def train_dgl(
             optimizer,
         )
 
-    if config.model.name == "alignn_atomwise":
+    if "alignn_atomwise" in config.model.name:
 
         def get_batch_errors(dat=[]):
             """Get errors for samples."""

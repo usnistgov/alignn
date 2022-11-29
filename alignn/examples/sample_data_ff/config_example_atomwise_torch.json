@@ -32,13 +32,13 @@
     "log_tensorboard": false,
     "standard_scalar_and_pca": false,
     "use_canonize": false,
-    "use_torch_graph": false,
+    "use_torch_graph": true,
     "num_workers": 0,
     "cutoff": 8.0,
     "max_neighbors": 12,
     "keep_data_order": false,
     "model": {
-        "name": "alignn_atomwise",
+        "name": "alignn_atomwise_torch",
         "atom_input_features": 92,
         "calculate_gradient":true,
         "atomwise_output_features":3,
@@ -47,8 +47,8 @@
         "output_features": 1,
         "graphwise_weight":0.85,
         "gradwise_weight":0.5,
-        "atomwise_weight":0.1,
-        "stresswise_weight":0.1
+        "atomwise_weight":0.0,
+        "stresswise_weight":0.0
           
     }
 }

@@ -183,6 +183,7 @@ def train_for_folder(
         "alignn",
         # "alignn_layernorm",
         "alignn_atomwise",
+        "alignn_atomwise_torch",
     }
 
     if config.model.name == "clgn":

@@ -232,6 +232,7 @@ class Graph(object):
         )
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
+        g.gdata = torch.tensor(atoms.lattice_mat)
         g.ndata["lattice_mat"] = torch.tensor(
             [atoms.lattice_mat for ii in range(atoms.num_atoms)]
         )
@@ -265,7 +266,7 @@ class Graph(object):
         # topk_tol=1.25,
         precision=torch.float64,
         neighbor_strategy="k-nearest",
-        compute_line_graph=False,
+        compute_line_graph=True,
         atom_features="atomic_number",
     ):
         """
@@ -277,13 +278,13 @@ class Graph(object):
         if atoms is not None:
             cart_coords = torch.tensor(atoms.cart_coords, dtype=precision)
             frac_coords = torch.tensor(atoms.frac_coords, dtype=precision)
-            lattice_matrix = torch.tensor(atoms.lattice_mat, dtype=precision)
+            lattice_mat = torch.tensor(atoms.lattice_mat, dtype=precision)
             elements = atoms.elements
 
         X_src = cart_coords
         num_atoms = X_src.shape[0]
 
-        recp = 2 * torch.pi * torch.linalg.inv(lattice_matrix).T
+        recp = 2 * torch.pi * torch.linalg.inv(lattice_mat).T
         recp_len = torch.tensor(
             [i for i in (torch.sqrt(torch.sum(recp**2, dim=1)))]
         )
@@ -298,7 +299,7 @@ class Graph(object):
 
         # tile periodic images into X_dst
         # index id_dst into X_dst maps to atom id as id_dest % num_atoms
-        X_dst = (cell_images @ lattice_matrix)[:, None, :] + X_src
+        X_dst = (cell_images @ lattice_mat)[:, None, :] + X_src
         X_dst = X_dst.reshape(-1, 3)
 
         # pairwise distances between atoms in (0,0,0) cell
@@ -335,30 +336,28 @@ class Graph(object):
 
         # index into tiled cell image index to atom ids
         g = dgl.graph((src, v % num_atoms))
-        g.ndata["coord"] = X_src.float()
-        g.gdata = lattice_matrix
+        g.ndata["cart_coords"] = X_src.float()
+        g.ndata["frac_coords"] = frac_coords.float()
+        g.gdata = lattice_mat
         g.edata["r"] = (X_dst[v] - X_src[src]).float()
-        # print(torch.norm(g.edata["r"], dim=1).sort()[0])
-        g.ndata["V"] = torch.tensor(
-            [
-                torch.dot(
-                    torch.cross(lattice_mat[0], lattice_mat[1]), lattice_mat[2]
+        g.edata["X_src"] = X_src[src]
+        g.edata["X_dst"] = X_dst[v]
+        g.edata["src"] = src
+        if elements:
+            sps_features = []
+            for ii, s in enumerate(elements):
+                feat = list(
+                    get_node_attributes(s, atom_features=atom_features)
                 )
-                for ii in range(num_atoms)
-            ]
-        )
-        sps_features = []
-        for ii, s in enumerate(elements):
-            feat = list(get_node_attributes(s, atom_features=atom_features))
-            # if include_prdf_angles:
-            #    feat=feat+list(prdf[ii])+list(adf[ii])
-            sps_features.append(feat)
-        sps_features = np.array(sps_features)
-        node_features = torch.tensor(sps_features).type(
-            torch.get_default_dtype()
-        )
+                # if include_prdf_angles:
+                #    feat=feat+list(prdf[ii])+list(adf[ii])
+                sps_features.append(feat)
+            sps_features = np.array(sps_features)
+            node_features = torch.tensor(sps_features).type(
+                torch.get_default_dtype()
+            )
 
-        g.ndata["atom_features"] = node_features
+            g.ndata["atom_features"] = node_features
         # (torch.tensor(a.atomic_numbers)[:, None]).long()
         if compute_line_graph:
             lg = g.line_graph(shared=True)
@@ -820,6 +819,7 @@ class StructureDataset(torch.utils.data.Dataset):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
+        batched_graph.gdata = torch.cat([g.gdata for g in graphs])
         return batched_graph, torch.tensor(labels)
 
     @staticmethod
@@ -829,6 +829,8 @@ class StructureDataset(torch.utils.data.Dataset):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, line_graphs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
+        batched_graph.gdata = torch.cat([g.gdata for g in graphs])
+        # print ('batched_graph.gdata',batched_graph.gdata)
         batched_line_graph = dgl.batch(line_graphs)
         if len(labels[0].size()) > 0:
             return batched_graph, batched_line_graph, torch.stack(labels)

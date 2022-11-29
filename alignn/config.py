@@ -12,6 +12,7 @@ from alignn.models.gcn import SimpleGCNConfig
 from alignn.models.densegcn import DenseGCNConfig
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
+from alignn.models.alignn_atomwise_torch import ALIGNNAtomWiseTorchConfig
 from alignn.models.dense_alignn import DenseALIGNNConfig
 from alignn.models.alignn_cgcnn import ACGCNNConfig
 from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
@@ -216,6 +217,7 @@ class TrainingConfig(BaseSettings):
         DenseGCNConfig,
         ALIGNNConfig,
         ALIGNNAtomWiseConfig,
+        ALIGNNAtomWiseTorchConfig,
         ALIGNN_LN_Config,
         DenseALIGNNConfig,
         ACGCNNConfig,
