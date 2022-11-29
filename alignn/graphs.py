@@ -7,8 +7,6 @@ import pandas as pd
 from collections import OrderedDict
 from jarvis.analysis.structure.neighbors import NeighborsAnalysis
 from jarvis.core.specie import chem_data, get_node_attributes
-
-# from jarvis.core.atoms import Atoms
 from collections import defaultdict
 from typing import List, Tuple, Sequence, Optional
 
@@ -251,6 +249,122 @@ class Graph(object):
             return g, lg
         else:
             return g
+
+    @staticmethod
+    def atom_dgl_multigraph_torch(
+        atoms=None,
+        cart_coords=[],
+        frac_coords=[],
+        lattice_mat=[],
+        elements=[],
+        cutoff: float = 8,
+        bond_tol: float = 0.15,
+        max_neighbors=12,
+        atol=1e-5,
+        topk_tol=1.3,
+        # topk_tol=1.25,
+        precision=torch.float64,
+        neighbor_strategy="k-nearest",
+        compute_line_graph=False,
+        atom_features="atomic_number",
+    ):
+        """
+        Get neighbors for each atom in the unit cell, out to a distance r.
+
+        Contains [index_i, index_j, distance, image] array.
+        Optionally, use a k-neighbor-shell graph e.g. 12
+        """
+        if atoms is not None:
+            cart_coords = torch.tensor(atoms.cart_coords, dtype=precision)
+            frac_coords = torch.tensor(atoms.frac_coords, dtype=precision)
+            lattice_matrix = torch.tensor(atoms.lattice_mat, dtype=precision)
+            elements = atoms.elements
+
+        X_src = cart_coords
+        num_atoms = X_src.shape[0]
+
+        recp = 2 * torch.pi * torch.linalg.inv(lattice_matrix).T
+        recp_len = torch.tensor(
+            [i for i in (torch.sqrt(torch.sum(recp**2, dim=1)))]
+        )
+
+        maxr = torch.ceil((cutoff + bond_tol) * recp_len / (2 * torch.pi))
+        nmin = torch.floor(torch.min(frac_coords, dim=0)[0]) - maxr
+        nmax = torch.ceil(torch.max(frac_coords, dim=0)[0]) + maxr
+        all_ranges = [
+            torch.arange(x, y, dtype=precision) for x, y in zip(nmin, nmax)
+        ]
+        cell_images = torch.cartesian_prod(*all_ranges)
+
+        # tile periodic images into X_dst
+        # index id_dst into X_dst maps to atom id as id_dest % num_atoms
+        X_dst = (cell_images @ lattice_matrix)[:, None, :] + X_src
+        X_dst = X_dst.reshape(-1, 3)
+
+        # pairwise distances between atoms in (0,0,0) cell
+        # and atoms in all periodic images
+        dist = torch.cdist(X_src, X_dst)
+
+        if neighbor_strategy == "cutoff":
+            neighbor_mask = torch.bitwise_and(
+                dist <= cutoff,
+                ~torch.isclose(dist, torch.DoubleTensor([0]), atol=atol),
+            )
+
+        elif neighbor_strategy == "k-nearest":
+            # collect 12th-nearest neighbor distance
+            # topk: k = 13 because first neighbor is a self-interaction
+            # this is filtered out in the neighbor_mask selection
+            try:
+                nbrdist, _ = dist.topk(max_neighbors + 1, largest=False)
+                k_dist = nbrdist[:, -1]
+
+                # expand k-NN graph to include all atoms in the
+                # neighbor shell of the twelfth neighbor
+                # broadcast the <= along the src axis
+                neighbor_mask = torch.bitwise_and(
+                    dist <= topk_tol * k_dist[:, None],
+                    ~torch.isclose(dist, torch.DoubleTensor([0]), atol=atol),
+                )
+            except Exception as exp:
+                print("exp", exp, atoms)
+                pass
+
+        # get node indices for edgelist from neighbor mask
+        src, v = torch.where(neighbor_mask)
+
+        # index into tiled cell image index to atom ids
+        g = dgl.graph((src, v % num_atoms))
+        g.ndata["coord"] = X_src.float()
+        g.gdata = lattice_matrix
+        g.edata["r"] = (X_dst[v] - X_src[src]).float()
+        # print(torch.norm(g.edata["r"], dim=1).sort()[0])
+        g.ndata["V"] = torch.tensor(
+            [
+                torch.dot(
+                    torch.cross(lattice_mat[0], lattice_mat[1]), lattice_mat[2]
+                )
+                for ii in range(num_atoms)
+            ]
+        )
+        sps_features = []
+        for ii, s in enumerate(elements):
+            feat = list(get_node_attributes(s, atom_features=atom_features))
+            # if include_prdf_angles:
+            #    feat=feat+list(prdf[ii])+list(adf[ii])
+            sps_features.append(feat)
+        sps_features = np.array(sps_features)
+        node_features = torch.tensor(sps_features).type(
+            torch.get_default_dtype()
+        )
+
+        g.ndata["atom_features"] = node_features
+        # (torch.tensor(a.atomic_numbers)[:, None]).long()
+        if compute_line_graph:
+            lg = g.line_graph(shared=True)
+            lg.apply_edges(compute_bond_cosines)
+            return g, lg
+        return g
 
     @staticmethod
     def from_atoms(

@@ -74,8 +74,10 @@ def load_graphs(
     neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
     max_neighbors: int = 12,
+    topk_tol: float = 1.3,
     cachedir: Optional[Path] = None,
     use_canonize: bool = False,
+    use_torch_graph: bool = False,
 ):
     """Construct crystal graphs.
 
@@ -93,14 +95,24 @@ def load_graphs(
     def atoms_to_graph(atoms):
         """Convert structure dict to DGLGraph."""
         structure = Atoms.from_dict(atoms)
-        return Graph.atom_dgl_multigraph(
-            structure,
-            cutoff=cutoff,
-            atom_features="atomic_number",
-            max_neighbors=max_neighbors,
-            compute_line_graph=False,
-            use_canonize=use_canonize,
-        )
+        if use_torch_graph:
+            return Graph.atom_dgl_multigraph_torch(
+                atoms=structure,
+                cutoff=cutoff,
+                max_neighbors=max_neighbors,
+                topk_tol=topk_tol,
+                compute_line_graph=False,
+                atom_features="atomic_number",
+            )
+        else:
+            return Graph.atom_dgl_multigraph(
+                structure,
+                cutoff=cutoff,
+                atom_features="atomic_number",
+                max_neighbors=max_neighbors,
+                compute_line_graph=False,
+                use_canonize=use_canonize,
+            )
 
     if cachedir is not None:
         cachefile = cachedir / f"{name}-{neighbor_strategy}.bin"
@@ -191,6 +203,8 @@ def get_torch_dataset(
     cutoff=8.0,
     max_neighbors=12,
     classification=False,
+    topk_tol=1.3,
+    use_torch_graph=False,
     output_dir=".",
     tmp_name="dataset",
 ):
@@ -214,6 +228,8 @@ def get_torch_dataset(
         use_canonize=use_canonize,
         cutoff=cutoff,
         max_neighbors=max_neighbors,
+        topk_tol=topk_tol,
+        use_torch_graph=use_torch_graph,
     )
     data = StructureDataset(
         df,
@@ -255,8 +271,10 @@ def get_train_val_loaders(
     filename: str = "sample",
     id_tag: str = "jid",
     use_canonize: bool = False,
+    use_torch_graph: bool = False,
     cutoff: float = 8.0,
     max_neighbors: int = 12,
+    topk_tol: float = 1.3,
     classification_threshold: Optional[float] = None,
     target_multiplication_factor: Optional[float] = None,
     standard_scalar_and_pca=False,
@@ -468,6 +486,8 @@ def get_train_val_loaders(
             name=dataset,
             line_graph=line_graph,
             cutoff=cutoff,
+            topk_tol=topk_tol,
+            use_torch_graph=use_torch_graph,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
             output_dir=output_dir,
@@ -486,6 +506,8 @@ def get_train_val_loaders(
             name=dataset,
             line_graph=line_graph,
             cutoff=cutoff,
+            topk_tol=topk_tol,
+            use_torch_graph=use_torch_graph,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
             output_dir=output_dir,
@@ -504,6 +526,8 @@ def get_train_val_loaders(
             name=dataset,
             line_graph=line_graph,
             cutoff=cutoff,
+            topk_tol=topk_tol,
+            use_torch_graph=use_torch_graph,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
             output_dir=output_dir,

@@ -193,7 +193,9 @@ class TrainingConfig(BaseSettings):
     use_canonize: bool = True
     num_workers: int = 4
     cutoff: float = 8.0
+    use_torch_graph: bool = False
     max_neighbors: int = 12
+    topk_tol: float = 1.3
     keep_data_order: bool = False
     normalize_graph_level_loss: bool = False
     distributed: bool = False

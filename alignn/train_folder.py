@@ -52,7 +52,9 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--output_dir", default="./", help="Folder to save outputs",
+    "--output_dir",
+    default="./",
+    help="Folder to save outputs",
 )
 
 
@@ -166,6 +168,8 @@ def train_for_folder(
         use_canonize=config.use_canonize,
         filename=config.filename,
         cutoff=config.cutoff,
+        topk_tol=config.topk_tol,
+        use_torch_graph=config.use_torch_graph,
         max_neighbors=config.max_neighbors,
         output_features=config.model.output_features,
         classification_threshold=config.classification_threshold,

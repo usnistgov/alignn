@@ -279,6 +279,8 @@ def train_for_folder(
         workers=config.num_workers,
         save_dataloader=config.save_dataloader,
         use_canonize=config.use_canonize,
+        topk_tol=config.topk_tol,
+        use_torch_graph=config.use_torch_graph,
         filename=config.filename,
         cutoff=config.cutoff,
         max_neighbors=config.max_neighbors,
