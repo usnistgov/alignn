@@ -53,11 +53,19 @@ class ALIGNNAtomWiseConfig(BaseSettings):
         env_prefix = "jv_model"
 
 
-def cutoff_function_based_edges(r=[], inner_cutoff=4):
+def cutoff_function_based_edges(r, inner_cutoff=4):
+    """Apply smooth cutoff to pairwise interactions
+
+    r: bond lengths
+    inner_cutoff: cutoff radius
+
+    inside cutoff radius, apply smooth cutoff envelope
+    outside cutoff radius: hard zeros
+    """
     ratio = r / inner_cutoff
     return torch.where(
         ratio <= 1,
-        1 - 6 * ratio**5 + 15 * ratio**4 - 10 * ratio**3,
+        1 - 6 * ratio ** 5 + 15 * ratio ** 4 - 10 * ratio ** 3,
         torch.zeros_like(r),
     )
 
@@ -118,6 +126,13 @@ class EdgeGatedGraphConv(nn.Module):
         m = g.edata.pop("e_nodes") + self.edge_gate(edge_feats)
 
         g.edata["sigma"] = torch.sigmoid(m)
+
+        # if edge attributes have a cutoff function value
+        # multiply the edge gate values with the cutoff value
+        cutoff_value = g.edata.get("cutoff_value")
+        if cutoff_value:
+            g.edata["sigma"] *= cutoff_value
+
         g.ndata["Bh"] = self.dst_update(node_feats)
         g.update_all(
             fn.u_mul_e("Bh", "sigma", "m"), fn.sum("m", "sum_sigma_h")
@@ -317,9 +332,11 @@ class ALIGNNAtomWise(nn.Module):
 
         bondlength = torch.norm(r, dim=1)
         if self.config.use_cutoff_function:
-            bondlength = cutoff_function_based_edges(
-                r=bondlength, inner_cutoff=self.config.inner_cutoff
+            # save cutoff function value for application in EdgeGatedGraphconv
+            fcut = cutoff_function_based_edges(
+                bondlength, inner_cutoff=self.config.inner_cutoff
             )
+            g.edata["cutoff_value"] = fcut
 
         y = self.edge_embedding(bondlength)
 
@@ -354,17 +371,14 @@ class ALIGNNAtomWise(nn.Module):
 
             # tmp_out = out*len(x)
             # print ('tmp_out',tmp_out)
-            dy = (
-                self.config.grad_multiplier
-                * grad(
-                    # tmp_out,
-                    out,
-                    r,
-                    grad_outputs=torch.ones_like(out),
-                    create_graph=create_graph,
-                    retain_graph=True,
-                )[0]
-            )
+            dy = self.config.grad_multiplier * grad(
+                # tmp_out,
+                out,
+                r,
+                grad_outputs=torch.ones_like(out),
+                create_graph=create_graph,
+                retain_graph=True,
+            )[0]
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
