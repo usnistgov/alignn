@@ -50,7 +50,7 @@ def nearest_neighbor_edges(
     atoms=None,
     cutoff=8,
     max_neighbors=12,
-    id=None,
+    iterate=0,
     use_canonize=False,
 ):
     """Construct k-NN edge list."""
@@ -60,23 +60,26 @@ def nearest_neighbor_edges(
     # if a site has too few neighbors, increase the cutoff radius
     min_nbrs = min(len(neighborlist) for neighborlist in all_neighbors)
 
-    attempt = 0
     # print ('cutoff=',all_neighbors)
     if min_nbrs < max_neighbors:
-        # print("extending cutoff radius!", attempt, cutoff, id)
+        # if not enough neighbors, extend the lattice and recurse up to twice
+        print("extending cutoff radius!", iterate, cutoff)
         lat = atoms.lattice
         if cutoff < max(lat.a, lat.b, lat.c):
             r_cut = max(lat.a, lat.b, lat.c)
         else:
             r_cut = 2 * cutoff
-        attempt += 1
 
+        if iterate == 2:
+            raise StopIteration("recursed 2x; stopping")
+
+        # recursive call
         return nearest_neighbor_edges(
             atoms=atoms,
             use_canonize=use_canonize,
             cutoff=r_cut,
             max_neighbors=max_neighbors,
-            id=id,
+            iterate=iterate + 1,
         )
     # build up edge list
     # NOTE: currently there's no guarantee that this creates undirected graphs
@@ -209,7 +212,6 @@ class Graph(object):
                 atoms=atoms,
                 cutoff=cutoff,
                 max_neighbors=max_neighbors,
-                id=id,
                 use_canonize=use_canonize,
             )
         else:
@@ -262,8 +264,7 @@ class Graph(object):
         bond_tol: float = 0.15,
         max_neighbors=12,
         atol=1e-5,
-        topk_tol=1.3,
-        # topk_tol=1.25,
+        topk_tol=1.001,
         precision=torch.float64,
         neighbor_strategy="k-nearest",
         compute_line_graph=True,
@@ -274,7 +275,31 @@ class Graph(object):
 
         Contains [index_i, index_j, distance, image] array.
         Optionally, use a k-neighbor-shell graph e.g. 12
+
+
+        a = Atoms(...)
+        pg = graphs.Graph.atom_dgl_multigraph(a, use_canonize=True, compute_line_graph=False)
+        tg = graphs.Graph.atom_dgl_multigraph_torch(a, compute_line_graph=False)
+
+        # round bond displacement vectors to add tolerance to numerical error
+        pg_edata = list(
+            zip(
+                map(int, pg.edges()[0]),
+                map(int, pg.edges()[1]),
+                map(tuple, torch.round(pg.edata["r"], decimals=3).tolist()),
+            )
+        )
+        tg_edata = list(
+            zip(
+                map(int, tg.edges()[0]),
+                map(int, tg.edges()[1]),
+                map(tuple, torch.round(tg.edata["r"], decimals=3).tolist()),
+            )
+        )
+        set(tg_edata).difference(pg_edata) # -> yields empty set
+
         """
+
         if atoms is not None:
             cart_coords = torch.tensor(atoms.cart_coords, dtype=precision)
             frac_coords = torch.tensor(atoms.frac_coords, dtype=precision)
@@ -286,7 +311,7 @@ class Graph(object):
 
         recp = 2 * torch.pi * torch.linalg.inv(lattice_mat).T
         recp_len = torch.tensor(
-            [i for i in (torch.sqrt(torch.sum(recp**2, dim=1)))]
+            [i for i in (torch.sqrt(torch.sum(recp ** 2, dim=1)))]
         )
 
         maxr = torch.ceil((cutoff + bond_tol) * recp_len / (2 * torch.pi))
@@ -311,28 +336,63 @@ class Graph(object):
                 dist <= cutoff,
                 ~torch.isclose(dist, torch.DoubleTensor([0]), atol=atol),
             )
+            # get node indices for edgelist from neighbor mask
+            src, v = torch.where(neighbor_mask)
 
         elif neighbor_strategy == "k-nearest":
             # collect 12th-nearest neighbor distance
             # topk: k = 13 because first neighbor is a self-interaction
             # this is filtered out in the neighbor_mask selection
-            try:
-                nbrdist, _ = dist.topk(max_neighbors + 1, largest=False)
-                k_dist = nbrdist[:, -1]
+            nbrdist, _ = dist.topk(max_neighbors + 1, largest=False)
+            k_dist = nbrdist[:, -1]
 
-                # expand k-NN graph to include all atoms in the
-                # neighbor shell of the twelfth neighbor
-                # broadcast the <= along the src axis
-                neighbor_mask = torch.bitwise_and(
-                    dist <= topk_tol * k_dist[:, None],
-                    ~torch.isclose(dist, torch.DoubleTensor([0]), atol=atol),
-                )
-            except Exception as exp:
-                print("exp", exp, atoms)
-                pass
+            # expand k-NN graph to include all atoms in the
+            # neighbor shell of the twelfth neighbor
+            # broadcast the <= along the src axis
+            neighbor_mask = torch.bitwise_and(
+                dist <= topk_tol * k_dist[:, None],  # no multiply by topk_tol
+                ~torch.isclose(dist, torch.DoubleTensor([0]), atol=atol),
+            )
 
-        # get node indices for edgelist from neighbor mask
-        src, v = torch.where(neighbor_mask)
+            # now back-match neighbors...
+            # src is always in (000) image
+            # annotate edges with image id of dst
+            # negate image indices and swap src and dst, should match
+
+            # get node indices for edgelist from neighbor mask
+            src, v = torch.where(neighbor_mask)
+            print(src)
+
+            # get node ids in image (000)
+            dst = v % num_atoms
+            image_id = v // num_atoms
+            image = cell_images[image_id]
+
+            # compare edges with shifted version
+            orig = set(zip(src.tolist(), dst.tolist(), map(tuple, image)))
+            shifted = set(zip(dst.tolist(), src.tolist(), map(tuple, -image)))
+
+            # back-complete any edge in orig
+            # with complement in shifted missing
+            missing = orig.difference(shifted)
+
+            cell_map = {
+                tuple(image.tolist()): idx
+                for idx, image in enumerate(cell_images)
+            }  # (h,k,l) -> idx
+
+            # new_src: (000), dst_id
+            # new_dst: index into neighbor_mask by new_image_id * n_atoms + src_id
+            for _src, _dst, image in missing:
+                new_src = _dst
+                new_dst = _src
+
+                new_image = -torch.tensor(image)
+                _v = cell_map[tuple(new_image.tolist())] * num_atoms + new_dst
+                neighbor_mask[new_src, _v] = 1
+
+            # get node indices for edgelist from completed neighbor mask
+            src, v = torch.where(neighbor_mask)
 
         # index into tiled cell image index to atom ids
         g = dgl.graph((src, v % num_atoms))
