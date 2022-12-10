@@ -276,7 +276,14 @@ class Graph(object):
         Contains [index_i, index_j, distance, image] array.
         Optionally, use a k-neighbor-shell graph e.g. 12
 
+        This function builds a supercell and identifies all edges  by
+        brute force calculation of the pairwise distances between atoms
+        in the original cell and atoms in the supercell. If the kNN graph
+        construction is used, do some extra work to make sure that all
+        edges have a reverse pair for dgl undirected graph representation,
+        but also that edges are not double counted.
 
+        # check that torch knn graph is equivalent to pytorch version (with canonical edges)
         a = Atoms(...)
         pg = graphs.Graph.atom_dgl_multigraph(a, use_canonize=True, compute_line_graph=False)
         tg = graphs.Graph.atom_dgl_multigraph_torch(a, compute_line_graph=False)
@@ -309,6 +316,7 @@ class Graph(object):
         X_src = cart_coords
         num_atoms = X_src.shape[0]
 
+        # determine how many supercells are needed for the cutoff radius
         recp = 2 * torch.pi * torch.linalg.inv(lattice_mat).T
         recp_len = torch.tensor(
             [i for i in (torch.sqrt(torch.sum(recp ** 2, dim=1)))]
@@ -317,6 +325,8 @@ class Graph(object):
         maxr = torch.ceil((cutoff + bond_tol) * recp_len / (2 * torch.pi))
         nmin = torch.floor(torch.min(frac_coords, dim=0)[0]) - maxr
         nmax = torch.ceil(torch.max(frac_coords, dim=0)[0]) + maxr
+
+        # construct the supercell index list
         all_ranges = [
             torch.arange(x, y, dtype=precision) for x, y in zip(nmin, nmax)
         ]
@@ -387,7 +397,9 @@ class Graph(object):
                 new_src = _dst
                 new_dst = _src
 
+                # shift dst image so src is in (000) image
                 new_image = -torch.tensor(image)
+                # index into the supercell to find dst atom
                 _v = cell_map[tuple(new_image.tolist())] * num_atoms + new_dst
                 neighbor_mask[new_src, _v] = 1
 
