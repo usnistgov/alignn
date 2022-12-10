@@ -170,6 +170,7 @@ AtomWise prediction example which looks for similar setup as before but unstead 
 
 ```
 train_folder_ff.py --root_dir "alignn/examples/sample_data_ff" --config "alignn/examples/sample_data_ff/config_example_atomwise.json" --output_dir=temp
+train_folder_ff.py --root_dir "alignn/examples/sample_data_ff/mlearn_data/Si" --config "alignn/examples/sample_data_ff/mlearn_data/Si/config.json" --output_dir=temp_si
 ```
 
 A pretrained ALIGNN-FF (under active development right now) can be used for predicting several properties, such as:
@@ -186,6 +187,9 @@ To know about other tasks, type.
 run_alignn_ff.py -h
 ```
 
+For dataset used in ALIGNN-FF training, visit:
+
+https://doi.org/10.6084/m9.figshare.21667874.v1
 
 <a name="performances"></a>
 

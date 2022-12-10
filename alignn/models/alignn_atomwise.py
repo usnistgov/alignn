@@ -65,7 +65,7 @@ def cutoff_function_based_edges(r, inner_cutoff=4):
     ratio = r / inner_cutoff
     return torch.where(
         ratio <= 1,
-        1 - 6 * ratio ** 5 + 15 * ratio ** 4 - 10 * ratio ** 3,
+        1 - 6 * ratio**5 + 15 * ratio**4 - 10 * ratio**3,
         torch.zeros_like(r),
     )
 
@@ -125,13 +125,17 @@ class EdgeGatedGraphConv(nn.Module):
         g.apply_edges(fn.u_add_v("e_src", "e_dst", "e_nodes"))
         m = g.edata.pop("e_nodes") + self.edge_gate(edge_feats)
 
-        g.edata["sigma"] = torch.sigmoid(m)
+        g.edata["sigma"] = torch.sigmoid(m).clone()
 
         # if edge attributes have a cutoff function value
         # multiply the edge gate values with the cutoff value
         cutoff_value = g.edata.get("cutoff_value")
-        if cutoff_value:
-            g.edata["sigma"] *= cutoff_value
+
+        if cutoff_value is not None:
+            # print('g.edata["sigma"]',g.edata["sigma"],g.edata["sigma"].shape)
+            # print('cutoff_value',cutoff_value,cutoff_value.shape)
+            g.edata["sigma"] *= cutoff_value.unsqueeze(1)
+            # print('g.edata["sigma"]2',g.edata["sigma"],g.edata["sigma"].shape)
 
         g.ndata["Bh"] = self.dst_update(node_feats)
         g.update_all(
@@ -371,14 +375,17 @@ class ALIGNNAtomWise(nn.Module):
 
             # tmp_out = out*len(x)
             # print ('tmp_out',tmp_out)
-            dy = self.config.grad_multiplier * grad(
-                # tmp_out,
-                out,
-                r,
-                grad_outputs=torch.ones_like(out),
-                create_graph=create_graph,
-                retain_graph=True,
-            )[0]
+            dy = (
+                self.config.grad_multiplier
+                * grad(
+                    # tmp_out,
+                    out,
+                    r,
+                    grad_outputs=torch.ones_like(out),
+                    create_graph=create_graph,
+                    retain_graph=True,
+                )[0]
+            )
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
