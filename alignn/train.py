@@ -864,21 +864,27 @@ def train_dgl(
                 pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
 
     if config.n_early_stopping is not None:
-        if classification:
-            my_metrics = "accuracy"
-        else:
-            my_metrics = "mae"
 
-        def default_score_fn(engine):
-            score = engine.state.metrics[my_metrics]
-            return score
+        # early stopping if no improvement (improvement = higher score)
+        if classification:
+
+            def es_score(engine):
+                """Higher accuracy is better."""
+                engine.state.metrics["accuracy"]
+
+        else:
+
+            def es_score(engine):
+                """Lower MAE is better."""
+                -engine.state.metrics["mae"]
 
         es_handler = EarlyStopping(
             patience=config.n_early_stopping,
-            score_function=default_score_fn,
+            score_function=es_score,
             trainer=trainer,
         )
         evaluator.add_event_handler(Events.EPOCH_COMPLETED, es_handler)
+
     # optionally log results to tensorboard
     if config.log_tensorboard:
 
