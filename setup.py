@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2023.01.09",
+    version="2023.01.10",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -33,7 +33,7 @@ setuptools.setup(
         "ase",
         # "dgl-cu101>=0.6.0",
     ],
-    # scripts=["alignn/alignn_train_folder.py"],
+    package_data={"alignn.ff": ["best_model.pt", "config.json"]},
     scripts=[
         "alignn/pretrained.py",
         "alignn/train_folder.py",
