@@ -130,7 +130,9 @@ These scripts automatically download datasets from [Databases in jarvis-tools](h
 Using pre-trained models
 -------------------------
 
-All the trained models are distributed on [figshare](https://figshare.com/projects/ALIGNN_models/126478) and this [pretrained.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/pretrained.py) can be applied to use them. These models can be used to directly make predictions.
+All the trained models are distributed on [Figshare](https://figshare.com/projects/ALIGNN_models/126478.
+
+The [pretrained.py script](https://github.com/usnistgov/alignn/blob/develop/alignn/pretrained.py) can be applied to use them. These models can be used to directly make predictions.
 
 A brief help section (`-h`) is shown using:
 

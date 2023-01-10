@@ -98,6 +98,10 @@ all_models = {
         "https://figshare.com/ndownloader/files/31458676",
         1,
     ],
+    "jv_supercon_tc_alignn": [
+        "https://figshare.com/ndownloader/files/38789199",
+        1,
+    ],
     "mp_e_form_alignnn": [
         "https://figshare.com/ndownloader/files/31458811",
         1,
@@ -253,7 +257,9 @@ def get_prediction(
     model = get_figshare_model(model_name)
     # print("Loading completed.")
     g, lg = Graph.atom_dgl_multigraph(
-        atoms, cutoff=float(cutoff), max_neighbors=max_neighbors,
+        atoms,
+        cutoff=float(cutoff),
+        max_neighbors=max_neighbors,
     )
     out_data = (
         model([g.to(device), lg.to(device)])
