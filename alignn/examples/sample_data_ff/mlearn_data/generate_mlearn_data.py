@@ -1,16 +1,17 @@
-from monty.serialization import loadfn
+"""Module for generating mlearn dataset."""
 from jarvis.core.atoms import pmg_to_atoms
 from jarvis.db.jsonutils import dumpjson
+from jarvis.db.jsonutils import loadjson
 
-# data = loadfn('data.json')
-data = loadfn("mlearn/data/Si/training.json")
+# Ref: https://github.com/materialsvirtuallab/mlearn
+data = loadjson("mlearn/data/Si/training.json")
 train_structures = [d["structure"] for d in data]
 train_energies = [d["outputs"]["energy"] for d in data]
 train_forces = [d["outputs"]["forces"] for d in data]
 train_stresses = [d["outputs"]["virial_stress"] for d in data]
 
 
-data = loadfn("mlearn/data/Si/test.json")
+data = loadjson("mlearn/data/Si/test.json")
 test_structures = [d["structure"] for d in data]
 test_energies = [d["outputs"]["energy"] for d in data]
 test_forces = [d["outputs"]["forces"] for d in data]
