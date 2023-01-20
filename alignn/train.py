@@ -844,7 +844,7 @@ def train_dgl(
         #    history["validation"][metric].append(vmetrics[metric])
 
         if config.store_outputs:
-            history["EOS"] = eos.data
+            history["EOS"] = train_eos.data
             history["trainEOS"] = train_eos.data
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_val.json"),
@@ -1027,10 +1027,12 @@ def train_dgl(
             )
             # TODO: Add IDs
             f.write("target,prediction\n")
-            for i, j in zip(x, y):
-                f.write("%6f, %6f\n" % (j, i))
-                line = str(i) + "," + str(j) + "\n"
-                f.write(line)
+            #for i, j in zip(x, y):
+                #f.write("%6f, %6f\n" % (j, i))
+                #line = str(i) + "," + str(j) + "\n"
+               # f.write(line)
+            for target_val, predicted_val in zip(x, y):
+                print(f”{target_val}, {predicted_val}”, file=f)
             f.close()
 
     # TODO: Fix IDs for train loader
