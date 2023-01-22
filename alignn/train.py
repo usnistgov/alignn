@@ -703,12 +703,10 @@ def train_dgl(
 
     # set up training engine and evaluators
     metrics = {
-        "loss": Loss(
-            criterion, output_transform=lambda tpl: (tpl[2],tpl[1])
-        ),
+        "loss": Loss(criterion, output_transform=lambda tpl: (tpl[2], tpl[1])),
         "mae": MeanAbsoluteError(
-            output_transform=lambda tpl: (tpl[2],tpl[1])
-        )
+            output_transform=lambda tpl: (tpl[2], tpl[1])
+        ),
     }
     if config.model.output_features > 1 and config.standard_scalar_and_pca:
         metrics = {
@@ -765,7 +763,7 @@ def train_dgl(
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
-        output_transform=lambda x,y,yp: (x,y,yp),
+        output_transform=lambda x, y, yp: (x, y, yp),
         # output_transform=make_standard_scalar_and_pca,
     )
 
@@ -774,7 +772,7 @@ def train_dgl(
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
-        output_transform=lambda x,y,yp: (x,y,yp),
+        output_transform=lambda x, y, yp: (x, y, yp),
         # output_transform=make_standard_scalar_and_pca,
     )
 
@@ -992,9 +990,9 @@ def train_dgl(
                     sc = pk.load(
                         open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
                     )
-                    out_data = sc.transform(
-                        np.array(out_data).reshape(-1, 1)
-                    )[0][0]
+                    out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
+                        0
+                    ][0]
 
                 inds.append(ind)
                 targets.append(target.cpu().numpy().ravel().tolist())
@@ -1035,14 +1033,16 @@ def train_dgl(
 
     if config.write_train_predictions:
         f = open(
-            os.path.join(config.output_dir, "prediction_results_train_set.csv"),
+            os.path.join(
+                config.output_dir, "prediction_results_train_set.csv"
+            ),
             "w",
         )
         f.write("id,target,prediction\n")
         inds = []
         targets = []
         predictions = []
-        for xtpl, y, yp  in train_evaluator.state.inout:
+        for xtpl, y, yp in train_evaluator.state.inout:
             inds.append(xtpl[0])
             targets.append(y.cpu().numpy().ravel().tolist())
             predictions.append(yp.cpu().numpy().ravel().tolist())
