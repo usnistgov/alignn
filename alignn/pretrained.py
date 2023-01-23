@@ -351,14 +351,12 @@ def get_multiple_predictions(
 
     results = []
     with torch.no_grad():
-        ids = test_loader.dataset.ids
-        for dat, id in zip(test_loader, ids):
-            g, lg, target = dat
+        for ind, g, lg, target in test_loader:
             out_data = model([g.to(device), lg.to(device)])
             out_data = out_data.cpu().numpy().tolist()
             target = target.cpu().numpy().flatten().tolist()
             info = {}
-            info["id"] = id
+            info["id"] = ind[0]  # TODO: PR improved reporting function
             info["pred"] = out_data
             results.append(info)
             print_freq = int(print_freq)
