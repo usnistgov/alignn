@@ -272,10 +272,13 @@ class ALIGNN(nn.Module):
         """
         # the only other ways are changing tests or writing
         # prepare_batch to behave circumstantially
-        if g[0] is None or isinstance(g[0], str) or (
-                isinstance(g[0], list) and all(
-                    [isinstance(x, str) for x in g[0]]
-                )
+        if (
+            g[0] is None
+            or isinstance(g[0], str)
+            or (
+                isinstance(g[0], list)
+                and all([isinstance(x, str) for x in g[0]])
+            )
         ):
             g = g[1:]
 
@@ -288,7 +291,7 @@ class ALIGNN(nn.Module):
 
             g = g.local_var()
         else:
-            g = g[0].local_var() #if not alignn layers, tuple not unpacked
+            g = g[0].local_var()  # if not alignn layers, tuple not unpacked
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")

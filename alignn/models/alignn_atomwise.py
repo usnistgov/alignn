@@ -286,10 +286,13 @@ class ALIGNNAtomWise(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
-        if g[0] is None or isinstance(g[0], str) or (
-                isinstance(g[0], list) and all(
-                    [isinstance(x, str) for x in g[0]]
-                )
+        if (
+            g[0] is None
+            or isinstance(g[0], str)
+            or (
+                isinstance(g[0], list)
+                and all([isinstance(x, str) for x in g[0]])
+            )
         ):
             g = g[1:]
 

@@ -401,7 +401,9 @@ class DenseALIGNN(nn.Module):
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
-                vmin=-np.pi, vmax=np.pi, bins=config.triplet_input_features,
+                vmin=-np.pi,
+                vmax=np.pi,
+                bins=config.triplet_input_features,
             ),
             MLPLayer(
                 config.triplet_input_features, config.embedding_features, norm
@@ -469,7 +471,7 @@ class DenseALIGNN(nn.Module):
 
     def forward(
         self,
-        g: Tuple[str, Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]]
+        g: Tuple[str, Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]],
     ):
         """ALIGNN : start with `atom_features`.
 
@@ -477,10 +479,13 @@ class DenseALIGNN(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
-        if g[0] is None or isinstance(g[0], str) or (
-                isinstance(g[0], list) and all(
-                    [isinstance(x, str) for x in g[0]]
-                )
+        if (
+            g[0] is None
+            or isinstance(g[0], str)
+            or (
+                isinstance(g[0], list)
+                and all([isinstance(x, str) for x in g[0]])
+            )
         ):
             g = g[1:]
 
