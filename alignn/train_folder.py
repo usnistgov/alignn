@@ -52,7 +52,9 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--output_dir", default="./", help="Folder to save outputs",
+    "--output_dir",
+    default="./",
+    help="Folder to save outputs",
 )
 
 

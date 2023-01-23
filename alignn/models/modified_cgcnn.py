@@ -181,7 +181,8 @@ class CGCNNConv(nn.Module):
         # apply the convolution term in eq. 5 (without residual connection)
         # storing the results in edge features `h`
         g.update_all(
-            message_func=fn.copy_e("m", "z"), reduce_func=fn.sum("z", "h"),
+            message_func=fn.copy_e("m", "z"),
+            reduce_func=fn.sum("z", "h"),
         )
 
         # final batchnorm
@@ -263,6 +264,16 @@ class CGCNN(nn.Module):
 
     def forward(self, g) -> torch.Tensor:
         """CGCNN function mapping graph to outputs."""
+        if (
+            g[0] is None
+            or isinstance(g[0], str)
+            or (
+                isinstance(g[0], list)
+                and all([isinstance(x, str) for x in g[0]])
+            )
+        ):
+            g = g[1:]
+
         g, lg = g
         g = g.local_var()
 
@@ -325,7 +336,9 @@ class ZeroInflatedGammaLoss(nn.modules.loss._Loss):
         )
 
     def forward(
-        self, inputs: Tuple[torch.Tensor, torch.Tensor], target: torch.Tensor,
+        self,
+        inputs: Tuple[torch.Tensor, torch.Tensor],
+        target: torch.Tensor,
     ) -> torch.Tensor:
         """Zero-inflated Gamma loss.
 

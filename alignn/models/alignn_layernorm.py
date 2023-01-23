@@ -136,7 +136,9 @@ class ALIGNNConv(nn.Module):
     """Line graph update."""
 
     def __init__(
-        self, in_features: int, out_features: int,
+        self,
+        in_features: int,
+        out_features: int,
     ):
         """Set up ALIGNN parameters."""
         super().__init__()
@@ -206,13 +208,19 @@ class ALIGNN(nn.Module):
         )
 
         self.edge_embedding = nn.Sequential(
-            RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_input_features,),
+            RBFExpansion(
+                vmin=0,
+                vmax=8.0,
+                bins=config.edge_input_features,
+            ),
             MLPLayer(config.edge_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
-                vmin=-1, vmax=1.0, bins=config.triplet_input_features,
+                vmin=-1,
+                vmax=1.0,
+                bins=config.triplet_input_features,
             ),
             MLPLayer(config.triplet_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
@@ -220,7 +228,10 @@ class ALIGNN(nn.Module):
 
         self.alignn_layers = nn.ModuleList(
             [
-                ALIGNNConv(config.hidden_features, config.hidden_features,)
+                ALIGNNConv(
+                    config.hidden_features,
+                    config.hidden_features,
+                )
                 for idx in range(config.alignn_layers)
             ]
         )
@@ -262,6 +273,16 @@ class ALIGNN(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
+        if (
+            g[0] is None
+            or isinstance(g[0], str)
+            or (
+                isinstance(g[0], list)
+                and all([isinstance(x, str) for x in g[0]])
+            )
+        ):
+            g = g[1:]
+
         if len(self.alignn_layers) > 0:
             g, lg = g
             lg = lg.local_var()
@@ -269,7 +290,9 @@ class ALIGNN(nn.Module):
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
 
-        g = g.local_var()
+            g = g.local_var()
+        else:
+            g = g[0].local_var()
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")

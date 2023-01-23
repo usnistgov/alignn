@@ -13,15 +13,8 @@ import ignite
 import torch
 from ignite.contrib.handlers import TensorboardLogger
 from sklearn.metrics import mean_absolute_error
+from ignite.handlers.stores import EpochOutputStore
 
-try:
-    from ignite.contrib.handlers.stores import EpochOutputStore
-
-    # For different version of pytorch-ignite
-except Exception:
-    from ignite.handlers.stores import EpochOutputStore
-
-    pass
 from ignite.handlers import EarlyStopping
 from ignite.contrib.handlers.tensorboard_logger import (
     global_step_from_engine,
@@ -60,6 +53,7 @@ import json
 import pprint
 
 import os
+from itertools import chain
 
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
@@ -74,7 +68,7 @@ if torch.cuda.is_available():
 
 def activated_output_transform(output):
     """Exponentiate output."""
-    y_pred, y = output
+    _, y, y_pred = output
     y_pred = torch.exp(y_pred)
     y_pred = y_pred[:, 1]
     return y_pred, y
@@ -83,7 +77,7 @@ def activated_output_transform(output):
 def make_standard_scalar_and_pca(output):
     """Use standard scalar and PCS for multi-output data."""
     sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
-    y_pred, y = output
+    _, y, y_pred = output
     y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
     y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
     # pc = pk.load(open("pca.pkl", "rb"))
@@ -98,7 +92,7 @@ def make_standard_scalar_and_pca(output):
 
 def thresholded_output_transform(output):
     """Round off output."""
-    y_pred, y = output
+    _, y, y_pred = output
     y_pred = torch.round(torch.exp(y_pred))
     # print ('output',y_pred)
     return y_pred, y
@@ -708,9 +702,13 @@ def train_dgl(
     criterion = criteria[config.criterion]
 
     # set up training engine and evaluators
-    metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
+    metrics = {
+        "loss": Loss(criterion, output_transform=lambda tpl: (tpl[2], tpl[1])),
+        "mae": MeanAbsoluteError(
+            output_transform=lambda tpl: (tpl[2], tpl[1])
+        ),
+    }
     if config.model.output_features > 1 and config.standard_scalar_and_pca:
-        # metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
         metrics = {
             "loss": Loss(
                 criterion, output_transform=make_standard_scalar_and_pca
@@ -722,9 +720,9 @@ def train_dgl(
 
     if config.criterion == "zig":
 
-        def zig_prediction_transform(x):
-            output, y = x
-            return criterion.predict(output), y
+        def zig_prediction_transform(output):
+            _, y, y_pred = output
+            return criterion.predict(y_pred), y
 
         metrics = {
             "loss": Loss(criterion),
@@ -765,6 +763,7 @@ def train_dgl(
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
+        output_transform=lambda x, y, yp: (x, y, yp),
         # output_transform=make_standard_scalar_and_pca,
     )
 
@@ -773,6 +772,7 @@ def train_dgl(
         metrics=metrics,
         prepare_batch=prepare_batch,
         device=device,
+        output_transform=lambda x, y, yp: (x, y, yp),
         # output_transform=make_standard_scalar_and_pca,
     )
 
@@ -813,9 +813,9 @@ def train_dgl(
         # log_results handler will save epoch output
         # in history["EOS"]
         eos = EpochOutputStore()
-        eos.attach(evaluator)
+        eos.attach(evaluator, "inout")
         train_eos = EpochOutputStore()
-        train_eos.attach(train_evaluator)
+        train_eos.attach(train_evaluator, "inout")
 
     # collect evaluation performance
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -839,11 +839,8 @@ def train_dgl(
             history["train"][metric].append(tm)
             history["validation"][metric].append(vm)
 
-        # for metric in metrics.keys():
-        #    history["train"][metric].append(tmetrics[metric])
-        #    history["validation"][metric].append(vmetrics[metric])
-
         if config.store_outputs:
+            # TODO: make these animation frame write-outs .append
             history["EOS"] = eos.data
             history["trainEOS"] = train_eos.data
             dumpjson(
@@ -920,15 +917,13 @@ def train_dgl(
         targets = []
         predictions = []
         with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+            for ind, g, lg, target in test_loader:
+                out_data = net([ind, g.to(device), lg.to(device)])
                 # out_data = torch.exp(out_data.cpu())
                 top_p, top_class = torch.topk(torch.exp(out_data), k=1)
                 target = int(target.cpu().numpy().flatten().tolist()[0])
 
-                f.write("%s, %d, %d\n" % (id, (target), (top_class)))
+                f.write("%s, %d, %d\n" % (ind, (target), (top_class)))
                 targets.append(target)
                 predictions.append(
                     top_class.cpu().numpy().flatten().tolist()[0]
@@ -951,10 +946,8 @@ def train_dgl(
         net.eval()
         mem = []
         with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+            for ind, g, lg, target in test_loader:
+                out_data = net([ind, g.to(device), lg.to(device)])
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(open("sc.pkl", "rb"))
@@ -963,7 +956,7 @@ def train_dgl(
                     )  # [0][0]
                 target = target.cpu().numpy().flatten().tolist()
                 info = {}
-                info["id"] = id
+                info["id"] = ind
                 info["target"] = target
                 info["predictions"] = out_data
                 mem.append(info)
@@ -973,6 +966,8 @@ def train_dgl(
             ),
             data=mem,
         )
+        # TODO: get classifier validation/train predictions
+
     if (
         config.write_predictions
         and not classification
@@ -984,14 +979,13 @@ def train_dgl(
             "w",
         )
         f.write("id,target,prediction\n")
+        inds = []
         targets = []
         predictions = []
         with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
-                out_data = out_data.cpu().numpy().tolist()
+            for ind, g, lg, target in test_loader:
+                out_data = net([ind, g.to(device), lg.to(device)])
+
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
                         open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
@@ -999,67 +993,66 @@ def train_dgl(
                     out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
                         0
                     ][0]
-                target = target.cpu().numpy().flatten().tolist()
-                if len(target) == 1:
-                    target = target[0]
-                f.write("%s, %6f, %6f\n" % (id, target, out_data))
-                targets.append(target)
-                predictions.append(out_data)
+
+                inds.append(ind)
+                targets.append(target.cpu().numpy().ravel().tolist())
+                predictions.append(out_data.cpu().numpy().ravel().tolist())
+            inds = list(chain.from_iterable(inds))
+            targets = list(chain.from_iterable(targets))
+            predictions = list(chain.from_iterable(predictions))
+            for i, j, k in zip(inds, targets, predictions):
+                f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
 
         print(
             "Test MAE:",
             mean_absolute_error(np.array(targets), np.array(predictions)),
         )
+
         if config.store_outputs and not classification:
-            x = []
-            y = []
-            for i in history["EOS"]:
-                x.append(i[0].cpu().numpy().tolist())
-                y.append(i[1].cpu().numpy().tolist())
-            x = np.array(x, dtype="float").flatten()
-            y = np.array(y, dtype="float").flatten()
             f = open(
                 os.path.join(
-                    config.output_dir, "prediction_results_train_set.csv"
+                    config.output_dir, "prediction_results_val_set.csv"
                 ),
                 "w",
             )
-            # TODO: Add IDs
-            f.write("target,prediction\n")
-            for i, j in zip(x, y):
-                f.write("%6f, %6f\n" % (j, i))
-                line = str(i) + "," + str(j) + "\n"
-                f.write(line)
+            f.write("id,target,prediction\n")
+            inds = []
+            targets = []
+            predictions = []
+            for xtpl, y, yp in evaluator.state.inout:
+                inds.append(xtpl[0])
+                targets.append(y.cpu().numpy().ravel().tolist())
+                predictions.append(yp.cpu().numpy().ravel().tolist())
+            inds = list(chain.from_iterable(inds))
+            targets = list(chain.from_iterable(targets))
+            predictions = list(chain.from_iterable(predictions))
+            for i, j, k in zip(inds, targets, predictions):
+                f.write("%s, %6f, %6f\n" % (i, j, k))
             f.close()
 
-    # TODO: Fix IDs for train loader
-    """
     if config.write_train_predictions:
-        net.eval()
-        f = open("train_prediction_results.csv", "w")
+        f = open(
+            os.path.join(
+                config.output_dir, "prediction_results_train_set.csv"
+            ),
+            "w",
+        )
         f.write("id,target,prediction\n")
-        with torch.no_grad():
-            ids = train_loader.dataset.dataset.ids[
-                train_loader.dataset.indices
-            ]
-            print("lens", len(ids), len(train_loader.dataset.dataset))
-            x = []
-            y = []
-
-            for dat, id in zip(train_loader, ids):
-                g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
-                out_data = out_data.cpu().numpy().tolist()
-                target = target.cpu().numpy().flatten().tolist()
-                for i, j in zip(out_data, target):
-                    x.append(i)
-                    y.append(j)
-            for i, j, k in zip(ids, x, y):
-                f.write("%s, %6f, %6f\n" % (i, j, k))
+        inds = []
+        targets = []
+        predictions = []
+        for xtpl, y, yp in train_evaluator.state.inout:
+            inds.append(xtpl[0])
+            targets.append(y.cpu().numpy().ravel().tolist())
+            predictions.append(yp.cpu().numpy().ravel().tolist())
+        inds = list(chain.from_iterable(inds))
+        targets = list(chain.from_iterable(targets))
+        predictions = list(chain.from_iterable(predictions))
+        for i, j, k in zip(inds, targets, predictions):
+            f.write("%s, %6f, %6f\n" % (i, j, k))
         f.close()
 
-    """
     return history
 
 

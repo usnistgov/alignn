@@ -267,6 +267,16 @@ class iCGCNN(nn.Module):
 
     def forward(self, g) -> torch.Tensor:
         """CGCNN function mapping graph to outputs."""
+        if (
+            g[0] is None
+            or isinstance(g[0], str)
+            or (
+                isinstance(g[0], list)
+                and all([isinstance(x, str) for x in g[0]])
+            )
+        ):
+            g = g[1:]
+
         g, lg = g
         g = g.local_var()
 
