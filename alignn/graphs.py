@@ -705,7 +705,7 @@ class StructureDataset(torch.utils.data.Dataset):
         """Dataloader helper to batch graphs cross `samples`."""
         ind, graphs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
-        return torch.tensor(ind), batched_graph, torch.tensor(labels)
+        return ind, batched_graph, torch.tensor(labels)
 
     @staticmethod
     def collate_line_graph(
