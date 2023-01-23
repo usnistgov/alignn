@@ -270,16 +270,25 @@ class ALIGNN(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
+        # the only other ways are changing tests or writing
+        # prepare_batch to behave circumstantially
+        if g[0] is None or isinstance(g[0], str) or (
+                isinstance(g[0], list) and all(
+                    [isinstance(x, str) for x in g[0]]
+                )
+        ):
+            g = g[1:]
+
         if len(self.alignn_layers) > 0:
-            _, g, lg = g
+            g, lg = g
             lg = lg.local_var()
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
-        else:
-            _, g = g
 
-        g = g.local_var()
+            g = g.local_var()
+        else:
+            g = g[0].local_var() #if not alignn layers, tuple not unpacked
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")

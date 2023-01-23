@@ -110,11 +110,21 @@ class DenseGCN(nn.Module):
 
     def forward(self, g):
         """Baseline SimpleGCN : start with `atom_features`."""
-        g = g.local_var()
+        if (
+            g[0] is None
+            or isinstance(g[0], str)
+            or (
+                isinstance(g[0], list)
+                and all([isinstance(x, str) for x in g[0]])
+            )
+        ):
+            g = g[1:]
+
+        g = g[0].local_var()
 
         if self.weight_edges:
             r = torch.norm(g.edata["r"], dim=1)
-            edge_weights = torch.exp(-(r ** 2) / self.edge_lengthscale ** 2)
+            edge_weights = torch.exp(-(r**2) / self.edge_lengthscale**2)
         else:
             edge_weights = None
 
