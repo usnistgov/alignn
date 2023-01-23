@@ -467,20 +467,19 @@ class Standardize(torch.nn.Module):
 
 
 def prepare_dgl_batch(
-    batch: Tuple[dgl.DGLGraph, torch.Tensor], device=None, non_blocking=False
+    batch: Tuple[str, dgl.DGLGraph, torch.Tensor],
+    device=None,
+    non_blocking=False,
 ):
     """Send batched dgl crystal graph to device."""
-    g, t = batch
-    batch = (
-        g.to(device, non_blocking=non_blocking),
-        t.to(device, non_blocking=non_blocking),
-    )
-
-    return batch
+    i, g, t = batch
+    xtpl = (i, g.to(device, non_blocking=non_blocking))
+    y = t.to(device, non_blocking=non_blocking)
+    return xtpl, y
 
 
 def prepare_line_graph_batch(
-    batch: Tuple[Tuple[dgl.DGLGraph, dgl.DGLGraph], torch.Tensor],
+    batch: Tuple[str, Tuple[dgl.DGLGraph, dgl.DGLGraph], torch.Tensor],
     device=None,
     non_blocking=False,
 ):
@@ -488,16 +487,15 @@ def prepare_line_graph_batch(
 
     Note: the batch is a nested tuple, with the graph and line graph together
     """
-    g, lg, t = batch
-    batch = (
-        (
-            g.to(device, non_blocking=non_blocking),
-            lg.to(device, non_blocking=non_blocking),
-        ),
-        t.to(device, non_blocking=non_blocking),
+    i, g, lg, t = batch
+    xtpl = (
+        i,
+        g.to(device, non_blocking=non_blocking),
+        lg.to(device, non_blocking=non_blocking),
     )
+    y = t.to(device, non_blocking=non_blocking)
 
-    return batch
+    return xtpl, y
 
 
 # def prepare_batch(batch, device=None):
