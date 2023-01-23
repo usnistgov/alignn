@@ -1012,26 +1012,25 @@ def train_dgl(
             mean_absolute_error(np.array(targets), np.array(predictions)),
         )
         if config.store_outputs and not classification:
-            x = []
-            y = []
-            for i in history["EOS"]:
-                x.append(i[0].cpu().numpy().tolist())
-                y.append(i[1].cpu().numpy().tolist())
-            x = np.array(x, dtype="float").flatten()
-            y = np.array(y, dtype="float").flatten()
-            f = open(
-                os.path.join(
-                    config.output_dir, "prediction_results_train_set.csv"
-                ),
-                "w",
-            )
+            # save training targets and predictions here
             # TODO: Add IDs
-            f.write("target,prediction\n")
-            for i, j in zip(x, y):
-                f.write("%6f, %6f\n" % (j, i))
-                line = str(i) + "," + str(j) + "\n"
-                f.write(line)
-            f.close()
+            resultsfile = os.path.join(
+                config.output_dir, "prediction_results_train_set.csv"
+            )
+
+            target_vals, predictions = [], []
+
+            for tgt, pred in history["trainEOS"]:
+                target_vals.append(tgt.cpu().numpy().tolist())
+                predictions.append(pred.cpu().numpy().tolist())
+
+            target_vals = np.array(target_vals, dtype="float").flatten()
+            predictions = np.array(predictions, dtype="float").flatten()
+
+            with open(resultsfile, "w") as f:
+                print("target,prediction", file=f)
+                for target_val, predicted_val in zip(target_vals, predictions):
+                    print(f"{target_val}, {predicted_val}", file=f)
 
     # TODO: Fix IDs for train loader
     """
