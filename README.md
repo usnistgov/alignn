@@ -21,7 +21,7 @@
 * [Pre-trained models](#pretrained)
 * [Quick start using colab](#colab)
 * [JARVIS-ALIGNN webapp](#webapp)
-* [ALIGNN-FF](#alignnff)
+* [ALIGNN-FF & ASE Calculator](#alignnff)
 * [Peformances on a few datasets](#performances)
 * [Useful notes](#notes)
 * [References](#refs)
@@ -166,9 +166,44 @@ A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https:
 ALIGNN-FF
 -------------------------
 
+[ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html) provides interface to various codes. An example for ALIGNN-FF is give below:
+
+```
+from alignn.ff.ff import AlignnAtomwiseCalculator,default_path
+model_path = default_path()
+calc = AlignnAtomwiseCalculator(path=model_path)
+
+from ase import Atom, Atoms
+import numpy as np
+import matplotlib.pyplot as plt
+
+lattice_params = np.linspace(3.5, 3.8)
+fcc_energies = []
+ready = True
+for a in lattice_params:
+    atoms = Atoms([Atom('Cu', (0, 0, 0))],
+                  cell=0.5 * a * np.array([[1.0, 1.0, 0.0],
+                                           [0.0, 1.0, 1.0],
+                                           [1.0, 0.0, 1.0]]),
+                 pbc=True)
+    
+    atoms.set_tags(np.ones(len(atoms)))
+    atoms.calc = calc
+    e = atoms.get_potential_energy()
+    fcc_energies.append(e)
+    
+import matplotlib.pyplot as plt
+%matplotlib inline
+plt.plot(lattice_params, fcc_energies)
+plt.title('1x1x1')
+plt.xlabel('Lattice constant ($\AA$)')
+plt.ylabel('Total energy (eV)')
+plt.show()
+```
+
 To train ALIGNN-FF use `train_folder_ff.py` script which uses `atomwise_alignn` model:
 
-AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data_ff directory):
+AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data_ff directory).:
 
 ```
 train_folder_ff.py --root_dir "alignn/examples/sample_data_ff" --config "alignn/examples/sample_data_ff/config_example_atomwise.json" --output_dir=temp
@@ -187,6 +222,7 @@ To know about other tasks, type.
 ```
 run_alignn_ff.py -h
 ```
+
 
 
 <a name="performances"></a>
