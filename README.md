@@ -343,7 +343,9 @@ coming soon!
 
 ### 10) On OpenCatalyst dataset 
 
-coming soon!
+[On 10k dataset](https://github.com/Open-Catalyst-Project/ocp/blob/main/MODELS.md#is2re-models):
+CGCNN MAE: 0.988
+ALIGNN MAE: 0.61
 
 
 <a name="notes"></a>
