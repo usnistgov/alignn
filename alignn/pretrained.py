@@ -102,6 +102,18 @@ all_models = {
         "https://figshare.com/ndownloader/files/38789199",
         1,
     ],
+    "jv_supercon_edos_alignn": [
+        "https://figshare.com/ndownloader/files/39946300",
+        1,
+    ],
+    "jv_supercon_debye_alignn": [
+        "https://figshare.com/ndownloader/files/39946297",
+        1,
+    ],
+    "jv_supercon_a2F_alignn": [
+        "https://figshare.com/ndownloader/files/38801886",
+        100,
+    ],
     "mp_e_form_alignnn": [
         "https://figshare.com/ndownloader/files/31458811",
         1,
