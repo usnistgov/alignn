@@ -35,7 +35,7 @@
     "num_workers": 0,
     "cutoff": 8.0,
     "max_neighbors": 12,
-    "keep_data_order": false,
+    "keep_data_order": true,
     "model": {
         "name": "alignn",
         "alignn_layers": 4,
