@@ -345,9 +345,11 @@ coming soon!
 
 [On 10k dataset](https://github.com/Open-Catalyst-Project/ocp/blob/main/MODELS.md#is2re-models):
 
-CGCNN MAE: 0.988
+|     DataSplit                                |     CGCNN                 |  DimeNet      |     SchNet    | DimeNet++    |     ALIGNN    |     MAD: MAE    |
+|----------------------------------------------|---------------------------|---------------|---------------|--------------|---------------|-----------------|
+|     10k                                      |     0.988                 |   1.0117      |    1.059      |    0.8837    |     0.61      |     -           |
 
-ALIGNN MAE: 0.61
+
 
 
 <a name="notes"></a>
