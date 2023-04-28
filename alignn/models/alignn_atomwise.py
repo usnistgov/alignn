@@ -17,6 +17,39 @@ from torch.nn import functional as F
 from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
 
+device = "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
+
+def compute_pair_vector_and_distance(g: dgl.DGLGraph):
+    """
+    Calculate bond vectors and distances using dgl graphs
+
+    Args:
+    g: DGL graph
+
+    Returns:
+    bond_vec (torch.tensor): bond distance between two atoms
+    bond_dist (torch.tensor): vector from src node to dst node
+    """
+    # bond_vec = g.edata['r'] #torch.zeros(g.num_edges(), 3)
+    bond_vec = g.edata["bond_vec"]  # torch.zeros(g.num_edges(), 3)
+    # bond_dist = torch.zeros(g.num_edges())
+    for i in range(g.num_edges()):
+        bond_vec[i, :] = (
+            g.ndata["pos"][g.edges()[1][i], :]
+            + torch.sum(
+                torch.squeeze(
+                    g.edata["pbc"][i][:] * g.edata["lattice"][i][:, None]
+                ),
+                dim=0,
+            )
+            - g.ndata["pos"][g.edges()[0][i], :]
+        )
+    bond_dist = torch.norm(bond_vec, dim=1)
+    return bond_vec  # , bond_dist
+
 
 class ALIGNNAtomWiseConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.alignn."""
@@ -293,16 +326,25 @@ class ALIGNNAtomWise(nn.Module):
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
 
-        g = g.local_var()
+        # g = g.local_var()
         result = {}
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
-        r = g.edata["r"]
+        pos = g.ndata["pos"]
+        pbc = g.edata["pbc"]
+        ###r = g.edata["r"]
+        # r = bond_vec
         if self.config.calculate_gradient:
-            r.requires_grad_(True)
+            # r.requires_grad_(True)
+            # pos.requires_grad_(True)
+            g.ndata["pos"].requires_grad_(True)
+            # r.requires_grad_(True)
         # r = g.edata["r"].clone().detach().requires_grad_(True)
+        # bondlength = bond_dist
+        r = compute_pair_vector_and_distance(g)
+
         bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
 
@@ -341,13 +383,16 @@ class ALIGNNAtomWise(nn.Module):
                 self.config.grad_multiplier
                 * grad(
                     # tmp_out,
-                    out,
-                    r,
+                    len(x) * out,
+                    [g.ndata["pos"]],
                     grad_outputs=torch.ones_like(out),
                     create_graph=create_graph,
                     retain_graph=True,
                 )[0]
             )
+            gradient = dy
+            print("gradient", gradient)
+            """
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
@@ -368,6 +413,7 @@ class ALIGNNAtomWise(nn.Module):
                 #    * torch.einsum("ij, ik->jk", result["r"], result["dy_dr"])
                 #    / 2
                 # )  # / ( g.ndata["V"][0])
+            """
         if self.link:
             out = self.link(out)
 

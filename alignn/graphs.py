@@ -7,6 +7,7 @@ import pandas as pd
 from collections import OrderedDict
 from jarvis.analysis.structure.neighbors import NeighborsAnalysis
 from jarvis.core.specie import chem_data, get_node_attributes
+from dgl.backend import tensor
 
 # from jarvis.core.atoms import Atoms
 from collections import defaultdict
@@ -94,7 +95,6 @@ def nearest_neighbor_edges(
     # so what's left is the odd ones out
     edges = defaultdict(set)
     for site_idx, neighborlist in enumerate(all_neighbors):
-
         # sort on distance
         neighborlist = sorted(neighborlist, key=lambda x: x[2])
         distances = np.array([nbr[2] for nbr in neighborlist])
@@ -137,7 +137,6 @@ def build_undirected_edgedata(
     # import pprint
     u, v, r = [], [], []
     for (src_id, dst_id), images in edges.items():
-
         for dst_image in images:
             # fractional coordinate for periodic image of dst
             dst_coord = atoms.frac_coords[dst_id] + dst_image
@@ -234,10 +233,16 @@ class Graph(object):
         )
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
+        g.ndata["pos"] = tensor(atoms.cart_coords)
+        g.edata["pbc"] = tensor(torch.zeros(g.num_edges(), 3))
         g.ndata["lattice_mat"] = torch.tensor(
             [atoms.lattice_mat for ii in range(atoms.num_atoms)]
         )
         g.edata["r"] = r
+        g.edata["bond_vec"] = tensor(torch.zeros(g.num_edges(), 3))
+        g.edata["lattice"] = tensor(
+            [[atoms.lattice_mat] for i in range(g.num_edges())]
+        )
         g.ndata["V"] = torch.tensor(
             [atoms.volume for ii in range(atoms.num_atoms)]
         )
