@@ -135,6 +135,7 @@ def build_undirected_edgedata(
     """
     # second pass: construct *undirected* graph
     # import pprint
+    imgs = []
     u, v, r = [], [], []
     for (src_id, dst_id), images in edges.items():
         for dst_image in images:
@@ -151,12 +152,16 @@ def build_undirected_edgedata(
                 u.append(uu)
                 v.append(vv)
                 r.append(dd)
+                imgs.append(dst_image)
     u, v, r = (np.array(x) for x in (u, v, r))
     u = torch.tensor(u)
     v = torch.tensor(v)
     r = torch.tensor(r).type(torch.get_default_dtype())
+    # print('imgs',imgs)
+    imgs = torch.tensor(np.array(imgs)).type(torch.get_default_dtype())
+    # print('edges',edges,len(edges),len(r),len(imgs),imgs[-1])
 
-    return u, v, r
+    return u, v, r, imgs
 
 
 class Graph(object):
@@ -218,7 +223,7 @@ class Graph(object):
         # elif neighbor_strategy == "voronoi":
         #    edges = voronoi_edges(structure)
 
-        u, v, r = build_undirected_edgedata(atoms, edges)
+        u, v, r, imgs = build_undirected_edgedata(atoms, edges)
 
         # build up atom attribute tensor
         sps_features = []
@@ -234,7 +239,8 @@ class Graph(object):
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
         g.ndata["pos"] = tensor(atoms.cart_coords)
-        g.edata["pbc"] = tensor(torch.zeros(g.num_edges(), 3))
+        g.edata["pbc"] = tensor(torch.zeros(g.num_edges(), 3)) + 1
+        # g.edata["pbc"] = tensor(imgs) #tensor(torch.zeros(g.num_edges(), 3))+1
         g.ndata["lattice_mat"] = torch.tensor(
             [atoms.lattice_mat for ii in range(atoms.num_atoms)]
         )

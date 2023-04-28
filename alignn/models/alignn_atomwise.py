@@ -17,6 +17,7 @@ from torch.nn import functional as F
 from alignn.models.utils import RBFExpansion
 from alignn.utils import BaseSettings
 
+torch.autograd.set_detect_anomaly(True)
 device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -330,7 +331,7 @@ class ALIGNNAtomWise(nn.Module):
         result = {}
 
         # initial node features: atom feature network...
-        x = g.ndata.pop("atom_features")
+        x = g.ndata["atom_features"]
         x = self.atom_embedding(x)
         pos = g.ndata["pos"]
         pbc = g.edata["pbc"]
@@ -343,9 +344,12 @@ class ALIGNNAtomWise(nn.Module):
             # r.requires_grad_(True)
         # r = g.edata["r"].clone().detach().requires_grad_(True)
         # bondlength = bond_dist
-        r = compute_pair_vector_and_distance(g)
+        r = compute_pair_vector_and_distance(g)  # +g.edata['r']
 
+        # print('r',r)
+        # print('pos',pos)
         bondlength = torch.norm(r, dim=1)
+        # print('bondlength',bondlength)
         y = self.edge_embedding(bondlength)
 
         # ALIGNN updates: update node, edge, triplet features
@@ -383,7 +387,7 @@ class ALIGNNAtomWise(nn.Module):
                 self.config.grad_multiplier
                 * grad(
                     # tmp_out,
-                    len(x) * out,
+                    out / len(x),
                     [g.ndata["pos"]],
                     grad_outputs=torch.ones_like(out),
                     create_graph=create_graph,
@@ -391,7 +395,7 @@ class ALIGNNAtomWise(nn.Module):
                 )[0]
             )
             gradient = dy
-            print("gradient", gradient)
+            # print("gradient", gradient)
             """
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))

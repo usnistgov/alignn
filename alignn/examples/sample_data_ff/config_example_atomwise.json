@@ -41,13 +41,13 @@
         "atom_input_features": 92,
         "calculate_gradient":true,
         "atomwise_output_features":3,
-        "alignn_layers":4,
-        "gcn_layers":4,
+        "alignn_layers":1,
+        "gcn_layers":1,
         "output_features": 1,
-        "graphwise_weight":0.85,
-        "gradwise_weight":0.05,
-        "atomwise_weight":0.05,
-        "stresswise_weight":0.05
+        "graphwise_weight":0.0,
+        "gradwise_weight":1.5,
+        "atomwise_weight":0.0,
+        "stresswise_weight":0.0
           
     }
 }
