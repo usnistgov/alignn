@@ -139,6 +139,7 @@ def build_undirected_edgedata(
     u, v, r = [], [], []
     for (src_id, dst_id), images in edges.items():
         for dst_image in images:
+            # print('dst_image',dst_image)
             # fractional coordinate for periodic image of dst
             dst_coord = atoms.frac_coords[dst_id] + dst_image
             # cartesian displacement vector pointing from src -> dst
@@ -208,8 +209,62 @@ class Graph(object):
         id: Optional[str] = None,
         compute_line_graph: bool = True,
         use_canonize: bool = False,
+        # use_fast_version: bool = True,
+        tol=1.0e-8,
     ):
         """Obtain a DGLGraph for Atoms object."""
+        """
+        if use_fast_version:
+            all_neighbors = atoms.get_all_neighbors(r=cutoff)
+
+            src_id = []
+            dst_id = []
+            images = []
+            rij = []
+            for i in all_neighbors:
+                for ii in i:
+                    src_id.append(ii[0])
+                    dst_id.append(ii[1])
+                    rij.append(ii[2])
+                    images.append(ii[3])
+            src_id = np.array(src_id)
+            dst_id = np.array(dst_id)
+            images = np.array(images)
+            rij = np.array(rij)
+            exclude_self = (src_id != dst_id) | (rij > tol)
+
+            src_id, dst_id, images, rij = (
+                src_id[exclude_self],
+                dst_id[exclude_self],
+                images[exclude_self],
+                rij[exclude_self],
+            )
+            u, v = tensor(src_id), tensor(dst_id)
+            g = dgl.graph((u, v))
+            print(atoms)
+            print(g)
+            print("src_id", src_id, len(src_id))
+            print("dst_id", dst_id, len(dst_id))
+            print("images", images, len(images))
+            print("rij", rij, len(rij))
+            edges = nearest_neighbor_edges(
+                atoms=atoms,
+                cutoff=cutoff,
+                max_neighbors=max_neighbors,
+                id=id,
+                use_canonize=use_canonize,
+            )
+            u, v, r, imgs = build_undirected_edgedata(atoms, edges)
+            print("u", u, u.shape)
+            print("v", v, v.shape)
+            print("r", r, r.shape)
+            import sys
+
+            sys.exit()
+            images = np.array(images)
+            lattice_matrix = atoms.lattice_mat
+        """
+
         if neighbor_strategy == "k-nearest":
             edges = nearest_neighbor_edges(
                 atoms=atoms,
@@ -224,7 +279,10 @@ class Graph(object):
         #    edges = voronoi_edges(structure)
 
         u, v, r, imgs = build_undirected_edgedata(atoms, edges)
-
+        # print ('r',r,r.shape)
+        # print('imgs',imgs,imgs.shape)
+        # import sys
+        # sys.exit()
         # build up atom attribute tensor
         sps_features = []
         for ii, s in enumerate(atoms.elements):
@@ -236,10 +294,17 @@ class Graph(object):
         node_features = torch.tensor(sps_features).type(
             torch.get_default_dtype()
         )
+        lattice_matrix = torch.tensor(np.array(atoms.lattice_mat)).type(
+            torch.get_default_dtype()
+        )
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
         g.ndata["pos"] = tensor(atoms.cart_coords)
-        g.edata["pbc"] = tensor(torch.zeros(g.num_edges(), 3)) + 1
+
+        g.edata["pbc"] = tensor(
+            torch.matmul(tensor(imgs), tensor(lattice_matrix))
+        )
+        # g.edata["pbc"] = tensor(torch.zeros(g.num_edges(), 3)) + 1
         # g.edata["pbc"] = tensor(imgs) #tensor(torch.zeros(g.num_edges(), 3))+1
         g.ndata["lattice_mat"] = torch.tensor(
             [atoms.lattice_mat for ii in range(atoms.num_atoms)]
