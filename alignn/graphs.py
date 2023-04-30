@@ -94,7 +94,6 @@ def nearest_neighbor_edges(
     # so what's left is the odd ones out
     edges = defaultdict(set)
     for site_idx, neighborlist in enumerate(all_neighbors):
-
         # sort on distance
         neighborlist = sorted(neighborlist, key=lambda x: x[2])
         distances = np.array([nbr[2] for nbr in neighborlist])
@@ -137,7 +136,6 @@ def build_undirected_edgedata(
     # import pprint
     u, v, r = [], [], []
     for (src_id, dst_id), images in edges.items():
-
         for dst_image in images:
             # fractional coordinate for periodic image of dst
             dst_coord = atoms.frac_coords[dst_id] + dst_image
@@ -234,13 +232,17 @@ class Graph(object):
         )
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
-        g.ndata["lattice_mat"] = torch.tensor(
-            [atoms.lattice_mat for ii in range(atoms.num_atoms)]
-        )
         g.edata["r"] = r
-        g.ndata["V"] = torch.tensor(
-            [atoms.volume for ii in range(atoms.num_atoms)]
-        )
+        vol = atoms.volume
+        g.ndata["V"] = torch.tensor([vol for ii in range(atoms.num_atoms)])
+        g.ndata["coords"] = torch.tensor(atoms.cart_coords)
+        # g.edata["V"] = torch.tensor(
+        #    [vol for ii in range(g.num_edges())]
+        # )
+        # lattice_mat = atoms.lattice_mat
+        # g.edata["lattice_mat"] = torch.tensor(
+        #    [lattice_mat for ii in range(g.num_edges())]
+        # )
 
         if compute_line_graph:
             # construct atomistic line graph
@@ -596,6 +598,7 @@ class StructureDataset(torch.utils.data.Dataset):
                 #        torch.get_default_dtype()
                 #    )
                 # )
+            # self.labels_stress = self.df[self.target_stress]
 
         self.ids = self.df[id_tag]
         self.labels = torch.tensor(self.df[target]).type(

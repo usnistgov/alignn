@@ -44,6 +44,9 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
     classification: bool = False
+    force_mult_natoms: bool = False
+    include_pos_deriv: bool = False
+    # batch_stress: bool = False
 
     class Config:
         """Configure model settings behavior."""
@@ -302,6 +305,7 @@ class ALIGNNAtomWise(nn.Module):
         r = g.edata["r"]
         if self.config.calculate_gradient:
             r.requires_grad_(True)
+
         # r = g.edata["r"].clone().detach().requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
         y = self.edge_embedding(bondlength)
@@ -337,17 +341,24 @@ class ALIGNNAtomWise(nn.Module):
 
             # tmp_out = out*len(x)
             # print ('tmp_out',tmp_out)
+            if self.config.include_pos_deriv:
+                # Not testes yet
+                g.ndata["coords"].requires_grad_(True)
+                dx = [g.ndata["coords"], r]
+            else:
+                dx = r
             dy = (
                 self.config.grad_multiplier
                 * grad(
-                    # tmp_out,
                     out,
-                    r,
+                    dx,
                     grad_outputs=torch.ones_like(out),
                     create_graph=create_graph,
                     retain_graph=True,
                 )[0]
             )
+            if self.config.force_mult_natoms:
+                dy *= g.num_nodes()
             g.edata["dy_dr"] = dy
             g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
             gradient = torch.squeeze(g.ndata["gradient"])
@@ -357,11 +368,44 @@ class ALIGNNAtomWise(nn.Module):
                 # 1 GPa = 10 kbar
                 # Following Virial stress formula, assuming inital velocity = 0
                 # Save volume as g.gdta['V']?
-                stress = -1 * (
-                    160.21766208
-                    * torch.matmul(r.T, dy)
-                    / (2 * g.ndata["V"][0])
+                # print('dy',dy.shape)
+                # print('r',r.shape)
+                # print('g.edata["V"]',g.edata["V"].shape)
+                stress = (
+                    -1
+                    * 160.21766208
+                    * (
+                        torch.matmul(r.T, dy)
+                        # / (2 * g.edata["V"])
+                        / (2 * g.ndata["V"][0])
+                    )
                 )
+                # print("stress1", stress, stress.shape)
+                # print("g.batch_size", g.batch_size)
+                stresses = []
+                count_edge = 0
+                count_node = 0
+                for graph_id in range(g.batch_size):
+                    num_edges = g.batch_num_edges()[graph_id]
+                    num_nodes = 0
+                    st = -1 * (
+                        160.21766208
+                        * torch.matmul(
+                            r[count_edge : count_edge + num_edges].T,
+                            dy[count_edge : count_edge + num_edges],
+                        )
+                        / g.ndata["V"][count_node + num_nodes]
+                    )
+
+                    count_edge = count_edge + num_edges
+                    num_nodes = g.batch_num_nodes()[graph_id]
+                    count_node = count_node + num_nodes
+                    # print("stresses.append", stresses[-1])
+                    for n in range(num_nodes):
+                        stresses.append(st)
+                # stress = (stresses)
+                stress = torch.cat(stresses)
+                # print("stress2", stress, stress.shape)
                 # virial = (
                 #    160.21766208
                 #    * 10

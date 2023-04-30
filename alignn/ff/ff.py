@@ -105,6 +105,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         epochs=None,
         output_dir=None,
         stress_wt=1.0,
+        force_multiplier=1.0,
+        force_mult_natoms=False,
         **kwargs,
     ):
         """Initialize class."""
@@ -116,6 +118,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         self.stress_wt = stress_wt
         config = loadjson(os.path.join(path, config_filename))
         self.config = config
+        self.force_multiplier = force_multiplier
+        self.force_mult_natoms = force_mult_natoms
         # config = TrainingConfig(**config)
         # if type(config) is dict:
         #    try:
@@ -170,11 +174,16 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         g, lg = Graph.atom_dgl_multigraph(j_atoms)
         result = self.net((g.to(self.device), lg.to(self.device)))
         # print ('stress',result["stress"].detach().numpy())
+        if self.force_mult_natoms:
+            mult = num_atoms
+        else:
+            mult = 1
+
         self.results = {
             "energy": result["out"].detach().cpu().numpy() * num_atoms,
-            "forces": result["grad"].detach().cpu().numpy() * num_atoms * (-1),
-            # "forces": result["grad"].detach().cpu().numpy()
-            # * num_atoms*(-1)/self.config['model']['gradwise_weight'],
+            "forces": result["grad"].detach().cpu().numpy()
+            * mult
+            * self.force_multiplier,
             "stress": full_3x3_to_voigt_6_stress(
                 result["stress"].detach().cpu().numpy()
             )
@@ -204,6 +213,8 @@ class ForceField(object):
         dyn=None,
         communicator=None,
         stress_wt=1.0,
+        force_multiplier=1.0,
+        force_mult_natoms=False,
     ):
         """Intialize class."""
         self.jarvis_atoms = jarvis_atoms
@@ -217,6 +228,8 @@ class ForceField(object):
         self.communicator = communicator
         self.logger = logger
         self.stress_wt = stress_wt
+        self.force_multiplier = force_multiplier
+        self.force_mult_natoms = force_mult_natoms
         if self.timestep is None:
             self.timestep = 0.01
         # Convert in appropriate units
@@ -243,6 +256,8 @@ class ForceField(object):
                 include_stress=self.include_stress,
                 model_filename=self.model_filename,
                 stress_wt=self.stress_wt,
+                force_multiplier=self.force_multiplier,
+                force_mult_natoms=self.force_mult_natoms,
                 # device="cuda" if torch.cuda.is_available() else "cpu",
             )
         )
