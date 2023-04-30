@@ -27,7 +27,8 @@ from ase.md.npt import NPT
 from ase.md.andersen import Andersen
 import ase.calculators.calculator
 from ase.stress import full_3x3_to_voigt_6_stress
-from alignn.config import TrainingConfig
+
+# from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
@@ -171,7 +172,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         self.results = {
             "energy": result["out"].detach().cpu().numpy() * num_atoms,
             "forces": result["grad"].detach().cpu().numpy() * num_atoms * (-1),
-            # "forces": result["grad"].detach().cpu().numpy()* num_atoms*(-1)/self.config['model']['gradwise_weight'],
+            # "forces": result["grad"].detach().cpu().numpy()
+            # * num_atoms*(-1)/self.config['model']['gradwise_weight'],
             "stress": full_3x3_to_voigt_6_stress(
                 result["stress"].detach().cpu().numpy()
             )
