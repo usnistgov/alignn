@@ -30,7 +30,7 @@ from ase.stress import full_3x3_to_voigt_6_stress
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
-from alignn.models.alignn_atomwise import ALIGNNAtomWise
+from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
 from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
 from alignn.pretrained import get_prediction
@@ -113,30 +113,33 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         self.include_stress = include_stress
 
         config = loadjson(os.path.join(path, config_filename))
-        config = TrainingConfig(**config)
-        if type(config) is dict:
-            try:
-                config = TrainingConfig(**config)
-            except Exception as exp:
-                print("Check", exp)
+        self.config = config
+        # config = TrainingConfig(**config)
+        # if type(config) is dict:
+        #    try:
+        #        config = TrainingConfig(**config)
+        #    except Exception as exp:
+        #        print("Check", exp)
         if self.include_stress:
             self.implemented_properties = ["energy", "forces", "stress"]
-            if config.model.stresswise_weight == 0:
-                config.model.stresswise_weight = 0.1
+            if config["model"]["stresswise_weight"] == 0:
+                config["model"]["stresswise_weight"] = 0.1
         else:
             self.implemented_properties = ["energy", "forces"]
 
-        config.keep_data_order = keep_data_order
+        config["keep_data_order"] = keep_data_order
         if classification_threshold is not None:
-            config.classification_threshold = float(classification_threshold)
+            config["classification_threshold"] = float(
+                classification_threshold
+            )
         if output_dir is not None:
-            config.output_dir = output_dir
+            config["output_dir"] = output_dir
         if batch_size is not None:
-            config.batch_size = int(batch_size)
+            config["batch_size"] = int(batch_size)
         if epochs is not None:
-            config.epochs = int(epochs)
+            config["epochs"] = int(epochs)
 
-        config.model.output_features = 1
+        config["model.output_features"] = 1
 
         import torch
 
@@ -144,7 +147,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             self.device = torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu"
             )
-        model = ALIGNNAtomWise(config.model)
+        model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config["model"]))
+        # model = ALIGNNAtomWise(config.model)
         model.state_dict()
         model.load_state_dict(
             torch.load(
@@ -166,7 +170,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         # print ('stress',result["stress"].detach().numpy())
         self.results = {
             "energy": result["out"].detach().cpu().numpy() * num_atoms,
-            "forces": result["grad"].detach().cpu().numpy(),
+            "forces": result["grad"].detach().cpu().numpy() * num_atoms * (-1),
+            # "forces": result["grad"].detach().cpu().numpy()* num_atoms*(-1)/self.config['model']['gradwise_weight'],
             "stress": full_3x3_to_voigt_6_stress(
                 result["stress"].detach().cpu().numpy()
             )
