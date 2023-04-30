@@ -104,6 +104,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         batch_size=None,
         epochs=None,
         output_dir=None,
+        stress_wt=0.01,
         **kwargs,
     ):
         """Initialize class."""
@@ -112,7 +113,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         )
         self.device = device
         self.include_stress = include_stress
-
+        self.stress_wt = stress_wt
         config = loadjson(os.path.join(path, config_filename))
         self.config = config
         # config = TrainingConfig(**config)
