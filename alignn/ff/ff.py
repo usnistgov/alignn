@@ -104,7 +104,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         batch_size=None,
         epochs=None,
         output_dir=None,
-        stress_wt=0.01,
+        stress_wt=1.0,
         **kwargs,
     ):
         """Initialize class."""
@@ -178,9 +178,9 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             "stress": full_3x3_to_voigt_6_stress(
                 result["stress"].detach().cpu().numpy()
             )
-            * self.stress_wt,
-            #* num_atoms,
-            # / 160.21766208,
+            * self.stress_wt
+            # * num_atoms,
+            / 160.21766208,
             "dipole": np.zeros(3),
             "charges": np.zeros(len(atoms)),
             "magmom": 0.0,
@@ -203,6 +203,7 @@ class ForceField(object):
         logfile="alignn_ff.log",
         dyn=None,
         communicator=None,
+        stress_wt=1.0,
     ):
         """Intialize class."""
         self.jarvis_atoms = jarvis_atoms
@@ -215,6 +216,7 @@ class ForceField(object):
         self.dyn = dyn
         self.communicator = communicator
         self.logger = logger
+        self.stress_wt = stress_wt
         if self.timestep is None:
             self.timestep = 0.01
         # Convert in appropriate units
@@ -240,6 +242,7 @@ class ForceField(object):
                 path=self.model_path,
                 include_stress=self.include_stress,
                 model_filename=self.model_filename,
+                stress_wt=self.stress_wt,
                 # device="cuda" if torch.cuda.is_available() else "cpu",
             )
         )
