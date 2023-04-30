@@ -106,7 +106,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         output_dir=None,
         stress_wt=1.0,
         force_multiplier=1.0,
-        force_mult_natoms=False,
+        force_mult_natoms=True,
         **kwargs,
     ):
         """Initialize class."""
