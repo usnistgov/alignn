@@ -178,7 +178,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             "stress": full_3x3_to_voigt_6_stress(
                 result["stress"].detach().cpu().numpy()
             )
-            * 10.0
+            * self.stress_wt
             * num_atoms,
             # / 160.21766208,
             "dipole": np.zeros(3),
