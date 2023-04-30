@@ -433,12 +433,23 @@ def train_dgl(
                     #    )
                     # )
                 if config.model.stresswise_weight != 0:
+                    # print('result["stress"]',result["stress"],result["stress"].shape)
+                    # print('dats[0].ndata["stresses"]')
+                    # print(dats[0].ndata["stresses"],dats[0].ndata["stresses"].shape)
                     loss4 = config.model.stresswise_weight * criterion(
-                        result["stress"].to(device),
-                        dats[0].ndata["stresses"][0].to(device),
+                        torch.flatten(result["stress"].to(device)),
+                        # (dats[0].ndata["stresses"]).to(device),
+                        torch.flatten(dats[0].ndata["stresses"]).to(device),
+                        # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
+                        # dats[0].ndata["stresses"][0].to(device),
                     )
                     info["target_stress"] = (
-                        dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                        dats[0]
+                        .ndata["stresses"]
+                        .cpu()
+                        .numpy()
+                        .tolist()
+                        # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
                     )
                     info["pred_stress"] = (
                         result["stress"].cpu().detach().numpy().tolist()
@@ -528,9 +539,16 @@ def train_dgl(
                         result["grad"].cpu().detach().numpy().tolist()
                     )
                 if config.model.stresswise_weight != 0:
+                    # loss4 = config.model.stresswise_weight * criterion(
+                    #    result["stress"].to(device),
+                    #    dats[0].ndata["stresses"][0].to(device),
+                    # )
                     loss4 = config.model.stresswise_weight * criterion(
-                        result["stress"].to(device),
-                        dats[0].ndata["stresses"][0].to(device),
+                        torch.flatten(result["stress"].to(device)),
+                        # (dats[0].ndata["stresses"]).to(device),
+                        torch.flatten(dats[0].ndata["stresses"]).to(device),
+                        # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
+                        # dats[0].ndata["stresses"][0].to(device),
                     )
                     info["target_stress"] = (
                         dats[0].ndata["stresses"][0].cpu().numpy().tolist()
@@ -629,9 +647,16 @@ def train_dgl(
                 )
             if config.model.stresswise_weight != 0:
                 loss4 = config.model.stresswise_weight * criterion(
-                    result["stress"][0].to(device),
-                    dats[0].ndata["stresses"].to(device),
+                    torch.flatten(result["stress"].to(device)),
+                    # (dats[0].ndata["stresses"]).to(device),
+                    torch.flatten(dats[0].ndata["stresses"]).to(device),
+                    # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
+                    # dats[0].ndata["stresses"][0].to(device),
                 )
+                # loss4 = config.model.stresswise_weight * criterion(
+                #    result["stress"][0].to(device),
+                #    dats[0].ndata["stresses"].to(device),
+                # )
                 info["target_stress"] = (
                     dats[0].ndata["stresses"][0].cpu().numpy().tolist()
                 )
@@ -864,7 +889,6 @@ def train_dgl(
                 pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
 
     if config.n_early_stopping is not None:
-
         # early stopping if no improvement (improvement = higher score)
         if classification:
 
@@ -887,7 +911,6 @@ def train_dgl(
 
     # optionally log results to tensorboard
     if config.log_tensorboard:
-
         tb_logger = TensorboardLogger(
             log_dir=os.path.join(config.output_dir, "tb_logs", "test")
         )
