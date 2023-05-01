@@ -34,7 +34,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     output_features: int = 1
     grad_multiplier: int = -1
     calculate_gradient: bool = True
-    atomwise_output_features: int = 3
+    atomwise_output_features: int = 0
     graphwise_weight: float = 1.0
     gradwise_weight: float = 0.0
     stresswise_weight: float = 0.0
