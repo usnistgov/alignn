@@ -67,6 +67,15 @@ def default_path():
     return dpath
 
 
+def revised_path():
+    """Get defaukt model path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "revised"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
 # print("default_model_path", default_model_path)
 
 
