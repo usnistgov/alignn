@@ -395,7 +395,8 @@ def train_dgl(
                     # )
 
                 if (
-                    config.model.atomwise_output_features is not None
+                    config.model.atomwise_output_features > 0
+                    # config.model.atomwise_output_features is not None
                     and config.model.atomwise_weight != 0
                 ):
                     loss2 = config.model.atomwise_weight * criterion(
@@ -514,7 +515,7 @@ def train_dgl(
                         result["out"].cpu().detach().numpy().tolist()
                     )
                 if (
-                    config.model.atomwise_output_features is not None
+                    config.model.atomwise_output_features > 0
                     and config.model.atomwise_weight != 0
                 ):
                     loss2 = config.model.atomwise_weight * criterion(
@@ -622,7 +623,7 @@ def train_dgl(
                     result["out"].cpu().detach().numpy().tolist()
                 )
 
-            if config.model.atomwise_output_features is not None:
+            if config.model.atomwise_output_features > 0:
                 loss2 = config.model.atomwise_weight * criterion(
                     result["atomwise_pred"].to(device),
                     dats[0].ndata["atomwise_target"].to(device),
