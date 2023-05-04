@@ -45,13 +45,34 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     zero_inflated: bool = False
     classification: bool = False
     force_mult_natoms: bool = False
+    energy_mult_natoms: bool = False
     include_pos_deriv: bool = False
+    use_cutoff_function: bool = False
+    inner_cutoff: float = 4  # Ansgtrom
+    stress_multiplier: float = 1
     # batch_stress: bool = False
 
     class Config:
         """Configure model settings behavior."""
 
         env_prefix = "jv_model"
+
+
+def cutoff_function_based_edges(r, inner_cutoff=4):
+    """Apply smooth cutoff to pairwise interactions
+
+    r: bond lengths
+    inner_cutoff: cutoff radius
+
+    inside cutoff radius, apply smooth cutoff envelope
+    outside cutoff radius: hard zeros
+    """
+    ratio = r / inner_cutoff
+    return torch.where(
+        ratio <= 1,
+        1 - 6 * ratio**5 + 15 * ratio**4 - 10 * ratio**3,
+        torch.zeros_like(r),
+    )
 
 
 class EdgeGatedGraphConv(nn.Module):
@@ -213,8 +234,8 @@ class ALIGNNAtomWise(nn.Module):
         self.config = config
         if self.config.gradwise_weight == 0:
             self.config.calculate_gradient = False
-        if self.config.atomwise_weight == 0:
-            self.config.atomwise_output_features = None
+        # if self.config.atomwise_weight == 0:
+        #    self.config.atomwise_output_features = None
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
         )
@@ -257,7 +278,8 @@ class ALIGNNAtomWise(nn.Module):
         )
 
         self.readout = AvgPooling()
-        if config.atomwise_output_features is not None:
+        if config.atomwise_output_features > 0:
+            # if config.atomwise_output_features is not None:
             self.fc_atomwise = nn.Linear(
                 config.hidden_features, config.atomwise_output_features
             )
@@ -308,6 +330,10 @@ class ALIGNNAtomWise(nn.Module):
 
         # r = g.edata["r"].clone().detach().requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
+        if self.config.use_cutoff_function:
+            bondlength = cutoff_function_based_edges(
+                bondlength, inner_cutoff=self.config.inner_cutoff
+            )
         y = self.edge_embedding(bondlength)
 
         # ALIGNN updates: update node, edge, triplet features
@@ -325,7 +351,8 @@ class ALIGNNAtomWise(nn.Module):
             out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
         if (
-            self.config.atomwise_output_features is not None
+            self.config.atomwise_output_features > 0
+            # self.config.atomwise_output_features is not None
             and self.config.atomwise_weight != 0
         ):
             atomwise_pred = self.fc_atomwise(x)
@@ -347,10 +374,14 @@ class ALIGNNAtomWise(nn.Module):
                 dx = [g.ndata["coords"], r]
             else:
                 dx = r
+            if self.config.energy_mult_natoms:
+                en_out = out * g.num_nodes()
+            else:
+                en_out = out
             dy = (
                 self.config.grad_multiplier
                 * grad(
-                    out,
+                    en_out,
                     dx,
                     grad_outputs=torch.ones_like(out),
                     create_graph=create_graph,
@@ -404,7 +435,7 @@ class ALIGNNAtomWise(nn.Module):
                     for n in range(num_nodes):
                         stresses.append(st)
                 # stress = (stresses)
-                stress = torch.cat(stresses)
+                stress = self.config.stress_multiplier * torch.cat(stresses)
                 # print("stress2", stress, stress.shape)
                 # virial = (
                 #    160.21766208

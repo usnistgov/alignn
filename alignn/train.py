@@ -393,7 +393,12 @@ def train_dgl(
                     #        - result["out"].cpu().detach().numpy()
                     #    )
                     # )
-
+                    # print("target_out", info["target_out"][0])
+                    # print("pred_out", info["pred_out"][0])
+                print(
+                    "config.model.atomwise_output_features",
+                    config.model.atomwise_output_features,
+                )
                 if (
                     config.model.atomwise_output_features > 0
                     # config.model.atomwise_output_features is not None
@@ -433,6 +438,8 @@ def train_dgl(
                     #        - result["grad"].cpu().detach().numpy()
                     #    )
                     # )
+                    # print("target_grad", info["target_grad"][0])
+                    # print("pred_grad", info["pred_grad"][0])
                 if config.model.stresswise_weight != 0:
                     # print('result["stress"]',result["stress"],result["stress"].shape)
                     # print('dats[0].ndata["stresses"]')
@@ -455,8 +462,8 @@ def train_dgl(
                     info["pred_stress"] = (
                         result["stress"].cpu().detach().numpy().tolist()
                     )
-                    # print ("target_stress",info["target_stress"])
-                    # print ("pred_stress",info["pred_stress"])
+                    # print("target_stress", info["target_stress"][0])
+                    # print("pred_stress", info["pred_stress"][0])
                 train_result.append(info)
                 loss = loss1 + loss2 + loss3 + loss4
                 loss.backward()
