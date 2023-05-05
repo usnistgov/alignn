@@ -450,7 +450,7 @@ class ALIGNNAtomWise(nn.Module):
             out = self.softmax(out)
         result["out"] = out
         result["grad"] = gradient
-        result["stress"] = stress
+        result["stresses"] = stress
         result["atomwise_pred"] = atomwise_pred
         # print(result)
         return result
