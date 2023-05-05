@@ -402,15 +402,15 @@ class ALIGNNAtomWise(nn.Module):
                 # print('dy',dy.shape)
                 # print('r',r.shape)
                 # print('g.edata["V"]',g.edata["V"].shape)
-                stress = (
-                    -1
-                    * 160.21766208
-                    * (
-                        torch.matmul(r.T, dy)
-                        # / (2 * g.edata["V"])
-                        / (2 * g.ndata["V"][0])
-                    )
-                )
+                # stress = (
+                #    -1
+                #    * 160.21766208
+                #    * (
+                #        torch.matmul(r.T, dy)
+                #        # / (2 * g.edata["V"])
+                #        / (2 * g.ndata["V"][0])
+                #    )
+                # )
                 # print("stress1", stress, stress.shape)
                 # print("g.batch_size", g.batch_size)
                 stresses = []
@@ -431,7 +431,7 @@ class ALIGNNAtomWise(nn.Module):
                     count_edge = count_edge + num_edges
                     num_nodes = g.batch_num_nodes()[graph_id]
                     count_node = count_node + num_nodes
-                    # print("stresses.append", stresses[-1])
+                    # print("stresses.append", stresses[-1], stresses[-1].shape)
                     for n in range(num_nodes):
                         stresses.append(st)
                 # stress = (stresses)

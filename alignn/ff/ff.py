@@ -187,14 +187,14 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             mult = num_atoms
         else:
             mult = 1
-
+        # print('result["stresses"]',result["stresses"],result["stresses"].shape)
         self.results = {
             "energy": result["out"].detach().cpu().numpy() * num_atoms,
             "forces": result["grad"].detach().cpu().numpy()
             * mult
             * self.force_multiplier,
             "stress": full_3x3_to_voigt_6_stress(
-                result["stress"].detach().cpu().numpy()
+                result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
             )
             * self.stress_wt
             # * num_atoms,

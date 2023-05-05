@@ -12,8 +12,12 @@ from alignn.ff.ff import (
 
 def test_alignnff():
     atoms = JAtoms.from_dict(get_jid_data()["atoms"])
+    atoms = JAtoms.from_dict(
+        get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
+    )
     model_path = default_path()
     print("model_path", model_path)
+    print("atoms", atoms)
     # atoms = atoms.make_supercell_matrix([2, 2, 2])
     # atoms=atoms.strain_atoms(.05)
     # print(atoms)
@@ -50,3 +54,6 @@ def test_alignnff():
         subs_thickness=10
         # film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
     )
+
+
+# test_alignnff()
