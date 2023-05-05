@@ -7,6 +7,7 @@ import pandas as pd
 from collections import OrderedDict
 from jarvis.analysis.structure.neighbors import NeighborsAnalysis
 from jarvis.core.specie import chem_data, get_node_attributes
+import math
 
 # from jarvis.core.atoms import Atoms
 from collections import defaultdict
@@ -158,6 +159,68 @@ def build_undirected_edgedata(
     return u, v, r
 
 
+###
+def radius_graph(
+    atoms=None,
+    cutoff=5,
+    bond_tol=0.5,
+    id=None,
+    atol=1e-5,
+):
+    """Construct edge list for radius graph."""
+    cart_coords = torch.tensor(atoms.cart_coords).type(
+        torch.get_default_dtype()
+    )
+    frac_coords = torch.tensor(atoms.frac_coords).type(
+        torch.get_default_dtype()
+    )
+    lattice_mat = torch.tensor(atoms.lattice_mat).type(
+        torch.get_default_dtype()
+    )
+    # elements = atoms.elements
+    X_src = cart_coords
+    num_atoms = X_src.shape[0]
+    # determine how many supercells are needed for the cutoff radius
+    recp = 2 * math.pi * torch.linalg.inv(lattice_mat).T
+    recp_len = torch.tensor(
+        [i for i in (torch.sqrt(torch.sum(recp**2, dim=1)))]
+    )
+    maxr = torch.ceil((cutoff + bond_tol) * recp_len / (2 * math.pi))
+    nmin = torch.floor(torch.min(frac_coords, dim=0)[0]) - maxr
+    nmax = torch.ceil(torch.max(frac_coords, dim=0)[0]) + maxr
+    # construct the supercell index list
+
+    all_ranges = [
+        torch.arange(x, y, dtype=torch.get_default_dtype())
+        for x, y in zip(nmin, nmax)
+    ]
+    cell_images = torch.cartesian_prod(*all_ranges)
+
+    # tile periodic images into X_dst
+    # index id_dst into X_dst maps to atom id as id_dest % num_atoms
+    X_dst = (cell_images @ lattice_mat)[:, None, :] + X_src
+    X_dst = X_dst.reshape(-1, 3)
+
+    # pairwise distances between atoms in (0,0,0) cell
+    # and atoms in all periodic image
+    dist = torch.cdist(X_src, X_dst)
+
+    neighbor_mask = torch.bitwise_and(
+        dist <= cutoff,
+        ~torch.isclose(
+            dist, torch.tensor([0]).type(torch.get_default_dtype()), atol=atol
+        ),
+    )
+    # get node indices for edgelist from neighbor mask
+    u, v = torch.where(neighbor_mask)
+
+    r = (X_dst[v] - X_src[u]).float()
+    return u, v % num_atoms, r
+
+
+###
+
+
 class Graph(object):
     """Generate a graph object."""
 
@@ -212,12 +275,15 @@ class Graph(object):
                 id=id,
                 use_canonize=use_canonize,
             )
+            u, v, r = build_undirected_edgedata(atoms, edges)
+        elif neighbor_strategy == "radius_graph":
+            u, v, r = radius_graph(atoms)
         else:
             raise ValueError("Not implemented yet", neighbor_strategy)
         # elif neighbor_strategy == "voronoi":
         #    edges = voronoi_edges(structure)
 
-        u, v, r = build_undirected_edgedata(atoms, edges)
+        # u, v, r = build_undirected_edgedata(atoms, edges)
 
         # build up atom attribute tensor
         sps_features = []

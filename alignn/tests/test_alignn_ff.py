@@ -8,6 +8,7 @@ from alignn.ff.ff import (
     ForceField,
     get_interface_energy,
 )
+from jarvis.core.graphs import Graphs
 
 
 def test_alignnff():
@@ -15,6 +16,8 @@ def test_alignnff():
     atoms = JAtoms.from_dict(
         get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
     )
+    g,lg=Graph.atom_dgl_multigraph(atoms)
+    g,lg=Graph.atom_dgl_multigraph(atoms,neighbor_strategy="radius_graph")
     model_path = default_path()
     print("model_path", model_path)
     print("atoms", atoms)
