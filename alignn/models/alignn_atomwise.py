@@ -431,7 +431,7 @@ class ALIGNNAtomWise(nn.Module):
                     count_edge = count_edge + num_edges
                     num_nodes = g.batch_num_nodes()[graph_id]
                     count_node = count_node + num_nodes
-                    # print("stresses.append", stresses[-1], stresses[-1].shape)
+                    # print("stresses.append",stresses[-1],stresses[-1].shape)
                     for n in range(num_nodes):
                         stresses.append(st)
                 # stress = (stresses)
