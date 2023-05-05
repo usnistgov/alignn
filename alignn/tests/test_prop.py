@@ -8,6 +8,8 @@ from alignn.pretrained import get_multiple_predictions
 from sklearn.metrics import mean_absolute_error
 import os
 from jarvis.core.atoms import Atoms
+from alignn.train_folder import train_for_folder
+from alignn.train_folder_ff import train_for_folder as train_for_folder_ff
 
 plt.switch_backend("agg")
 
@@ -30,17 +32,19 @@ config = {
     "optimizer": "adamw",
     "scheduler": "onecycle",
     "num_workers": 4,
-    "model": {"name": "alignn",},
+    "model": {
+        "name": "alignn",
+    },
 }
 
 
-def test_runtime_training():
-    cmd1 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json"'
-    os.system(cmd1)
-    cmd2 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --classification_threshold 0.01 --config "alignn/examples/sample_data/config_example.json"'
-    os.system(cmd2)
-    cmd3 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
-    os.system(cmd3)
+# def test_runtime_training():
+#    cmd1 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json"'
+#    os.system(cmd1)
+#    cmd2 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --classification_threshold 0.01 --config "alignn/examples/sample_data/config_example.json"'
+#    os.system(cmd2)
+#    cmd3 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
+#    os.system(cmd3)
 
 
 def test_minor_configs():
@@ -236,8 +240,58 @@ def test_pretrained():
     get_multiple_predictions(atoms_array=[Si, Si])
 
 
+def test_alignn_train():
+    root_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../examples/sample_data/")
+    )
+    config = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "../examples/sample_data/config_example.json",
+        )
+    )
+    train_for_folder(root_dir=root_dir, config_name=config)
+
+    root_dir = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__), "../examples/sample_data_multi_prop/"
+        )
+    )
+    config = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "../examples/sample_data/config_example.json",
+        )
+    )
+    train_for_folder(root_dir=root_dir, config_name=config)
+
+    root_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../examples/sample_data/")
+    )
+    config = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "../examples/sample_data/config_example.json",
+        )
+    )
+    train_for_folder(
+        root_dir=root_dir, config_name=config, classification_threshold=0.01
+    )
+
+    root_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../examples/sample_data_ff/")
+    )
+    config = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "../examples/sample_data_ff/config_example_atomwise.json",
+        )
+    )
+    train_for_folder_ff(root_dir=root_dir, config_name=config)
+
+
 # test_minor_configs()
 # test_pretrained()
 # test_runtime_training()
-
+# test_alignn_train()
 # test_models()
