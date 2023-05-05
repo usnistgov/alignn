@@ -393,7 +393,12 @@ def train_dgl(
                     #        - result["out"].cpu().detach().numpy()
                     #    )
                     # )
-
+                    # print("target_out", info["target_out"][0])
+                    # print("pred_out", info["pred_out"][0])
+                # print(
+                #    "config.model.atomwise_output_features",
+                #    config.model.atomwise_output_features,
+                # )
                 if (
                     config.model.atomwise_output_features > 0
                     # config.model.atomwise_output_features is not None
@@ -433,30 +438,38 @@ def train_dgl(
                     #        - result["grad"].cpu().detach().numpy()
                     #    )
                     # )
+                    # print("target_grad", info["target_grad"][0])
+                    # print("pred_grad", info["pred_grad"][0])
                 if config.model.stresswise_weight != 0:
-                    # print('result["stress"]',result["stress"],result["stress"].shape)
-                    # print('dats[0].ndata["stresses"]')
+                    # print(
+                    #    'result["stress"]',
+                    #    result["stresses"],
+                    #    result["stresses"].shape,
+                    # )
+                    # print(
+                    #    'dats[0].ndata["stresses"]',
+                    #    torch.cat(tuple(dats[0].ndata["stresses"])),
+                    #    dats[0].ndata["stresses"].shape,
+                    # )  # ,torch.cat(dats[0].ndata["stresses"]),
+                    # torch.cat(dats[0].ndata["stresses"]).shape)
+                    # print('result["stresses"]',result["stresses"],result["stresses"].shape)
                     # print(dats[0].ndata["stresses"],dats[0].ndata["stresses"].shape)
                     loss4 = config.model.stresswise_weight * criterion(
-                        torch.flatten(result["stress"].to(device)),
-                        # (dats[0].ndata["stresses"]).to(device),
-                        torch.flatten(dats[0].ndata["stresses"]).to(device),
-                        # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
-                        # dats[0].ndata["stresses"][0].to(device),
+                        (result["stresses"]).to(device),
+                        torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
                     )
                     info["target_stress"] = (
-                        dats[0]
-                        .ndata["stresses"]
+                        torch.cat(tuple(dats[0].ndata["stresses"]))
                         .cpu()
                         .numpy()
                         .tolist()
                         # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
                     )
                     info["pred_stress"] = (
-                        result["stress"].cpu().detach().numpy().tolist()
+                        result["stresses"].cpu().detach().numpy().tolist()
                     )
-                    # print ("target_stress",info["target_stress"])
-                    # print ("pred_stress",info["pred_stress"])
+                    # print("target_stress", info["target_stress"][0])
+                    # print("pred_stress", info["pred_stress"][0])
                 train_result.append(info)
                 loss = loss1 + loss2 + loss3 + loss4
                 loss.backward()
@@ -514,6 +527,7 @@ def train_dgl(
                     info["pred_out"] = (
                         result["out"].cpu().detach().numpy().tolist()
                     )
+
                 if (
                     config.model.atomwise_output_features > 0
                     and config.model.atomwise_weight != 0
@@ -545,17 +559,23 @@ def train_dgl(
                     #    dats[0].ndata["stresses"][0].to(device),
                     # )
                     loss4 = config.model.stresswise_weight * criterion(
-                        torch.flatten(result["stress"].to(device)),
+                        # torch.flatten(result["stress"].to(device)),
                         # (dats[0].ndata["stresses"]).to(device),
-                        torch.flatten(dats[0].ndata["stresses"]).to(device),
+                        # torch.flatten(dats[0].ndata["stresses"]).to(device),
                         # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
                         # dats[0].ndata["stresses"][0].to(device),
+                        (result["stresses"]).to(device),
+                        torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
                     )
                     info["target_stress"] = (
-                        dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                        torch.cat(tuple(dats[0].ndata["stresses"]))
+                        .cpu()
+                        .numpy()
+                        .tolist()
+                        # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
                     )
                     info["pred_stress"] = (
-                        result["stress"].cpu().detach().numpy().tolist()
+                        result["stresses"].cpu().detach().numpy().tolist()
                     )
                 loss = loss1 + loss2 + loss3 + loss4
                 val_result.append(info)
@@ -648,9 +668,11 @@ def train_dgl(
                 )
             if config.model.stresswise_weight != 0:
                 loss4 = config.model.stresswise_weight * criterion(
-                    torch.flatten(result["stress"].to(device)),
+                    # torch.flatten(result["stress"].to(device)),
                     # (dats[0].ndata["stresses"]).to(device),
-                    torch.flatten(dats[0].ndata["stresses"]).to(device),
+                    # torch.flatten(dats[0].ndata["stresses"]).to(device),
+                    result["stresses"].to(device),
+                    torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
                     # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
                     # dats[0].ndata["stresses"][0].to(device),
                 )
@@ -659,10 +681,13 @@ def train_dgl(
                 #    dats[0].ndata["stresses"].to(device),
                 # )
                 info["target_stress"] = (
-                    dats[0].ndata["stresses"][0].cpu().numpy().tolist()
+                    torch.cat(tuple(dats[0].ndata["stresses"]))
+                    .cpu()
+                    .numpy()
+                    .tolist()
                 )
                 info["pred_stress"] = (
-                    result["stress"].cpu().detach().numpy().tolist()
+                    result["stresses"].cpu().detach().numpy().tolist()
                 )
             test_result.append(info)
             loss = loss1 + loss2 + loss3 + loss4
