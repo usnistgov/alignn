@@ -450,7 +450,8 @@ def train_dgl(
                     #    'dats[0].ndata["stresses"]',
                     #    torch.cat(tuple(dats[0].ndata["stresses"])),
                     #    dats[0].ndata["stresses"].shape,
-                    # )  # ,torch.cat(dats[0].ndata["stresses"]),torch.cat(dats[0].ndata["stresses"]).shape)
+                    # )  # ,torch.cat(dats[0].ndata["stresses"]),
+                    # torch.cat(dats[0].ndata["stresses"]).shape)
                     # print('result["stresses"]',result["stresses"],result["stresses"].shape)
                     # print(dats[0].ndata["stresses"],dats[0].ndata["stresses"].shape)
                     loss4 = config.model.stresswise_weight * criterion(
