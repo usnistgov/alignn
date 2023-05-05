@@ -277,7 +277,7 @@ class Graph(object):
             )
             u, v, r = build_undirected_edgedata(atoms, edges)
         elif neighbor_strategy == "radius_graph":
-            u, v, r = radius_graph(atoms)
+            u, v, r = radius_graph(atoms, cutoff=cutoff)
         else:
             raise ValueError("Not implemented yet", neighbor_strategy)
         # elif neighbor_strategy == "voronoi":
