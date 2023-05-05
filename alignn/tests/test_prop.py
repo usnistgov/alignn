@@ -10,6 +10,8 @@ import os
 from jarvis.core.atoms import Atoms
 from alignn.train_folder import train_for_folder
 from alignn.train_folder_ff import train_for_folder as train_for_folder_ff
+from jarvis.db.figshare import get_jid_data
+from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, revised_path
 
 plt.switch_backend("agg")
 
@@ -290,8 +292,28 @@ def test_alignn_train():
     train_for_folder_ff(root_dir=root_dir, config_name=config)
 
 
+def test_calculator():
+    atoms = Atoms.from_dict(
+        get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
+    )
+    model_path = default_path()
+    calc = AlignnAtomwiseCalculator(path=model_path)
+    ase_atoms = atoms.ase_converter()
+    ase_atoms.calc = calc
+    energy = ase_atoms.get_potential_energy()
+    forces = ase_atoms.get_forces()
+    stress = ase_atoms.get_stress()
+    print("round(energy,3)", round(energy, 3))
+    print("max(forces.flatten()),3)", max(forces.flatten()))
+    print("max(stress.flatten()),3)", max(stress.flatten()))
+    # assert round(energy,3)==round(-60.954999923706055,3)
+    # assert round(max(forces.flatten()),2)==round(0.08332983,2)
+    # assert round(max(stress.flatten()),2)==round(0.002801671050217803,2)
+
+
 # test_minor_configs()
 # test_pretrained()
 # test_runtime_training()
 # test_alignn_train()
 # test_models()
+# test_calculator()
