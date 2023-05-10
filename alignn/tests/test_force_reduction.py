@@ -211,7 +211,10 @@ class SimpleModel(nn.Module):
 
 def test_compare_position_and_displacement_autograd_forces():
     """Check that all elements of both autograd force methods match."""
+    # run gradient checking with 64-bit floating point
+    default_dtype = torch.get_default_dtype()
     torch.set_default_dtype(torch.float64)
+
     model = SimpleModel(cutoff=5)
 
     # evaluate energy and both styles of autograd forces
@@ -222,9 +225,15 @@ def test_compare_position_and_displacement_autograd_forces():
     # are equal to within numerical precision
     assert torch.isclose(f_x, f_vec).all().item()
 
+    # reset floating point precision for other test suites
+    torch.set_default_dtype(default_dtype)
+
+
 
 def test_compare_forces_finite_difference():
     """Compare autograd forces with centered finite difference."""
+    # run gradient checking with 64-bit floating point
+    default_dtype = torch.get_default_dtype()
     torch.set_default_dtype(torch.float64)
 
     model = SimpleModel(cutoff=5)
@@ -257,3 +266,6 @@ def test_compare_forces_finite_difference():
   
     assert torch.isclose(f_vec, f_dx, atol=1e-05, rtol=0.001).all().item()
     assert torch.isclose(f_x, f_dx, atol=1e-05, rtol=0.001).all().item()
+
+    # reset floating point precision for other test suites
+    torch.set_default_dtype(default_dtype)
