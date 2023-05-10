@@ -219,7 +219,7 @@ def test_compare_position_and_displacement_autograd_forces():
 
     # check that all elements of both autograd force methods
     # are equal to within numerical precision
-    return torch.isclose(f_x, f_vec).all().item()
+    assert torch.isclose(f_x, f_vec).all().item()
 
 
 def test_compare_forces_finite_difference():
@@ -252,9 +252,6 @@ def test_compare_forces_finite_difference():
     )
 
     # compare to autograd using the numerical parameters from torch.autograd.gradcheck
-    vec_matches = (
-        torch.isclose(f_vec, f_dx, atol=1e-05, rtol=0.001).all().item()
-    )
-    pos_matches = torch.isclose(f_x, f_dx, atol=1e-05, rtol=0.001).all().item()
-
-    return vec_matches and pos_matches
+  
+    assert torch.isclose(f_vec, f_dx, atol=1e-05, rtol=0.001).all().item()
+    assert torch.isclose(f_x, f_dx, atol=1e-05, rtol=0.001).all().item()
