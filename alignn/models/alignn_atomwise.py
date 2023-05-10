@@ -394,16 +394,24 @@ class ALIGNNAtomWise(nn.Module):
 
             # force_i contributions from r_{j->i} (in edges)
             g.edata["pairwise_forces"] = pairwise_force_contribution
-            g.update_all(fn.copy_e("pairwise_forces", "m"), fn.sum("m", "forces_ji"))
+            g.update_all(
+                fn.copy_e("pairwise_forces", "m"),
+                fn.sum("m", "forces_ji")
+            )
 
             # reduce over reverse edges too!
             # force_i contributions from r_{i->j} (out edges)
-            # implement this by aggregating pairwise_force_contributions over reversed edges
+            # aggregate pairwise_force_contributions over reversed edges
             rg = dgl.reverse(g, copy_edata=True)
-            rg.update_all(fn.copy_e("pairwise_forces", "m"), fn.sum("m", "forces_ij"))
+            rg.update_all(
+                fn.copy_e("pairwise_forces", "m"),
+                fn.sum("m", "forces_ij")
+            )
 
             # combine dE / d(r_{j->i}) and dE / d(r_{i->j})
-            forces = torch.squeeze(g.ndata["forces_ji"] - rg.ndata["forces_ij"])
+            forces = torch.squeeze(
+                g.ndata["forces_ji"] - rg.ndata["forces_ij"]
+            )
 
             if self.config.stresswise_weight != 0:
                 # Under development, use with caution
