@@ -60,7 +60,9 @@ import json
 import pprint
 
 import os
+import warnings
 
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 # from sklearn.decomposition import PCA, KernelPCA
 # from sklearn.preprocessing import StandardScaler
 

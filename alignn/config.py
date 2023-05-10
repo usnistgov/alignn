@@ -157,7 +157,9 @@ class TrainingConfig(BaseSettings):
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
-    neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
+    neighbor_strategy: Literal[
+        "k-nearest", "voronoi", "radius_graph"
+    ] = "k-nearest"
     id_tag: Literal["jid", "id", "_oqmd_entry_id"] = "jid"
 
     # logging configuration

@@ -48,7 +48,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     energy_mult_natoms: bool = False
     include_pos_deriv: bool = False
     use_cutoff_function: bool = False
-    inner_cutoff: float = 4  # Ansgtrom
+    inner_cutoff: float = 6  # Ansgtrom
     stress_multiplier: float = 1
     # batch_stress: bool = False
 

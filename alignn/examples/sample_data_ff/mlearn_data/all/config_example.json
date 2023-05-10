@@ -62,6 +62,6 @@
         "use_cutoff_function": true,
         "energy_mult_natoms": true,
         "classification": false,
-        "stress_multiplier":10
+        "stress_multiplier":1
     }
 }
