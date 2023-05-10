@@ -376,7 +376,7 @@ class ALIGNNAtomWise(nn.Module):
 
             # force calculation based on bond displacement vectors
             # autograd gives dE / d{r_{i->j}}
-            pairwise_force_contributions = (
+            pair_forces = (
                 self.config.grad_multiplier
                 * grad(
                     en_out,
@@ -387,15 +387,15 @@ class ALIGNNAtomWise(nn.Module):
                 )[0]
             )
             if self.config.force_mult_natoms:
-                dy *= g.num_nodes()
+                pair_forces *= g.num_nodes()
 
             # construct force_i = dE / d{r_i}
             # reduce over bonds to get forces on each atom
 
             # force_i contributions from r_{j->i} (in edges)
-            g.edata["pairwise_forces"] = pairwise_force_contributions
+            g.edata["pair_forces"] = pair_forces
             g.update_all(
-                fn.copy_e("pairwise_forces", "m"),
+                fn.copy_e("pair_forces", "m"),
                 fn.sum("m", "forces_ji")
             )
 
@@ -404,7 +404,7 @@ class ALIGNNAtomWise(nn.Module):
             # aggregate pairwise_force_contributions over reversed edges
             rg = dgl.reverse(g, copy_edata=True)
             rg.update_all(
-                fn.copy_e("pairwise_forces", "m"),
+                fn.copy_e("pair_forces", "m"),
                 fn.sum("m", "forces_ij")
             )
 
@@ -443,7 +443,7 @@ class ALIGNNAtomWise(nn.Module):
                         160.21766208
                         * torch.matmul(
                             r[count_edge : count_edge + num_edges].T,
-                            dy[count_edge : count_edge + num_edges],
+                            pair_forces[count_edge : count_edge + num_edges],
                         )
                         / g.ndata["V"][count_node + num_nodes]
                     )
