@@ -393,7 +393,7 @@ class ALIGNNAtomWise(nn.Module):
             # reduce over bonds to get forces on each atom
 
             # force_i contributions from r_{j->i} (in edges)
-            g.edata["pairwise_forces"] = pairwise_force_contribution
+            g.edata["pairwise_forces"] = pairwise_force_contributions
             g.update_all(
                 fn.copy_e("pairwise_forces", "m"),
                 fn.sum("m", "forces_ji")
