@@ -211,6 +211,7 @@ class SimpleModel(nn.Module):
 
 def test_compare_position_and_displacement_autograd_forces():
     """Check that all elements of both autograd force methods match."""
+    torch.set_default_dtype(torch.float64)
     model = SimpleModel(cutoff=5)
 
     # evaluate energy and both styles of autograd forces
@@ -224,6 +225,7 @@ def test_compare_position_and_displacement_autograd_forces():
 
 def test_compare_forces_finite_difference():
     """Compare autograd forces with centered finite difference."""
+    torch.set_default_dtype(torch.float64)
 
     model = SimpleModel(cutoff=5)
     x = torch.from_numpy(at.cart_coords)
