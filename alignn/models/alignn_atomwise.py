@@ -50,6 +50,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     use_cutoff_function: bool = False
     inner_cutoff: float = 6  # Ansgtrom
     stress_multiplier: float = 1
+    add_reverse_forces: bool = False  # will make True as default soon
     # batch_stress: bool = False
 
     class Config:
@@ -357,7 +358,8 @@ class ALIGNNAtomWise(nn.Module):
         ):
             atomwise_pred = self.fc_atomwise(x)
             # atomwise_pred = torch.squeeze(self.readout(g, atomwise_pred))
-        gradient = torch.empty(1)
+        forces = torch.empty(1)
+        # gradient = torch.empty(1)
         stress = torch.empty(1)
 
         if self.config.calculate_gradient:
@@ -395,23 +397,23 @@ class ALIGNNAtomWise(nn.Module):
             # force_i contributions from r_{j->i} (in edges)
             g.edata["pair_forces"] = pair_forces
             g.update_all(
-                fn.copy_e("pair_forces", "m"),
-                fn.sum("m", "forces_ji")
+                fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ji")
             )
+            if self.config.add_reverse_forces:
+                # reduce over reverse edges too!
+                # force_i contributions from r_{i->j} (out edges)
+                # aggregate pairwise_force_contributions over reversed edges
+                rg = dgl.reverse(g, copy_edata=True)
+                rg.update_all(
+                    fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ij")
+                )
 
-            # reduce over reverse edges too!
-            # force_i contributions from r_{i->j} (out edges)
-            # aggregate pairwise_force_contributions over reversed edges
-            rg = dgl.reverse(g, copy_edata=True)
-            rg.update_all(
-                fn.copy_e("pair_forces", "m"),
-                fn.sum("m", "forces_ij")
-            )
-
-            # combine dE / d(r_{j->i}) and dE / d(r_{i->j})
-            forces = torch.squeeze(
-                g.ndata["forces_ji"] - rg.ndata["forces_ij"]
-            )
+                # combine dE / d(r_{j->i}) and dE / d(r_{i->j})
+                forces = torch.squeeze(
+                    g.ndata["forces_ji"] - rg.ndata["forces_ij"]
+                )
+            else:
+                forces = torch.squeeze(g.ndata["forces_ji"])
 
             if self.config.stresswise_weight != 0:
                 # Under development, use with caution
