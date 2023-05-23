@@ -76,6 +76,15 @@ def revised_path():
     return dpath
 
 
+def wt01_path():
+    """Get defaukt model path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "alignnff_wt0.1"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
 # print("default_model_path", default_model_path)
 
 
