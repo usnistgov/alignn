@@ -48,8 +48,9 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     energy_mult_natoms: bool = False
     include_pos_deriv: bool = False
     use_cutoff_function: bool = False
-    inner_cutoff: float = 4  # Ansgtrom
+    inner_cutoff: float = 6  # Ansgtrom
     stress_multiplier: float = 1
+    add_reverse_forces: bool = False  # will make True as default soon
     # batch_stress: bool = False
 
     class Config:
@@ -357,42 +358,63 @@ class ALIGNNAtomWise(nn.Module):
         ):
             atomwise_pred = self.fc_atomwise(x)
             # atomwise_pred = torch.squeeze(self.readout(g, atomwise_pred))
-        gradient = torch.empty(1)
+        forces = torch.empty(1)
+        # gradient = torch.empty(1)
         stress = torch.empty(1)
 
         if self.config.calculate_gradient:
-            create_graph = True
-            # if config.normalize_graph_level_loss
-            # print ('out',out)
-            # print ('x',len(x))
 
-            # tmp_out = out*len(x)
-            # print ('tmp_out',tmp_out)
             if self.config.include_pos_deriv:
-                # Not testes yet
+                # Not tested yet
                 g.ndata["coords"].requires_grad_(True)
                 dx = [g.ndata["coords"], r]
             else:
                 dx = r
+
             if self.config.energy_mult_natoms:
                 en_out = out * g.num_nodes()
             else:
                 en_out = out
-            dy = (
+
+            # force calculation based on bond displacement vectors
+            # autograd gives dE / d{r_{i->j}}
+            pair_forces = (
                 self.config.grad_multiplier
                 * grad(
                     en_out,
                     dx,
-                    grad_outputs=torch.ones_like(out),
-                    create_graph=create_graph,
+                    grad_outputs=torch.ones_like(en_out),
+                    create_graph=True,
                     retain_graph=True,
                 )[0]
             )
             if self.config.force_mult_natoms:
-                dy *= g.num_nodes()
-            g.edata["dy_dr"] = dy
-            g.update_all(fn.copy_e("dy_dr", "m"), fn.sum("m", "gradient"))
-            gradient = torch.squeeze(g.ndata["gradient"])
+                pair_forces *= g.num_nodes()
+
+            # construct force_i = dE / d{r_i}
+            # reduce over bonds to get forces on each atom
+
+            # force_i contributions from r_{j->i} (in edges)
+            g.edata["pair_forces"] = pair_forces
+            g.update_all(
+                fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ji")
+            )
+            if self.config.add_reverse_forces:
+                # reduce over reverse edges too!
+                # force_i contributions from r_{i->j} (out edges)
+                # aggregate pairwise_force_contributions over reversed edges
+                rg = dgl.reverse(g, copy_edata=True)
+                rg.update_all(
+                    fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ij")
+                )
+
+                # combine dE / d(r_{j->i}) and dE / d(r_{i->j})
+                forces = torch.squeeze(
+                    g.ndata["forces_ji"] - rg.ndata["forces_ij"]
+                )
+            else:
+                forces = torch.squeeze(g.ndata["forces_ji"])
+
             if self.config.stresswise_weight != 0:
                 # Under development, use with caution
                 # 1 eV/Angstrom3 = 160.21766208 GPa
@@ -423,7 +445,7 @@ class ALIGNNAtomWise(nn.Module):
                         160.21766208
                         * torch.matmul(
                             r[count_edge : count_edge + num_edges].T,
-                            dy[count_edge : count_edge + num_edges],
+                            pair_forces[count_edge : count_edge + num_edges],
                         )
                         / g.ndata["V"][count_node + num_nodes]
                     )
@@ -449,7 +471,7 @@ class ALIGNNAtomWise(nn.Module):
         if self.classification:
             out = self.softmax(out)
         result["out"] = out
-        result["grad"] = gradient
+        result["grad"] = forces
         result["stresses"] = stress
         result["atomwise_pred"] = atomwise_pred
         # print(result)

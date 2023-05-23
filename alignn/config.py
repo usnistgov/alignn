@@ -157,7 +157,9 @@ class TrainingConfig(BaseSettings):
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
-    neighbor_strategy: Literal["k-nearest", "voronoi"] = "k-nearest"
+    neighbor_strategy: Literal[
+        "k-nearest", "voronoi", "radius_graph"
+    ] = "k-nearest"
     id_tag: Literal["jid", "id", "_oqmd_entry_id"] = "jid"
 
     # logging configuration
@@ -194,7 +196,7 @@ class TrainingConfig(BaseSettings):
     num_workers: int = 4
     cutoff: float = 8.0
     max_neighbors: int = 12
-    keep_data_order: bool = False
+    keep_data_order: bool = True
     normalize_graph_level_loss: bool = False
     distributed: bool = False
     n_early_stopping: Optional[int] = None  # typically 50

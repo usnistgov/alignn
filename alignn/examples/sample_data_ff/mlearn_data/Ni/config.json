@@ -42,7 +42,7 @@
     "output_dir": "./",
     "model": {
         "name": "alignn_atomwise",
-        "alignn_layers": 4,
+        "alignn_layers": 2,
         "gcn_layers": 4,
         "atom_input_features": 92,
         "edge_input_features": 80,
@@ -52,7 +52,7 @@
         "output_features": 1,
         "grad_multiplier": -1,
         "calculate_gradient": true,
-        "atomwise_output_features": 3,
+        "atomwise_output_features": 0,
         "graphwise_weight": 1.0,
         "gradwise_weight": 10.0,
         "stresswise_weight": 0.0,

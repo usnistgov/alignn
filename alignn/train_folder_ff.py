@@ -14,6 +14,7 @@ from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
 
 # from alignn.models.alignn import ALIGNN, ALIGNNConfig
 import torch
+import time
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -40,7 +41,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--keep_data_order",
-    default=False,
+    default=True,
     help="Whether to randomly shuffle samples",
 )
 
@@ -290,6 +291,7 @@ def train_for_folder(
         output_dir=config.output_dir,
     )
 
+    t1 = time.time()
     train_dgl(
         config,
         model=model,
@@ -300,6 +302,8 @@ def train_for_folder(
             prepare_batch,
         ],
     )
+    t2 = time.time()
+    print("Time taken (s)", t2 - t1)
 
     # train_data = get_torch_dataset(
 

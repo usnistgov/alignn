@@ -76,6 +76,15 @@ def revised_path():
     return dpath
 
 
+def wt01_path():
+    """Get defaukt model path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "alignnff_wt0.1"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
 # print("default_model_path", default_model_path)
 
 
@@ -223,7 +232,7 @@ class ForceField(object):
         communicator=None,
         stress_wt=1.0,
         force_multiplier=1.0,
-        force_mult_natoms=False,
+        force_mult_natoms=True,
     ):
         """Intialize class."""
         self.jarvis_atoms = jarvis_atoms
