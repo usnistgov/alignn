@@ -26,10 +26,10 @@ def test_alignnff():
     # atoms=atoms.strain_atoms(.05)
     # print(atoms)
     ev = ev_curve(atoms=atoms, model_path=model_path)
-    surf = surface_energy(atoms=atoms, model_path=model_path)
-    print('surf',surf)
-    vac = vacancy_formation(atoms=atoms, model_path=model_path)
-    print('vac',vac)
+    # surf = surface_energy(atoms=atoms, model_path=model_path)
+    # print('surf',surf)
+    # vac = vacancy_formation(atoms=atoms, model_path=model_path)
+    # print('vac',vac)
 
     ff = ForceField(
         jarvis_atoms=atoms,
