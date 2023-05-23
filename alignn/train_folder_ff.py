@@ -41,7 +41,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--keep_data_order",
-    default=False,
+    default=True,
     help="Whether to randomly shuffle samples",
 )
 
