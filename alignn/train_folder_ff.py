@@ -253,6 +253,9 @@ def train_for_folder(
             raise ValueError("Make sure the outputs are of same size.")
         else:
             config.model.output_features = 1
+    # print('config.neighbor_strategy',config.neighbor_strategy)
+    # import sys
+    # sys.exit()
     (
         train_loader,
         val_loader,
