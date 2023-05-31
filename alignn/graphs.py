@@ -203,8 +203,11 @@ def radius_graph(
 
     # pairwise distances between atoms in (0,0,0) cell
     # and atoms in all periodic image
-    dist = torch.cdist(X_src, X_dst)
-
+    dist = torch.cdist(
+        X_src, X_dst, compute_mode="donot_use_mm_for_euclid_dist"
+    )
+    # u, v = torch.nonzero(dist <= cutoff, as_tuple=True)
+    # print("u1v1", u, v, u.shape, v.shape)
     neighbor_mask = torch.bitwise_and(
         dist <= cutoff,
         ~torch.isclose(
@@ -213,8 +216,14 @@ def radius_graph(
     )
     # get node indices for edgelist from neighbor mask
     u, v = torch.where(neighbor_mask)
+    # print("u2v2", u, v, u.shape, v.shape)
+    # print("v1", v, v.shape)
+    # print("v2", v % num_atoms, (v % num_atoms).shape)
 
     r = (X_dst[v] - X_src[u]).float()
+    # gk = dgl.knn_graph(X_dst, 12)
+    # print("r", r, r.shape)
+    # print("gk", gk)
     return u, v % num_atoms, r
 
 
@@ -277,6 +286,9 @@ class Graph(object):
             )
             u, v, r = build_undirected_edgedata(atoms, edges)
         elif neighbor_strategy == "radius_graph":
+            # print('HERE')
+            # import sys
+            # sys.exit()
             u, v, r = radius_graph(atoms, cutoff=cutoff)
         else:
             raise ValueError("Not implemented yet", neighbor_strategy)
@@ -302,6 +314,7 @@ class Graph(object):
         vol = atoms.volume
         g.ndata["V"] = torch.tensor([vol for ii in range(atoms.num_atoms)])
         g.ndata["coords"] = torch.tensor(atoms.cart_coords)
+        # print("g", g)
         # g.edata["V"] = torch.tensor(
         #    [vol for ii in range(g.num_edges())]
         # )

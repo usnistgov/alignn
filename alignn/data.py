@@ -100,6 +100,7 @@ def load_graphs(
             max_neighbors=max_neighbors,
             compute_line_graph=False,
             use_canonize=use_canonize,
+            neighbor_strategy=neighbor_strategy,
         )
 
     if cachedir is not None:
@@ -299,7 +300,6 @@ def get_train_val_loaders(
         # print("val", len(val_loader.dataset))
         # print("test", len(test_loader.dataset))
     else:
-
         if not dataset_array:
             d = jdata(dataset)
         else:
