@@ -68,6 +68,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--id_key",
+    default="jid",
+    help="Name of the key for graph level id such as id",
+)
+
+parser.add_argument(
     "--force_key",
     default="forces",
     help="Name of key for gradient level data such as forces, (Natoms x p)",
@@ -108,6 +114,7 @@ def train_for_folder(
     classification_threshold=None,
     batch_size=None,
     epochs=None,
+    id_key="jid",
     target_key="total_energy",
     atomwise_key="forces",
     gradwise_key="forces",
@@ -175,7 +182,7 @@ def train_for_folder(
             target_stress = "stresses"
 
         info["atoms"] = i["atoms"]
-        info["jid"] = i["jid"]
+        info["jid"] = i[id_key]
         dataset.append(info)
     print("len dataset", len(dataset))
     n_outputs = []
@@ -322,6 +329,7 @@ if __name__ == "__main__":
         batch_size=(args.batch_size),
         epochs=(args.epochs),
         target_key=(args.target_key),
+        id_key=(args.id_key),
         atomwise_key=(args.atomwise_key),
         gradwise_key=(args.force_key),
         stresswise_key=(args.stresswise_key),

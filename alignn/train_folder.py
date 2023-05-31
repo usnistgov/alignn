@@ -197,7 +197,7 @@ if __name__ == "__main__":
     train_for_folder(
         root_dir=args.root_dir,
         config_name=args.config_name,
-        keep_data_order=args.keep_data_order,
+        # keep_data_order=args.keep_data_order,
         classification_threshold=args.classification_threshold,
         output_dir=args.output_dir,
         batch_size=(args.batch_size),
