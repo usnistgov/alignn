@@ -198,6 +198,9 @@ def train_dgl(
     # print ('output_dir train', config.output_dir)
     if not train_val_test_loaders:
         # use input standardization for all real-valued feature sets
+        # print("config.neighbor_strategy",config.neighbor_strategy)
+        # import sys
+        # sys.exit()
         (
             train_loader,
             val_loader,
