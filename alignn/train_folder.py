@@ -30,11 +30,11 @@ parser.add_argument(
     "--file_format", default="poscar", help="poscar/cif/xyz/pdb file format."
 )
 
-parser.add_argument(
-    "--keep_data_order",
-    default=True,
-    help="Whether to randomly shuffle samples, True/False",
-)
+# parser.add_argument(
+#    "--keep_data_order",
+#    default=True,
+#    help="Whether to randomly shuffle samples, True/False",
+# )
 
 parser.add_argument(
     "--classification_threshold",
@@ -52,7 +52,9 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--output_dir", default="./", help="Folder to save outputs",
+    "--output_dir",
+    default="./",
+    help="Folder to save outputs",
 )
 
 
