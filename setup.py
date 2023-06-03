@@ -34,7 +34,9 @@ setuptools.setup(
         # "dgl-cu101>=0.6.0",
     ],
     package_data={
-        "alignn.ff": ["best_model.pt", "config.json"],
+        "alignn.ff.alignnff_wt10": ["best_model.pt", "config.json"],
+        "alignn.ff.alignnff_wt1": ["best_model.pt", "config.json"],
+        "alignn.ff.alignnff_wt0.1": ["best_model.pt", "config.json"],
         "alignn.ff.revised": ["best_model.pt", "config.json"],
     },
     scripts=[
