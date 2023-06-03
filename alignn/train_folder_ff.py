@@ -39,11 +39,11 @@ parser.add_argument(
     "--file_format", default="poscar", help="poscar/cif/xyz/pdb file format."
 )
 
-parser.add_argument(
-    "--keep_data_order",
-    default=True,
-    help="Whether to randomly shuffle samples",
-)
+# parser.add_argument(
+#    "--keep_data_order",
+#    default=True,
+#    help="Whether to randomly shuffle samples",
+# )
 
 parser.add_argument(
     "--classification_threshold",
@@ -110,7 +110,7 @@ parser.add_argument(
 def train_for_folder(
     root_dir="examples/sample_data",
     config_name="config.json",
-    keep_data_order=False,
+    # keep_data_order=False,
     classification_threshold=None,
     batch_size=None,
     epochs=None,
@@ -135,7 +135,7 @@ def train_for_folder(
         except Exception as exp:
             print("Check", exp)
 
-    config.keep_data_order = keep_data_order
+    # config.keep_data_order = keep_data_order
     if classification_threshold is not None:
         config.classification_threshold = float(classification_threshold)
     if output_dir is not None:

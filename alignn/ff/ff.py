@@ -61,8 +61,10 @@ __author__ = "Kamal Choudhary, Brian DeCost, Keith Butler, Lily Major"
 
 
 def default_path():
-    """Get defaukt model path."""
-    dpath = os.path.abspath(str(os.path.join(os.path.dirname(__file__), ".")))
+    """Get default model path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "alignnff_wt10"))
+    )
     print("model_path", dpath)
     return dpath
 
@@ -80,6 +82,24 @@ def wt01_path():
     """Get defaukt model path."""
     dpath = os.path.abspath(
         str(os.path.join(os.path.dirname(__file__), "alignnff_wt0.1"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
+def wt1_path():
+    """Get defaukt model path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "alignnff_wt1"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
+def wt10_path():
+    """Get defaukt model path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "alignnff_wt10"))
     )
     print("model_path", dpath)
     return dpath
