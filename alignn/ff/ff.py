@@ -65,7 +65,6 @@ def default_path():
     dpath = os.path.abspath(
         str(os.path.join(os.path.dirname(__file__), "alignnff_wt10"))
     )
-    # dpath = os.path.abspath(str(os.path.join(os.path.dirname(__file__), ".")))
     print("model_path", dpath)
     return dpath
 
