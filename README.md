@@ -230,6 +230,8 @@ run_alignn_ff.py -h
 Performances
 -------------------------
 
+Please refer to [JARVIS-Leaderboard](https://pages.nist.gov/jarvis_leaderboard/) to check the performance of ALIGNN models on several databases.
+
 ### 1) On JARVIS-DFT 2021 dataset (classification)
 
 |     Model                               |     Threshold         |     ALIGNN    |
@@ -283,7 +285,7 @@ Performances
 
 ### 3) On Materials project 2018 dataset
 
-The results from models other than ALIGNN are reported as given in corresponding papers, not necessarily reproduced by us. You can also refer to [MatBench](https://matbench.materialsproject.org/) project to check the performance of ALIGNN model on the Materials project and other databases.
+The results from models other than ALIGNN are reported as given in corresponding papers, not necessarily reproduced by us. 
 
 |     Prop    |     Unit      |     MAD     |     CFID     |     CGCNN    |     MEGNet    |     SchNet    |     ALIGNN    |     MAD:MAE    |
 |-------------|---------------|-------------|--------------|--------------|---------------|---------------|---------------|----------------|
