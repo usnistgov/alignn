@@ -316,7 +316,18 @@ class ALIGNNAtomWise(nn.Module):
             g, lg = g
             lg = lg.local_var()
 
-            # angle features (fixed)
+        # needed for gradient wrt relative position
+        if self.config.calculate_gradient:
+            r.requires_grad_(True)
+
+        r = g.edata["r"]
+
+        # re-compute bond angle cosines here to ensure
+        # the three-body interactions are fully included
+        # in the autograd graph. don't rely on dataloader/caching.
+        if len(self.alignn_layers) > 0:
+            lg.ndata["r"] = r # overwrites precomputed r values
+            lg.apply_edges(compute_bond_cosines) # overwrites precomputed h
             z = self.angle_embedding(lg.edata.pop("h"))
 
         g = g.local_var()
@@ -325,9 +336,6 @@ class ALIGNNAtomWise(nn.Module):
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
-        r = g.edata["r"]
-        if self.config.calculate_gradient:
-            r.requires_grad_(True)
 
         # r = g.edata["r"].clone().detach().requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
