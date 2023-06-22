@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2023.05.31",
+    version="2023.06.20",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -36,7 +36,7 @@ setuptools.setup(
     package_data={
         "alignn.ff.alignnff_wt10": ["best_model.pt", "config.json"],
         "alignn.ff.alignnff_wt1": ["best_model.pt", "config.json"],
-        "alignn.ff.alignnff_wt0.1": ["best_model.pt", "config.json"],
+        "alignn.ff.alignnff_wt01": ["best_model.pt", "config.json"],
         "alignn.ff.revised": ["best_model.pt", "config.json"],
     },
     scripts=[
