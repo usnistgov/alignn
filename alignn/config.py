@@ -125,6 +125,7 @@ TARGET_ENUM = Literal[
     "f_enp",
     "final_energy",
     "energy_per_atom",
+    "ead",
 ]
 
 
@@ -154,6 +155,9 @@ class TrainingConfig(BaseSettings):
         "hpov",
         "pdbbind",
         "pdbbind_core",
+        "tinnet_OH",
+        "tinnet_O",
+        "tinnet_N",
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
