@@ -31,7 +31,7 @@
 
 <a name="intro"></a>
 # ALIGNN (Introduction)
-The Atomistic Line Graph Neural Network (https://www.nature.com/articles/s41524-021-00650-1)  introduces a new graph convolution layer that explicitly models both two and three body interactions in atomistic systems. 
+The Atomistic Line Graph Neural Network (https://www.nature.com/articles/s41524-021-00650-1)  introduces a new graph convolution layer that explicitly models both two and three body interactions in atomistic systems.
 
 This is achieved by composing two edge-gated graph convolution layers, the first applied to the atomistic line graph *L(g)* (representing triplet interactions) and the second applied to the atomistic bond graph *g* (representing pair interactions).
 
@@ -56,31 +56,52 @@ Now,
 bash Miniconda3-latest-Linux-x86_64.sh (for linux)
 bash Miniconda3-latest-MacOSX-x86_64.sh (for Mac)
 ```
-Download 32/64 bit python 3.8 miniconda exe and install (for windows)
+Download 32/64 bit python 3.10 miniconda exe and install (for windows)
 Now, let's make a conda environment, say "version", choose other name as you like::
 ```
-conda create --name version python=3.8
+conda create --name version python=3.10
 source activate version
 ```
-#### Method 1 (using setup.py):
 
-Now, let's install the package:
+#### optional GPU dependencies
+
+If you need CUDA support, it's best to install PyTorch and DGL before installing alignn to ensure that you get a CUDA-enabled version of DGL.
+
+To [install the stable release of PyTorch] on linux with cudatoolkit 11.8 run
+
 ```
-git clone https://github.com/usnistgov/alignn.git
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+```
+
+Then [install the matching DGL version](https://www.dgl.ai/pages/start.html)
+
+```
+conda install -c dglteam/label/cu118 dgl
+```
+
+Some of our models may not be stable with the latest DGL release (v1.1.0) so you may wish to install v1.0.2 instead:
+
+```
+conda install -c dglteam/label/cu118 dgl==1.0.2.cu118
+```
+
+
+#### Method 1 (editable in-place install)
+
+You can install a development version of alignn by cloning the repository and installing in place with pip:
+
+```
+git clone https://github.com/usnistgov/alignn
 cd alignn
-python setup.py develop
+python -m pip install -e .
 ```
-For using GPUs/CUDA, install dgl-cu101 or dgl-cu111 based on the CUDA version available on your system, e.g.
 
-```
-pip install dgl-cu111
-```
 
 #### Method 2 (using pypi):
 
 As an alternate method, ALIGNN can also be installed using `pip` command as follows:
 ```
-pip install alignn dgl-cu111
+python -m pip install alignn
 ```
 
 <a name="example"></a>
@@ -90,7 +111,7 @@ Examples
 #### Dataset
 The main script to train model is `train_folder.py`. A user needs at least the following info to train a model: 1) `id_prop.csv` with name of the file and corresponding value, 2) `config_example.json` a config file with training and hyperparameters.
 
-Users can keep their structure files in `POSCAR`, `.cif`, `.xyz` or `.pdb` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop.csv` file. 
+Users can keep their structure files in `POSCAR`, `.cif`, `.xyz` or `.pdb` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop.csv` file.
 
 In this directory, `id_prop.csv`, the filenames, and correponding target values are kept in `comma separated values (csv) format`.
 
@@ -98,10 +119,10 @@ Here is an example of training OptB88vdw bandgaps of 50 materials from JARVIS-DF
 
 The dataset in split in 80:10:10 as training-validation-test set (controlled by `train_ratio, val_ratio, test_ratio`) . To change the split proportion and other parameters, change the [config_example.json](https://github.com/usnistgov/alignn/blob/main/alignn/examples/sample_data/config_example.json) file. If, users want to train on certain sets and val/test on another dataset, set `n_train`, `n_val`, `n_test` manually in the `config_example.json` and also set `keep_data_order` as True there so that random shuffle is disabled.
 
-A brief help guide (`-h`) can be obtained as follows. 
+A brief help guide (`-h`) can be obtained as follows.
 
 ```
-train_folder.py -h 
+train_folder.py -h
 ```
 #### Regression example
 Now, the model is trained as follows. Please increase the `batch_size` parameter to something like 32 or 64 in `config_example.json` for general trainings.
@@ -186,12 +207,12 @@ for a in lattice_params:
                                            [0.0, 1.0, 1.0],
                                            [1.0, 0.0, 1.0]]),
                  pbc=True)
-    
+
     atoms.set_tags(np.ones(len(atoms)))
     atoms.calc = calc
     e = atoms.get_potential_energy()
     fcc_energies.append(e)
-    
+
 import matplotlib.pyplot as plt
 %matplotlib inline
 plt.plot(lattice_params, fcc_energies)
@@ -285,14 +306,14 @@ Please refer to [JARVIS-Leaderboard](https://pages.nist.gov/jarvis_leaderboard/)
 
 ### 3) On Materials project 2018 dataset
 
-The results from models other than ALIGNN are reported as given in corresponding papers, not necessarily reproduced by us. 
+The results from models other than ALIGNN are reported as given in corresponding papers, not necessarily reproduced by us.
 
 |     Prop    |     Unit      |     MAD     |     CFID     |     CGCNN    |     MEGNet    |     SchNet    |     ALIGNN    |     MAD:MAE    |
 |-------------|---------------|-------------|--------------|--------------|---------------|---------------|---------------|----------------|
 |     Ef      |     eV(atom)<sup>-1</sup>    |     0.93    |     0.104    |     0.039    |     0.028     |     0.035     |     0.022     |     42.27      |
 |     Eg      |     eV        |     1.35    |     0.434    |     0.388    |     0.33      |     -         |     0.218     |     6.19       |
 
- 
+
 
 ### 4) On QM9 dataset
 
@@ -343,7 +364,7 @@ coming soon!
 
 coming soon!
 
-### 10) On OpenCatalyst dataset 
+### 10) On OpenCatalyst dataset
 
 [On 10k dataset](https://github.com/Open-Catalyst-Project/ocp/blob/main/MODELS.md#is2re-models):
 
@@ -405,4 +426,3 @@ Code of conduct
 --------------------
 
 Please see [Code of conduct](https://github.com/usnistgov/jarvis/blob/master/CODE_OF_CONDUCT.md)
-
