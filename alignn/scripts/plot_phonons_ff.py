@@ -37,7 +37,7 @@ def ase_phonon(
     filename="Al_phonon.png",
     ev_file=None,
     model_path="",
-):      
+):
     """Get phonon bandstructure and DOS using ASE."""
     calc = AlignnAtomwiseCalculator(path=model_path)
     # Setup crystal and EMT calculator
