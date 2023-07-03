@@ -1,2 +1,2 @@
 """Version number."""
-__version__ = "2023.06.20"
+__version__ = "2023.07.01"

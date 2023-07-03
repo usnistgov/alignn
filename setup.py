@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2023.06.20",
+    version="2023.07.01",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -31,6 +31,7 @@ setuptools.setup(
         "pydocstyle>=6.0.0",
         "pyparsing>=2.2.1,<3",
         "ase",
+        "accelerate>=0.20.3",
         # "dgl-cu101>=0.6.0",
     ],
     package_data={

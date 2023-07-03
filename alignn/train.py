@@ -241,6 +241,14 @@ def train_dgl(
         val_loader = train_val_test_loaders[1]
         test_loader = train_val_test_loaders[2]
         prepare_batch = train_val_test_loaders[3]
+    if config.distributed:
+        print(
+            "Using Accelerator, currently experimental, use at your own risk."
+        )
+        from accelerate import Accelerator
+
+        accelerator = Accelerator()
+        device = accelerator.device
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True
@@ -259,7 +267,9 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
-
+    if config.data_parallel and torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        net = torch.nn.DataParallel(net)
     net.to(device)
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
@@ -361,6 +371,18 @@ def train_dgl(
         params = group_decay(net)
         optimizer = setup_optimizer(params, config)
         # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+        if config.distributed:
+            from accelerate import Accelerator
+
+            accelerator = Accelerator()
+            print("Using Accelerator device", accelerator.device)
+
+            device = accelerator.device
+            # print('model',net)
+            net.to(device)
+            train_loader, val_loader, model, optimizer = accelerator.prepare(
+                train_loader, val_loader, net, optimizer
+            )
         history_train = []
         history_val = []
         for e in range(config.epochs):
@@ -477,7 +499,10 @@ def train_dgl(
                     # print("pred_stress", info["pred_stress"][0])
                 train_result.append(info)
                 loss = loss1 + loss2 + loss3 + loss4
-                loss.backward()
+                if config.distributed:
+                    accelerator.backward(loss)
+                else:
+                    loss.backward()
                 optimizer.step()
                 # optimizer.zero_grad()
                 running_loss += loss.item()
@@ -708,6 +733,12 @@ def train_dgl(
         import torch.distributed as dist
         import os
 
+        print()
+        print()
+        print()
+        gpus = torch.cuda.device_count()
+        print("Using DistributedDataParallel !!!", gpus)
+
         def setup(rank, world_size):
             os.environ["MASTER_ADDR"] = "localhost"
             os.environ["MASTER_PORT"] = "12355"
@@ -719,12 +750,20 @@ def train_dgl(
             dist.destroy_process_group()
 
         setup(2, 2)
-        # local_rank = 0
+        local_rank = [0, 1]
         # net=torch.nn.parallel.DataParallel(net
         # ,device_ids=[local_rank, ],output_device=local_rank)
         net = torch.nn.parallel.DistributedDataParallel(
-            net
-        )  # ,device_ids=[local_rank, ],output_device=local_rank)
+            net,
+            device_ids=[
+                local_rank,
+            ],
+            output_device=local_rank,
+        )
+        print()
+        print()
+        print()
+        # )  # ,device_ids=[local_rank, ],output_device=local_rank)
     """
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)

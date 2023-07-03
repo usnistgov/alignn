@@ -6,11 +6,17 @@ from sklearn.metrics import mean_absolute_error
 import matplotlib.pyplot as plt
 import os
 
-out_dir = "/wrk/knc6/ALINN_FC/FD/temp"
 out_dir = "/wrk/knc6/ALINN_FC/FD_elements_mult/temp"
 out_dir = "/wrk/knc6/ALINN_FC/FD_elements/temp"
 out_dir = "/wrk/knc6/ALINN_FC/FD_mult/temp"
+out_dir = "/wrk/knc6/ALINN_FC/FD/temp"
+out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/Out2"
+out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/Out3"
+# out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/OutCu002"
+out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/OutCu003"
+out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/OutCu004"
 # out_dir = "/wrk/knc6/AlIGNN-FF/jdft_max_min_307113/out"
+out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/OutMlearnAll"
 
 # Plot training hostory
 json_path = os.path.join(out_dir, "history_val.json")
@@ -59,6 +65,7 @@ baseline_mae = mean_absolute_error(
     np.array(xx),
     np.array([x_bar for i in range(len(xx))]),
 )
+print("Val")
 print("Baseline MAE: eV", baseline_mae)
 print("MAE eV", mean_absolute_error(xx, yy))
 
@@ -83,6 +90,7 @@ baseline_mae = mean_absolute_error(
     np.array(xx),
     np.array([x_bar for i in range(len(xx))]),
 )
+print("Test")
 print("Baseline MAE: eV/A", baseline_mae)
 print("MAE eV/A", mean_absolute_error(xx, yy))
 plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
@@ -117,6 +125,7 @@ baseline_mae = mean_absolute_error(
     np.array(xx),
     np.array([x_bar for i in range(len(xx))]),
 )
+print("Train")
 print("Baseline MAE: eV", baseline_mae)
 print("MAE eV", mean_absolute_error(xx, yy))
 

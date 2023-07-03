@@ -247,7 +247,7 @@ def train_for_folder(
             model.load_state_dict(
                 torch.load(restart_model_path, map_location=device)
             )
-            model.to(device)
+            model = model.to(device)
 
     # print ('n_outputs',n_outputs[0])
     if multioutput and classification_threshold is not None:

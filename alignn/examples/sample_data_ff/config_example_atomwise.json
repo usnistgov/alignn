@@ -35,18 +35,19 @@
     "num_workers": 0,
     "cutoff": 8.0,
     "max_neighbors": 12,
-    "keep_data_order": false,
+    "keep_data_order": true,
+    "distributed":true,
     "model": {
         "name": "alignn_atomwise",
         "atom_input_features": 92,
         "calculate_gradient":true,
-        "atomwise_output_features":3,
+        "atomwise_output_features":0,
         "alignn_layers":4,
         "gcn_layers":4,
         "output_features": 1,
         "graphwise_weight":0.85,
         "gradwise_weight":0.05,
-        "atomwise_weight":0.05,
+        "atomwise_weight":0.0,
         "stresswise_weight":0.05
           
     }

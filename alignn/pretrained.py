@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 import tempfile
 import torch
 import sys
+import json
 
 # from jarvis.db.jsonutils import loadjson
 import argparse
@@ -152,6 +153,7 @@ all_models = {
         "https://figshare.com/ndownloader/files/31459228",
         1,
     ],
+    "ocp2020_all": ["https://figshare.com/ndownloader/files/41411025", 1],
     "jv_pdos_alignn": [
         "https://figshare.com/ndownloader/files/36757005",
         66,
@@ -201,6 +203,8 @@ device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
 
+# device = "cpu"
+
 
 def get_all_models():
     """Return the figshare links for models."""
@@ -213,11 +217,11 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
 
     tmp = all_models[model_name]
     url = tmp[0]
-    output_features = tmp[1]
-    if len(tmp) > 2:
-        config_params = tmp[2]
-    else:
-        config_params = {}
+    # output_features = tmp[1]
+    # if len(tmp) > 2:
+    #    config_params = tmp[2]
+    # else:
+    #    config_params = {}
     zfile = model_name + ".zip"
     path = str(os.path.join(os.path.dirname(__file__), zfile))
     if not os.path.isfile(path):
@@ -235,19 +239,27 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
     zp = zipfile.ZipFile(path)
     names = zp.namelist()
     chks = []
+    cfg = []
     for i in names:
         if "checkpoint_" in i and "pt" in i:
             tmp = i
             chks.append(i)
+        if "config.json" in i:
+            cfg = i
+
     print("Using chk file", tmp, "from ", chks)
     print("Path", os.path.abspath(path))
+    print("Config", os.path.abspath(cfg))
+    config = json.loads(zipfile.ZipFile(path).read(cfg))
     # print("Loading the zipfile...", zipfile.ZipFile(path).namelist())
     data = zipfile.ZipFile(path).read(tmp)
-    model = ALIGNN(
-        ALIGNNConfig(
-            name="alignn", output_features=output_features, **config_params
-        )
-    )
+    # model = ALIGNN(
+    #    ALIGNNConfig(
+    #        name="alignn", output_features=output_features, **config_params
+    #    )
+    # )
+    model = ALIGNN(ALIGNNConfig(**config["model"]))
+
     new_file, filename = tempfile.mkstemp()
     with open(filename, "wb") as f:
         f.write(data)

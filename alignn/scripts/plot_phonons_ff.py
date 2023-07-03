@@ -1,29 +1,27 @@
-from ase.build import bulk
-from ase.calculators.emt import EMT
+"""Module for phonons using ase."""
+# from ase.build import bulk
+# from ase.calculators.emt import EMT
 from ase.phonons import Phonons
 import matplotlib.pyplot as plt  # noqa
-from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, ev_curve
+
+# from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, ev_curve
+from alignn.ff.ff import AlignnAtomwiseCalculator
 from jarvis.analysis.structure.spacegroup import (
     Spacegroup3D,
-    symmetrically_distinct_miller_indices,
+    #    symmetrically_distinct_miller_indices,
 )
 from jarvis.core.atoms import Atoms as JarvisAtoms
 from jarvis.db.figshare import get_jid_data
 from ase.cell import Cell
-import numpy as np
-from jarvis.analysis.thermodynamics.energetics import get_optb88vdw_energy
 
-opt_en = get_optb88vdw_energy()
-jids = [i["jid"] for i in list(opt_en.values())]
-jids.append("JVASP-32")
+# from jarvis.analysis.thermodynamics.energetics import get_optb88vdw_energy
+
+# opt_en = get_optb88vdw_energy()
+# jids = [i["jid"] for i in list(opt_en.values())]
+# jids.append("JVASP-32")
+# jids.append("JVASP-19821")
+# jids.append("JVASP-254")
 # model_path = default_path()
-model_path = "/wrk/knc6/ALINN_FC/FD_elements_42/temp"
-model_path = "/wrk/knc6/ALINN_FC/FD_elements_mult/temp"
-model_path = "/wrk/knc6/ALINN_FC/FD_elements/temp"
-model_path = "/wrk/knc6/ALINN_FC/FD/temp"
-model_path = "/wrk/knc6/ALINN_FC/FD_mult/temp"
-
-calc = AlignnAtomwiseCalculator(path=model_path)
 
 
 def ase_phonon(
@@ -38,12 +36,16 @@ def ase_phonon(
     use_cvn=True,
     filename="Al_phonon.png",
     ev_file=None,
-):
+    model_path="",
+):      
+    """Get phonon bandstructure and DOS using ASE."""
+    calc = AlignnAtomwiseCalculator(path=model_path)
     # Setup crystal and EMT calculator
     # atoms = bulk("Al", "fcc", a=4.05)
 
     # Phonon calculator
     # N = 7
+    # ev_file = (None,)
     if jid is not None:
         atoms = JarvisAtoms.from_dict(
             get_jid_data(jid=jid, dataset=dataset)["atoms"]
@@ -52,12 +54,12 @@ def ase_phonon(
             jid + "_" + atoms.composition.reduced_formula + "_phonon.png"
         )
     if use_cvn:
-        # atoms = JarvisAtoms.from_dict(get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"])
         spg = Spacegroup3D(atoms)
         atoms_cvn = spg.conventional_standard_structure
-        lat_sys = spg.lattice_system
+        # lat_sys = spg.lattice_system
     else:
         atoms_cvn = atoms
+    """
     if ev_file is not None:
         ev_curve(
             atoms=atoms_cvn,
@@ -67,6 +69,7 @@ def ase_phonon(
         )
         plt.clf()
         plt.close()
+    """
     cell = Cell(atoms_cvn.lattice_mat)
     path = cell.bandpath(npoints=npoints)
     print(path)
@@ -113,13 +116,27 @@ def ase_phonon(
 
 
 if __name__ == "__main__":
-    bs = ase_phonon(jid="JVASP-32", ev_file=None)
+    model_path = "/wrk/knc6/ALINN_FC/FD_mult/temp"
+    bs = ase_phonon(
+        jid="JVASP-32", ev_file="JVASP-32_ev.png", model_path=model_path
+    )
+    bs = ase_phonon(
+        jid="JVASP-19821", ev_file="JVASP-19821_ev.png", model_path=model_path
+    )
+    bs = ase_phonon(
+        jid="JVASP-254", ev_file="JVASP-254_ev.png", model_path=model_path
+    )
+    bs = ase_phonon(
+        jid="JVASP-816", ev_file="JVASP-816_ev.png", model_path=model_path
+    )
+    """
     for i in jids:
         try:
             ev_file = i + "_ev.png"
-            bs = ase_phonon(jid=i, ev_file=None)
+            bs = ase_phonon(jid=i, ev_file=ev_file, model_path=model_path)
         except:
             pass
+    """
     # bs = ase_phonon(jid="JVASP-21195", ev_file="ev.png")
     # bs = ase_phonon(jid="JVASP-943", ev_file="ev.png")
     # bs = ase_phonon(jid="JVASP-1002", ev_file="ev.png")
