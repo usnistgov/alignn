@@ -241,14 +241,17 @@ def train_dgl(
         val_loader = train_val_test_loaders[1]
         test_loader = train_val_test_loaders[2]
         prepare_batch = train_val_test_loaders[3]
-    # if config.distributed:
-    #    print(
-    #        "Using Accelerator, currently experimental, use at your own risk."
-    #    )
-    #    from accelerate import Accelerator
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    if config.distributed:
+        print(
+            "Using Accelerator, currently experimental, use at your own risk."
+        )
+        from accelerate import Accelerator
 
-    #    accelerator = Accelerator()
-    #    device = accelerator.device
+        accelerator = Accelerator()
+        device = accelerator.device
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True

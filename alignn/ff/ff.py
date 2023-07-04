@@ -72,6 +72,24 @@ def revised_path():
     return dpath
 
 
+def mlearn_path():
+    """Get model trained on mlearn path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "fmult_mlearn_only"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
+def fd_path():
+    """Get model trained on mlearn path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "alignnff_fd"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
 def wt01_path():
     """Get defaukt model path."""
     dpath = os.path.abspath(

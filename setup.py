@@ -39,6 +39,8 @@ setuptools.setup(
         "alignn.ff.alignnff_wt1": ["best_model.pt", "config.json"],
         "alignn.ff.alignnff_wt01": ["best_model.pt", "config.json"],
         "alignn.ff.revised": ["best_model.pt", "config.json"],
+        "alignn.ff.fmult_mlearn_only": ["best_model.pt", "config.json"],
+        "alignn.ff.alignnff_fd": ["best_model.pt", "config.json"],
     },
     scripts=[
         "alignn/pretrained.py",
