@@ -363,7 +363,6 @@ class ALIGNNAtomWise(nn.Module):
         stress = torch.empty(1)
 
         if self.config.calculate_gradient:
-
             if self.config.include_pos_deriv:
                 # Not tested yet
                 g.ndata["coords"].requires_grad_(True)
@@ -388,8 +387,6 @@ class ALIGNNAtomWise(nn.Module):
                     retain_graph=True,
                 )[0]
             )
-            if self.config.force_mult_natoms:
-                pair_forces *= g.num_nodes()
 
             # construct force_i = dE / d{r_i}
             # reduce over bonds to get forces on each atom
@@ -470,6 +467,17 @@ class ALIGNNAtomWise(nn.Module):
 
         if self.classification:
             out = self.softmax(out)
+        if self.config.force_mult_natoms:
+            n_nodes = torch.cat(
+                [
+                    i * torch.ones(i, device=g.device)
+                    for i in g.batch_num_nodes()
+                ]
+            )
+            # print('n_nodes',n_nodes,n_nodes.shape)
+            # print('pair_forces',pair_forces,pair_forces.shape)
+            forces *= n_nodes[:, None]
+            # forces *= g.num_nodes()
         result["out"] = out
         result["grad"] = forces
         result["stresses"] = stress

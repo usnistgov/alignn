@@ -16,8 +16,9 @@ out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/Out3"
 out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/OutCu003"
 out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/OutCu004"
 # out_dir = "/wrk/knc6/AlIGNN-FF/jdft_max_min_307113/out"
+out_dir = "/wrk/knc6/ALINN_FC/ALIGNNFF_DB/temp"
+out_dir = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"
 out_dir = "/wrk/knc6/ALINN_FC/FitSNAP/Ta_snap/OutMlearnAll"
-
 # Plot training hostory
 json_path = os.path.join(out_dir, "history_val.json")
 v = loadjson(json_path)

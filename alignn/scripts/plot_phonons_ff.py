@@ -116,9 +116,12 @@ def ase_phonon(
 
 
 if __name__ == "__main__":
-    model_path = "/wrk/knc6/ALINN_FC/FD_mult/temp"
+    model_path = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"
     bs = ase_phonon(
         jid="JVASP-32", ev_file="JVASP-32_ev.png", model_path=model_path
+    )
+    bs = ase_phonon(
+        jid="JVASP-1002", ev_file="JVASP-32_ev.png", model_path=model_path
     )
     bs = ase_phonon(
         jid="JVASP-19821", ev_file="JVASP-19821_ev.png", model_path=model_path
