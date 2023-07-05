@@ -37,10 +37,15 @@ from jarvis.analysis.structure.spacegroup import (
 )
 from jarvis.analysis.interface.zur import make_interface
 from jarvis.analysis.defects.surface import Surface
+from jarvis.core.kpoints import Kpoints3D as Kpoints
 
-# from jarvis.core.kpoints import Kpoints3D as Kpoints
-from jarvis.core.atoms import get_supercell_dims
+# from jarvis.core.atoms import get_supercell_dims
 from ase import Atoms as AseAtoms
+from ase.phonons import Phonons
+import matplotlib.pyplot as plt  # noqa
+from jarvis.db.figshare import get_jid_data
+from ase.cell import Cell
+
 
 try:
     from gpaw import GPAW, PW
@@ -950,31 +955,27 @@ def phonons(
     model_path=".",
     model_filename="best_model.pt",
     on_relaxed_struct=False,
+    dim=[2, 2, 2],
+    freq_conversion_factor=33.356,
 ):
     """Make Phonon calculation setup."""
-    if on_relaxed_struct:
-        ff = ForceField(
-            jarvis_atoms=atoms,
-            model_path=model_path,
-            model_filename=model_filename,
-        )
-        atoms, en, fs = ff.optimize_atoms()
+    calc = AlignnAtomwiseCalculator(
+        path=model_path,
+        force_mult_natoms=False,
+        force_multiplier=1,
+        stress_wt=-4800,
+    )
+
     from phonopy import Phonopy
     from phonopy.file_IO import (
-        #    parse_FORCE_CONSTANTS,
         write_FORCE_CONSTANTS,
     )
 
-    # kpoints = Kpoints().kpath(atoms, line_density=line_density)
-    spg = Spacegroup3D(atoms=atoms)  # .spacegroup_data()
-    cvn = spg.conventional_standard_structure
-    dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
-    atoms = cvn.make_supercell([dim[0], dim[1], dim[2]])
+    kpoints = Kpoints().kpath(atoms, line_density=line_density)
     bulk = atoms.phonopy_converter()
     phonon = Phonopy(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
-    phonon.generate_displacements(distance=0.02)
+    phonon.generate_displacements(distance=0.01)
     print("Len dis", len(phonon.supercells_with_displacements))
-    # disps = phonon.get_displacements()
     supercells = phonon.get_supercells_with_displacements()
     # Force calculations by calculator
     set_of_forces = []
@@ -987,22 +988,12 @@ def phonons(
             cell=scell.get_cell(),
             pbc=True,
         )
-        j_atoms = ase_to_atoms(ase_atoms)
+        ase_atoms.calc = calc
+        # energy = ase_atoms.get_potential_energy()
+        forces = np.array(ase_atoms.get_forces())
         disp = disp + 1
 
-        # parameters["control_file"] = "run0.mod"
-
-        ff = ForceField(
-            jarvis_atoms=j_atoms,
-            model_path=model_path,
-            model_filename=model_filename,
-        )
-        st, energy, forces = ff.optimize_atoms(optimize_lattice=False)
-        # forces = forces * -1
-        # print("forces=", forces)
         drift_force = forces.sum(axis=0)
-        # print("drift forces=", drift_force)
-        # Simple translational invariance
         for force in forces:
             force -= drift_force / forces.shape[0]
         set_of_forces.append(forces)
@@ -1010,6 +1001,33 @@ def phonons(
     write_FORCE_CONSTANTS(
         phonon.get_force_constants(), filename="FORCE_CONSTANTS"
     )
+
+    freqs = []
+    for k in kpoints.kpts:
+        tmp = []
+        for i, freq in enumerate(phonon.get_frequencies(k)):
+            # print("[Phonopy]%3d: %10.5f cm-1" %  (i + 1, freq*33.356))#THz
+            tmp.append(freq * freq_conversion_factor)
+        freqs.append(tmp)
+
+    freqs = np.array(freqs)
+    for i in range(freqs.shape[1]):
+        plt.plot(freqs[:, i], c="b")
+    lbls = kpoints.labels
+    lbls_x = np.arange(len(lbls))
+    x_i = []
+    x_j = []
+    for i, j in zip(lbls_x, lbls):
+        if j != "":
+            tmp = "$" + str(j) + "$"
+            x_j.append(tmp)
+            x_i.append(i)
+    plt.xticks(x_i, x_j)
+    # plt.xticks(lbls_x,lbls)
+    plt.tight_layout()
+    plt.savefig("phonopy_bands.png")
+    plt.close()
+
     phonon.run_mesh([20, 20, 20])
     phonon.run_total_dos()
     tdos = phonon._total_dos
@@ -1018,23 +1036,170 @@ def phonons(
     freqs, ds = tdos.get_dos()
     # print('tods',tdos.get_dos())
     dosfig = phonon.plot_total_dos()
-    dosfig.savefig("dos1.png")
+    dosfig.savefig("phonopy_dos.png")
     dosfig.close()
 
     plt.plot(freqs, ds)
     plt.close("dos2.png")
 
 
-if __name__ == "__main__":
-    from jarvis.db.figshare import get_jid_data
+def phonons3(
+    atoms=None,
+    enforce_c_size=8,
+    line_density=5,
+    model_path=".",
+    model_filename="best_model.pt",
+    on_relaxed_struct=False,
+    dim=[2, 2, 2],
+):
+    """Make Phonon3 calculation setup."""
+    from phono3py import Phono3py
 
-    atoms = Spacegroup3D(
-        JarvisAtoms.from_dict(
-            get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    calc = AlignnAtomwiseCalculator(path=model_path)
+
+    # kpoints = Kpoints().kpath(atoms, line_density=line_density)
+    # dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
+    # atoms = cvn.make_supercell([dim[0], dim[1], dim[2]])
+    bulk = atoms.phonopy_converter()
+    phonon = Phono3py(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
+    phonon.generate_displacements(distance=0.03)
+    # disps = phonon.generate_displacements()
+    supercells = phonon.supercells_with_displacements
+    print(
+        "Len dis", len(phonon.supercells_with_displacements), len(supercells)
+    )
+    # Force calculations by calculator
+    set_of_forces = []
+    disp = 0
+
+    for ii, scell in enumerate(supercells):
+        print("scell=", ii)
+        ase_atoms = AseAtoms(
+            symbols=scell.get_chemical_symbols(),
+            scaled_positions=scell.get_scaled_positions(),
+            cell=scell.get_cell(),
+            pbc=True,
         )
-    ).conventional_standard_structure
-    phonons(atoms=atoms)
+        ase_atoms.calc = calc
+        # energy = ase_atoms.get_potential_energy()
+        forces = np.array(ase_atoms.get_forces())
+        disp = disp + 1
+        drift_force = forces.sum(axis=0)
+        for force in forces:
+            force -= drift_force / forces.shape[0]
+        set_of_forces.append(forces)
+    # phonon.save("phono3py_disp.yaml")
+    forces = np.array(set_of_forces).reshape(-1, len(phonon.supercell), 3)
+    phonon.forces = forces
+    phonon.produce_fc3()
+    phonon.mesh_numbers = 30
+    phonon.init_phph_interaction()
+    phonon.run_thermal_conductivity(
+        temperatures=range(0, 1001, 10), write_kappa=True
+    )
+    print(phonon.thermal_conductivity.kappa)
 
+
+def ase_phonon(
+    atoms=[],
+    N=2,
+    path=[],
+    jid=None,
+    npoints=100,
+    dataset="dft_3d",
+    delta=0.01,
+    emin=-0.01,
+    use_cvn=True,
+    filename="Atom_phonon.png",
+    ev_file=None,
+    model_path="",
+):
+    """Get phonon bandstructure and DOS using ASE."""
+    calc = AlignnAtomwiseCalculator(path=model_path)
+    # Setup crystal and EMT calculator
+    # atoms = bulk("Al", "fcc", a=4.05)
+
+    # Phonon calculator
+    # N = 7
+    # ev_file = (None,)
+    if jid is not None:
+        atoms = JarvisAtoms.from_dict(
+            get_jid_data(jid=jid, dataset=dataset)["atoms"]
+        )
+        filename = (
+            jid + "_" + atoms.composition.reduced_formula + "_phonon.png"
+        )
+    if use_cvn:
+        spg = Spacegroup3D(atoms)
+        atoms_cvn = spg.conventional_standard_structure
+        # lat_sys = spg.lattice_system
+    else:
+        atoms_cvn = atoms
+    """
+    if ev_file is not None:
+        ev_curve(
+            atoms=atoms_cvn,
+            fig_name=ev_file,
+            model_path=model_path,
+            dx=np.arange(-0.2, 0.2, 0.05),
+        )
+        plt.clf()
+        plt.close()
+    """
+    cell = Cell(atoms_cvn.lattice_mat)
+    path = cell.bandpath(npoints=npoints)
+    print(path)
+    atoms = atoms_cvn.ase_converter()
+
+    ph = Phonons(atoms, calc, supercell=(N, N, N), delta=delta)
+    # ph = Phonons(atoms, EMT(), supercell=(N, N, N), delta=0.05)
+    ph.run()
+
+    # Read forces and assemble the dynamical matrix
+    ph.read(acoustic=True)
+    ph.clean()
+
+    # path = atoms.cell.bandpath("GXULGK", npoints=100)
+    bs = ph.get_band_structure(path)
+
+    dos = ph.get_dos(kpts=(20, 20, 20)).sample_grid(npts=npoints, width=1e-3)
+
+    # Plot the band structure and DOS:
+    fig = plt.figure(1, figsize=(7, 4))
+    ax = fig.add_axes([0.12, 0.07, 0.67, 0.85])
+    # ax = fig.add_axes([0.12, 0.07, 0.67, 0.85])
+    # print (bs)
+    emax = max(bs.energies.flatten()) + 0.01  # 0.1  # 0.035
+    bs.plot(ax=ax, emin=emin, emax=emax, color="blue")
+    dosax = fig.add_axes([0.8, 0.07, 0.17, 0.85])
+    dosax.fill_between(
+        dos.get_weights(),
+        dos.get_energies(),
+        y2=0,
+        color=(0.2, 0.4, 0.6, 0.6),
+        # color="grey",
+        edgecolor="blue",
+        lw=1,
+        where=dos.get_energies() >= emin,
+    )
+    dosax.set_ylim(emin, emax)
+    dosax.set_yticks([])
+    dosax.set_xticks([])
+    dosax.set_xlabel("DOS", fontsize=18)
+    fig.savefig(filename)
+    plt.close()
+    return bs
+
+
+if __name__ == "__main__":
+    atoms = JarvisAtoms.from_dict(
+        get_jid_data(jid="JVASP-867", dataset="dft_3d")["atoms"]
+        # get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    )
+    mlearn = mlearn_path()
+    phonons(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    ase_phonon(atoms=atoms, model_path=mlearn)
 
 """
 if __name__ == "__main__":
