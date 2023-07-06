@@ -40,7 +40,7 @@
     "distributed": false,
     "data_parallel": false,
     "n_early_stopping": null,
-    "output_dir": "OutMlearnAll",
+    "output_dir": "OutCu2",
     "model": {
         "name": "alignn_atomwise",
         "alignn_layers": 2,

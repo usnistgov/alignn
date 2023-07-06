@@ -45,6 +45,8 @@ from ase.phonons import Phonons
 import matplotlib.pyplot as plt  # noqa
 from jarvis.db.figshare import get_jid_data
 from ase.cell import Cell
+from matplotlib.gridspec import GridSpec
+from sklearn.metrics import mean_absolute_error
 
 
 try:
@@ -593,6 +595,148 @@ class ForceField(object):
         return ase_to_atoms(self.atoms)
 
 
+def plot_ff_training(out_dir="/wrk/knc6/ALINN_FC/FD_mult/temp_new"):
+    """Plot FF training results."""
+    json_path = os.path.join(out_dir, "history_val.json")
+    v = loadjson(json_path)
+    ens = []
+    fs = []
+    for i in v:
+        ens.append(i[0])
+        fs.append(i[2])
+    the_grid = GridSpec(1, 2)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(12, 5))
+    plt.subplot(the_grid[0])
+    plt.title("(a) Energy")
+    plt.plot(ens)
+    plt.xlabel("Epochs")
+    plt.ylabel("eV")
+    plt.subplot(the_grid[1])
+    plt.title("(b) Forces")
+    plt.plot(fs)
+    plt.xlabel("Epochs")
+    plt.ylabel("eV/A")
+    plt.tight_layout()
+    plt.savefig("history.png")
+    plt.close()
+
+    # Plot val comparison
+    the_grid = GridSpec(1, 2)
+    json_path = os.path.join(out_dir, "Val_results.json")
+    test = loadjson(json_path)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(12, 5))
+    plt.subplot(the_grid[0])
+    xx = []
+    yy = []
+    factor = 1
+    for i in test:
+        for j, k in zip(i["target_out"], i["pred_out"]):
+            xx.append(j)
+            yy.append(k)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Val")
+    print("Baseline MAE: eV", baseline_mae)
+    print("MAE eV", mean_absolute_error(xx, yy))
+
+    plt.plot(xx, yy, ".")
+    plt.ylabel("ALIGNN Energy (eV)")
+    plt.xlabel("DFT Energy (eV)")
+
+    plt.subplot(the_grid[1])
+    xx = []
+    yy = []
+    for i in test:
+        for j, k in zip(i["target_grad"], i["pred_grad"]):
+            for m, n in zip(j, k):
+                xx.append(m)
+                yy.append(n)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Test")
+    print("Baseline MAE: eV/A", baseline_mae)
+    print("MAE eV/A", mean_absolute_error(xx, yy))
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+    plt.ylabel("ALIGNN Force (eV/A)")
+    plt.xlabel("DFT Force (eV/A)")
+    plt.tight_layout()
+    plt.savefig("val.png")
+    plt.close()
+
+    # Plot train comparison
+    the_grid = GridSpec(1, 2)
+    json_path = os.path.join(out_dir, "Train_results.json")
+    test = loadjson(json_path)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(12, 5))
+    plt.subplot(the_grid[0])
+    xx = []
+    yy = []
+    factor = 1
+    for i in test:
+        for j, k in zip(i["target_out"], i["pred_out"]):
+            xx.append(j)
+            yy.append(k)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Train")
+    print("Baseline MAE: eV", baseline_mae)
+    print("MAE eV", mean_absolute_error(xx, yy))
+
+    plt.plot(xx, yy, ".")
+    plt.ylabel("ALIGNN Energy (eV)")
+    plt.xlabel("DFT Energy (eV)")
+
+    plt.subplot(the_grid[1])
+    xx = []
+    yy = []
+    for i in test:
+        for j, k in zip(i["target_grad"], i["pred_grad"]):
+            for m, n in zip(j, k):
+                xx.append(m)
+                yy.append(n)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Baseline MAE: eV/A", baseline_mae)
+    print("MAE eV/A", mean_absolute_error(xx, yy))
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+    plt.ylabel("ALIGNN Force (eV/A)")
+    plt.xlabel("DFT Force (eV/A)")
+    plt.tight_layout()
+    plt.savefig("train.png")
+    plt.close()
+
+
 def ev_curve(
     atoms=None,
     dx=np.arange(-0.05, 0.05, 0.01),
@@ -957,6 +1101,8 @@ def phonons(
     on_relaxed_struct=False,
     dim=[2, 2, 2],
     freq_conversion_factor=33.356,
+    phonopy_bands_figname="phonopy_bands.png",
+    phonopy_dos_figname="phonopy_dos.png",
 ):
     """Make Phonon calculation setup."""
     calc = AlignnAtomwiseCalculator(
@@ -1024,8 +1170,9 @@ def phonons(
             x_i.append(i)
     plt.xticks(x_i, x_j)
     # plt.xticks(lbls_x,lbls)
+    plt.ylabel("Frequency (cm$^{-1}$)")
     plt.tight_layout()
-    plt.savefig("phonopy_bands.png")
+    plt.savefig(phonopy_bands_figname)
     plt.close()
 
     phonon.run_mesh([20, 20, 20])
@@ -1036,11 +1183,12 @@ def phonons(
     freqs, ds = tdos.get_dos()
     # print('tods',tdos.get_dos())
     dosfig = phonon.plot_total_dos()
-    dosfig.savefig("phonopy_dos.png")
+    dosfig.savefig(phonopy_dos_figname)
     dosfig.close()
 
-    plt.plot(freqs, ds)
-    plt.close("dos2.png")
+    # plt.plot(freqs, ds)
+    # plt.close("dos2.png")
+    return phonon
 
 
 def phonons3(
@@ -1193,10 +1341,10 @@ def ase_phonon(
 
 if __name__ == "__main__":
     atoms = JarvisAtoms.from_dict(
-        get_jid_data(jid="JVASP-867", dataset="dft_3d")["atoms"]
+        get_jid_data(jid="JVASP-1002", dataset="dft_3d")["atoms"]
         # get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
     )
-    mlearn = mlearn_path()
+    mlearn = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"  # mlearn_path()
     phonons(atoms=atoms, model_path=mlearn, enforce_c_size=3)
     phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
     ase_phonon(atoms=atoms, model_path=mlearn)
