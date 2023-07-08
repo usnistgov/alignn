@@ -300,10 +300,7 @@ def get_train_val_loaders(
         # print("val", len(val_loader.dataset))
         # print("test", len(test_loader.dataset))
     else:
-        if dataset_array is not None:
-            d = jdata(dataset)
-        else:
-            d = dataset_array
+        d = jdata(dataset) if dataset_array is None else dataset_array
 
             # for ii, i in enumerate(pc_y):
             #    d[ii][target] = pc_y[ii].tolist()
