@@ -163,7 +163,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         output_dir=None,
         stress_wt=1.0,
         force_multiplier=1.0,
-        force_mult_natoms=True,
+        force_mult_natoms=False,
         **kwargs,
     ):
         """Initialize class."""
@@ -271,7 +271,7 @@ class ForceField(object):
         communicator=None,
         stress_wt=1.0,
         force_multiplier=1.0,
-        force_mult_natoms=True,
+        force_mult_natoms=False,
     ):
         """Intialize class."""
         self.jarvis_atoms = jarvis_atoms
@@ -359,8 +359,9 @@ class ForceField(object):
         optimizer="FIRE",
         trajectory="opt.traj",
         logfile="opt.log",
-        steps=1000,
-        fmax=0.05,
+        steps=500,
+        fmax=0.1,
+        # fmax=0.05,
         optimize_lattice=True,
         interval=1,
     ):
@@ -744,6 +745,7 @@ def ev_curve(
     model_filename="best_model.pt",
     fig_name="eos.png",
     on_relaxed_struct=False,
+    stress_wt=1,
 ):
     """Get EV curve."""
     if on_relaxed_struct:
@@ -751,6 +753,7 @@ def ev_curve(
             jarvis_atoms=atoms,
             model_path=model_path,
             model_filename=model_filename,
+            stress_wt=stress_wt,
         )
         relaxed, en, fs = ff.optimize_atoms()
     else:
