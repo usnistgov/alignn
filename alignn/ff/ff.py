@@ -1103,9 +1103,10 @@ def phonons(
     model_filename="best_model.pt",
     on_relaxed_struct=False,
     dim=[2, 2, 2],
-    freq_conversion_factor=33.356,
+    freq_conversion_factor=333.566830,  # ThztoCm-1
     phonopy_bands_figname="phonopy_bands.png",
-    phonopy_dos_figname="phonopy_dos.png",
+    # phonopy_dos_figname="phonopy_dos.png",
+    write_fc=False,
 ):
     """Make Phonon calculation setup."""
     calc = AlignnAtomwiseCalculator(
@@ -1124,7 +1125,7 @@ def phonons(
     bulk = atoms.phonopy_converter()
     phonon = Phonopy(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
     phonon.generate_displacements(distance=0.01)
-    print("Len dis", len(phonon.supercells_with_displacements))
+    # print("Len dis", len(phonon.supercells_with_displacements))
     supercells = phonon.get_supercells_with_displacements()
     # Force calculations by calculator
     set_of_forces = []
@@ -1147,50 +1148,94 @@ def phonons(
             force -= drift_force / forces.shape[0]
         set_of_forces.append(forces)
     phonon.produce_force_constants(forces=set_of_forces)
-    write_FORCE_CONSTANTS(
-        phonon.get_force_constants(), filename="FORCE_CONSTANTS"
-    )
+    if write_fc:
+        write_FORCE_CONSTANTS(
+            phonon.get_force_constants(), filename="FORCE_CONSTANTS"
+        )
 
+    lbls = kpoints.labels
+    lbls_ticks = []
     freqs = []
-    for k in kpoints.kpts:
-        tmp = []
-        for i, freq in enumerate(phonon.get_frequencies(k)):
-            # print("[Phonopy]%3d: %10.5f cm-1" %  (i + 1, freq*33.356))#THz
-            tmp.append(freq * freq_conversion_factor)
-        freqs.append(tmp)
+    tmp_kp = []
+    lbls_x = []
+    count = 0
+    for ii, k in enumerate(kpoints.kpts):
+        k_str = ",".join(map(str, k))
+        if ii == 0:
+            tmp = []
+            for i, freq in enumerate(phonon.get_frequencies(k)):
+                tmp.append(freq)
+            freqs.append(tmp)
+            tmp_kp.append(k_str)
+            lbl = "$" + str(lbls[ii]) + "$"
+            lbls_ticks.append(lbl)
+            lbls_x.append(count)
+            count += 1
+            # lbls_x.append(ii)
+        elif k_str != tmp_kp[-1]:
+            tmp_kp.append(k_str)
+            tmp = []
+            for i, freq in enumerate(phonon.get_frequencies(k)):
+                tmp.append(freq)
+            freqs.append(tmp)
+            lbl = lbls[ii]
+            if lbl != "":
+                lbl = "$" + str(lbl) + "$"
+                lbls_ticks.append(lbl)
+                # lbls_x.append(ii)
+                lbls_x.append(count)
+            count += 1
+    # lbls_x = np.arange(len(lbls_ticks))
 
     freqs = np.array(freqs)
+    freqs = freqs * freq_conversion_factor
+    # print('freqs',freqs,freqs.shape)
+    the_grid = GridSpec(1, 2, width_ratios=[3, 1], wspace=0.0)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(10, 5))
+    plt.subplot(the_grid[0])
     for i in range(freqs.shape[1]):
-        plt.plot(freqs[:, i], c="b")
-    lbls = kpoints.labels
-    lbls_x = np.arange(len(lbls))
-    x_i = []
-    x_j = []
-    for i, j in zip(lbls_x, lbls):
-        if j != "":
-            tmp = "$" + str(j) + "$"
-            x_j.append(tmp)
-            x_i.append(i)
-    plt.xticks(x_i, x_j)
-    # plt.xticks(lbls_x,lbls)
+        plt.plot(freqs[:, i], lw=2, c="b")
+    for i in lbls_x:
+        plt.axvline(x=i, c="black")
+    plt.xticks(lbls_x, lbls_ticks)
+    # print('lbls_x',lbls_x,len(lbls_x))
+    # print('lbls_ticks',lbls_ticks,len(lbls_ticks))
     plt.ylabel("Frequency (cm$^{-1}$)")
-    plt.tight_layout()
-    plt.savefig(phonopy_bands_figname)
-    plt.close()
+    plt.xlim([0, max(lbls_x)])
 
-    phonon.run_mesh([20, 20, 20])
+    phonon.run_mesh([40, 40, 40], is_gamma_center=True, is_mesh_symmetry=False)
     phonon.run_total_dos()
     tdos = phonon._total_dos
 
     # print('tods',tdos._frequencies.shape)
     freqs, ds = tdos.get_dos()
-    # print('tods',tdos.get_dos())
-    dosfig = phonon.plot_total_dos()
-    dosfig.savefig(phonopy_dos_figname)
-    dosfig.close()
+    freqs = np.array(freqs)
+    freqs = freqs * freq_conversion_factor
+    min_freq = -0.05 * freq_conversion_factor
+    max_freq = max(freqs)
+    plt.ylim([min_freq, max_freq])
 
-    # plt.plot(freqs, ds)
-    # plt.close("dos2.png")
+    plt.subplot(the_grid[1])
+    plt.fill_between(
+        ds, freqs, color=(0.2, 0.4, 0.6, 0.6), edgecolor="k", lw=1, y2=0
+    )
+    plt.xlabel("DOS")
+    # plt.plot(ds,freqs)
+    plt.yticks([])
+    plt.xticks([])
+    plt.ylim([min_freq, max_freq])
+    plt.xlim([0, max(ds)])
+    plt.tight_layout()
+    plt.savefig(phonopy_bands_figname)
+    plt.close()
+    # print('freqs',freqs)
+    # print('ds',ds)
+    # print('tods',tdos.get_dos())
+    # dosfig = phonon.plot_total_dos()
+    # dosfig.savefig(phonopy_dos_figname)
+    # dosfig.close()
+
     return phonon
 
 
@@ -1344,13 +1389,14 @@ def ase_phonon(
 
 if __name__ == "__main__":
     atoms = JarvisAtoms.from_dict(
-        get_jid_data(jid="JVASP-1002", dataset="dft_3d")["atoms"]
-        # get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+        # get_jid_data(jid="JVASP-867", dataset="dft_3d")["atoms"]
+        # get_jid_data(jid="JVASP-1002", dataset="dft_3d")["atoms"]
+        get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
     )
     mlearn = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"  # mlearn_path()
     phonons(atoms=atoms, model_path=mlearn, enforce_c_size=3)
-    phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
-    ase_phonon(atoms=atoms, model_path=mlearn)
+    # phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    # ase_phonon(atoms=atoms, model_path=mlearn)
 
 """
 if __name__ == "__main__":
