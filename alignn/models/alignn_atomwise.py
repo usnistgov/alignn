@@ -387,6 +387,8 @@ class ALIGNNAtomWise(nn.Module):
                     retain_graph=True,
                 )[0]
             )
+            if self.config.force_mult_natoms:
+                pair_forces *= g.num_nodes()
 
             # construct force_i = dE / d{r_i}
             # reduce over bonds to get forces on each atom
@@ -418,20 +420,22 @@ class ALIGNNAtomWise(nn.Module):
                 # 1 GPa = 10 kbar
                 # Following Virial stress formula, assuming inital velocity = 0
                 # Save volume as g.gdta['V']?
-                # print('dy',dy.shape)
+                # print('pair_forces',pair_forces.shape)
                 # print('r',r.shape)
-                # print('g.edata["V"]',g.edata["V"].shape)
-                # stress = (
-                #    -1
-                #    * 160.21766208
-                #    * (
-                #        torch.matmul(r.T, dy)
-                #        # / (2 * g.edata["V"])
-                #        / (2 * g.ndata["V"][0])
-                #    )
-                # )
+                # print('g.ndata["V"]',g.ndata["V"].shape)
+                """
+                stress = (
+                   -1
+                   * 160.21766208
+                   * (
+                       torch.matmul(r.T, pair_forces)
+                       # / (2 * g.edata["V"])
+                       / (2 * g.ndata["V"][0])
+                   )
+                )
                 # print("stress1", stress, stress.shape)
                 # print("g.batch_size", g.batch_size)
+                """
                 stresses = []
                 count_edge = 0
                 count_node = 0
@@ -467,17 +471,6 @@ class ALIGNNAtomWise(nn.Module):
 
         if self.classification:
             out = self.softmax(out)
-        if self.config.force_mult_natoms:
-            n_nodes = torch.cat(
-                [
-                    i * torch.ones(i, device=g.device)
-                    for i in g.batch_num_nodes()
-                ]
-            )
-            # print('n_nodes',n_nodes,n_nodes.shape)
-            # print('pair_forces',pair_forces,pair_forces.shape)
-            forces *= n_nodes[:, None]
-            # forces *= g.num_nodes()
         result["out"] = out
         result["grad"] = forces
         result["stresses"] = stress

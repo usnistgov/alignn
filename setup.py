@@ -41,6 +41,7 @@ setuptools.setup(
         "alignn.ff.revised": ["best_model.pt", "config.json"],
         "alignn.ff.fmult_mlearn_only": ["best_model.pt", "config.json"],
         "alignn.ff.alignnff_fd": ["best_model.pt", "config.json"],
+        "alignn.ff.alignnff_fmult": ["best_model.pt", "config.json"],
     },
     scripts=[
         "alignn/pretrained.py",
