@@ -164,6 +164,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         stress_wt=1.0,
         force_multiplier=1.0,
         force_mult_natoms=False,
+        batch_stress=True,
         **kwargs,
     ):
         """Initialize class."""
@@ -201,9 +202,10 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             config["batch_size"] = int(batch_size)
         if epochs is not None:
             config["epochs"] = int(epochs)
-
-        config["model.output_features"] = 1
-
+        if batch_stress is not None:
+            config["model"]["batch_stress"] = batch_stress
+        # config["model.output_features"] = 1
+        # print('config',config["model"])
         import torch
 
         if self.device is None:
@@ -211,7 +213,6 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 "cuda" if torch.cuda.is_available() else "cpu"
             )
         model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config["model"]))
-        # model = ALIGNNAtomWise(config.model)
         model.state_dict()
         model.load_state_dict(
             torch.load(
@@ -272,6 +273,7 @@ class ForceField(object):
         stress_wt=1.0,
         force_multiplier=1.0,
         force_mult_natoms=False,
+        batch_stress=True,
     ):
         """Intialize class."""
         self.jarvis_atoms = jarvis_atoms
@@ -285,6 +287,7 @@ class ForceField(object):
         self.communicator = communicator
         self.logger = logger
         self.stress_wt = stress_wt
+        self.batch_stress = batch_stress
         self.force_multiplier = force_multiplier
         self.force_mult_natoms = force_mult_natoms
         if self.timestep is None:
@@ -315,6 +318,7 @@ class ForceField(object):
                 stress_wt=self.stress_wt,
                 force_multiplier=self.force_multiplier,
                 force_mult_natoms=self.force_mult_natoms,
+                batch_stress=self.batch_stress,
                 # device="cuda" if torch.cuda.is_available() else "cpu",
             )
         )

@@ -59,6 +59,7 @@ from jarvis.db.jsonutils import dumpjson
 import json
 import pprint
 
+# from accelerate import Accelerator
 import os
 import warnings
 
@@ -503,6 +504,9 @@ def train_dgl(
                 train_result.append(info)
                 loss = loss1 + loss2 + loss3 + loss4
                 if config.distributed:
+                    from accelerate import Accelerator
+
+                    accelerator = Accelerator()
                     accelerator.backward(loss)
                 else:
                     loss.backward()
@@ -514,21 +518,42 @@ def train_dgl(
             )
             # dumpjson(filename="Train_results.json", data=train_result)
             scheduler.step()
-            print(
-                "TrainLoss",
-                "Epoch",
-                e,
-                "total",
-                running_loss,
-                "out",
-                mean_out,
-                "atom",
-                mean_atom,
-                "grad",
-                mean_grad,
-                "stress",
-                mean_stress,
-            )
+            if config.distributed:
+                from accelerate import Accelerator
+
+                accelerator = Accelerator()
+                accelerator.print(
+                    "TrainLoss",
+                    "Epoch",
+                    e,
+                    "total",
+                    running_loss,
+                    "out",
+                    mean_out,
+                    "atom",
+                    mean_atom,
+                    "grad",
+                    mean_grad,
+                    "stress",
+                    mean_stress,
+                )
+
+            else:
+                print(
+                    "TrainLoss",
+                    "Epoch",
+                    e,
+                    "total",
+                    running_loss,
+                    "out",
+                    mean_out,
+                    "atom",
+                    mean_atom,
+                    "grad",
+                    mean_grad,
+                    "stress",
+                    mean_stress,
+                )
             history_train.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_train.json"),
@@ -623,7 +648,13 @@ def train_dgl(
                     net.state_dict(),
                     os.path.join(config.output_dir, best_model_name),
                 )
-                print("Saving data for epoch:", e)
+                if config.distributed:
+                    from accelerate import Accelerator
+
+                    accelerator = Accelerator()
+                    accelerator.print("Saving data for epoch:", e)
+                else:
+                    print("Saving data for epoch:", e)
                 dumpjson(
                     filename=os.path.join(
                         config.output_dir, "Train_results.json"
@@ -636,21 +667,41 @@ def train_dgl(
                     ),
                     data=val_result,
                 )
-            print(
-                "ValLoss",
-                "Epoch",
-                e,
-                "total",
-                val_loss,
-                "out",
-                mean_out,
-                "atom",
-                mean_atom,
-                "grad",
-                mean_grad,
-                "stress",
-                mean_stress,
-            )
+            if config.distributed:
+                from accelerate import Accelerator
+
+                accelerator = Accelerator()
+                accelerator.print(
+                    "ValLoss",
+                    "Epoch",
+                    e,
+                    "total",
+                    val_loss,
+                    "out",
+                    mean_out,
+                    "atom",
+                    mean_atom,
+                    "grad",
+                    mean_grad,
+                    "stress",
+                    mean_stress,
+                )
+            else:
+                print(
+                    "ValLoss",
+                    "Epoch",
+                    e,
+                    "total",
+                    val_loss,
+                    "out",
+                    mean_out,
+                    "atom",
+                    mean_atom,
+                    "grad",
+                    mean_grad,
+                    "stress",
+                    mean_stress,
+                )
             history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_val.json"),
@@ -725,7 +776,13 @@ def train_dgl(
             test_result.append(info)
             loss = loss1 + loss2 + loss3 + loss4
             test_loss += loss.item()
-        print("TestLoss", e, test_loss)
+        if config.distributed:
+            from accelerate import Accelerator
+
+            accelerator = Accelerator()
+            accelerator.print("TestLoss", e, test_loss)
+        else:
+            print("TestLoss", e, test_loss)
         dumpjson(
             filename=os.path.join(config.output_dir, "Test_results.json"),
             data=test_result,

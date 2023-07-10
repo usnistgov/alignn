@@ -51,7 +51,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     inner_cutoff: float = 6  # Ansgtrom
     stress_multiplier: float = 1
     add_reverse_forces: bool = False  # will make True as default soon
-    # batch_stress: bool = False
+    batch_stress: bool = True
 
     class Config:
         """Configure model settings behavior."""
@@ -423,42 +423,48 @@ class ALIGNNAtomWise(nn.Module):
                 # print('pair_forces',pair_forces.shape)
                 # print('r',r.shape)
                 # print('g.ndata["V"]',g.ndata["V"].shape)
-                """
-                stress = (
-                   -1
-                   * 160.21766208
-                   * (
-                       torch.matmul(r.T, pair_forces)
-                       # / (2 * g.edata["V"])
-                       / (2 * g.ndata["V"][0])
-                   )
-                )
+                if not self.config.batch_stress:
+                    # print('Not batch_stress')
+                    stress = (
+                        -1
+                        * 160.21766208
+                        * (
+                            torch.matmul(r.T, pair_forces)
+                            # / (2 * g.edata["V"])
+                            / (2 * g.ndata["V"][0])
+                        )
+                    )
                 # print("stress1", stress, stress.shape)
                 # print("g.batch_size", g.batch_size)
-                """
-                stresses = []
-                count_edge = 0
-                count_node = 0
-                for graph_id in range(g.batch_size):
-                    num_edges = g.batch_num_edges()[graph_id]
-                    num_nodes = 0
-                    st = -1 * (
-                        160.21766208
-                        * torch.matmul(
-                            r[count_edge : count_edge + num_edges].T,
-                            pair_forces[count_edge : count_edge + num_edges],
+                else:
+                    # print('Using batch_stress')
+                    stresses = []
+                    count_edge = 0
+                    count_node = 0
+                    for graph_id in range(g.batch_size):
+                        num_edges = g.batch_num_edges()[graph_id]
+                        num_nodes = 0
+                        st = -1 * (
+                            160.21766208
+                            * torch.matmul(
+                                r[count_edge : count_edge + num_edges].T,
+                                pair_forces[
+                                    count_edge : count_edge + num_edges
+                                ],
+                            )
+                            / g.ndata["V"][count_node + num_nodes]
                         )
-                        / g.ndata["V"][count_node + num_nodes]
-                    )
 
-                    count_edge = count_edge + num_edges
-                    num_nodes = g.batch_num_nodes()[graph_id]
-                    count_node = count_node + num_nodes
-                    # print("stresses.append",stresses[-1],stresses[-1].shape)
-                    for n in range(num_nodes):
-                        stresses.append(st)
-                # stress = (stresses)
-                stress = self.config.stress_multiplier * torch.cat(stresses)
+                        count_edge = count_edge + num_edges
+                        num_nodes = g.batch_num_nodes()[graph_id]
+                        count_node = count_node + num_nodes
+                        # print("stresses.append",stresses[-1],stresses[-1].shape)
+                        for n in range(num_nodes):
+                            stresses.append(st)
+                    # stress = (stresses)
+                    stress = self.config.stress_multiplier * torch.cat(
+                        stresses
+                    )
                 # print("stress2", stress, stress.shape)
                 # virial = (
                 #    160.21766208
