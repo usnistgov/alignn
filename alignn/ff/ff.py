@@ -1403,7 +1403,6 @@ if __name__ == "__main__":
         get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
     )
     mlearn = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"  # mlearn_path()
-    # mlearn = "/wrk/knc6/Software/alignn_calc/alignn/alignn/ff/alignnff_fmult/"
     phonons(atoms=atoms, model_path=mlearn, enforce_c_size=3)
     # phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
     # ase_phonon(atoms=atoms, model_path=mlearn)
