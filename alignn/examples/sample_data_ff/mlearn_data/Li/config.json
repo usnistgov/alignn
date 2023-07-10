@@ -56,6 +56,7 @@
         "graphwise_weight": 1.0,
         "gradwise_weight": 10.0,
         "stresswise_weight": 0.0,
+        "force_mult_natoms": true,
         "atomwise_weight": 0.0,
         "link": "identity",
         "zero_inflated": false,

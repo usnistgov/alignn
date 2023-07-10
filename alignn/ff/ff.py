@@ -5,8 +5,6 @@ import os
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
-
-# from ase import Atoms as AseAtoms
 import matplotlib.pyplot as plt
 from jarvis.analysis.thermodynamics.energetics import unary_energy
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
@@ -27,25 +25,29 @@ from ase.md.npt import NPT
 from ase.md.andersen import Andersen
 import ase.calculators.calculator
 from ase.stress import full_3x3_to_voigt_6_stress
-
-# from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
 from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
 from alignn.pretrained import get_prediction
-
-# from jarvis.analysis.defects.surface import Surface
 from jarvis.analysis.structure.spacegroup import (
     Spacegroup3D,
     symmetrically_distinct_miller_indices,
 )
 from jarvis.analysis.interface.zur import make_interface
 from jarvis.analysis.defects.surface import Surface
+from jarvis.core.kpoints import Kpoints3D as Kpoints
 
-# from jarvis.core.kpoints import Kpoints3D as Kpoints
 # from jarvis.core.atoms import get_supercell_dims
+from ase import Atoms as AseAtoms
+from ase.phonons import Phonons
+import matplotlib.pyplot as plt  # noqa
+from jarvis.db.figshare import get_jid_data
+from ase.cell import Cell
+from matplotlib.gridspec import GridSpec
+from sklearn.metrics import mean_absolute_error
+
 
 try:
     from gpaw import GPAW, PW
@@ -55,7 +57,6 @@ plt.switch_backend("agg")
 # from ase.optimize.optimize import Optimizer
 # from ase.io import Trajectory
 # from ase.neighborlist import NeighborList
-# from ase import Atoms
 
 __author__ = "Kamal Choudhary, Brian DeCost, Keith Butler, Lily Major"
 
@@ -73,6 +74,24 @@ def revised_path():
     """Get defaukt model path."""
     dpath = os.path.abspath(
         str(os.path.join(os.path.dirname(__file__), "revised"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
+def mlearn_path():
+    """Get model trained on mlearn path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "fmult_mlearn_only"))
+    )
+    print("model_path", dpath)
+    return dpath
+
+
+def fd_path():
+    """Get model trained on mlearn path."""
+    dpath = os.path.abspath(
+        str(os.path.join(os.path.dirname(__file__), "alignnff_fd"))
     )
     print("model_path", dpath)
     return dpath
@@ -144,7 +163,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         output_dir=None,
         stress_wt=1.0,
         force_multiplier=1.0,
-        force_mult_natoms=True,
+        force_mult_natoms=False,
+        batch_stress=True,
         **kwargs,
     ):
         """Initialize class."""
@@ -182,9 +202,10 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             config["batch_size"] = int(batch_size)
         if epochs is not None:
             config["epochs"] = int(epochs)
-
-        config["model.output_features"] = 1
-
+        if batch_stress is not None:
+            config["model"]["batch_stress"] = batch_stress
+        # config["model.output_features"] = 1
+        # print('config',config["model"])
         import torch
 
         if self.device is None:
@@ -192,7 +213,6 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 "cuda" if torch.cuda.is_available() else "cpu"
             )
         model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config["model"]))
-        # model = ALIGNNAtomWise(config.model)
         model.state_dict()
         model.load_state_dict(
             torch.load(
@@ -252,7 +272,8 @@ class ForceField(object):
         communicator=None,
         stress_wt=1.0,
         force_multiplier=1.0,
-        force_mult_natoms=True,
+        force_mult_natoms=False,
+        batch_stress=True,
     ):
         """Intialize class."""
         self.jarvis_atoms = jarvis_atoms
@@ -266,6 +287,7 @@ class ForceField(object):
         self.communicator = communicator
         self.logger = logger
         self.stress_wt = stress_wt
+        self.batch_stress = batch_stress
         self.force_multiplier = force_multiplier
         self.force_mult_natoms = force_mult_natoms
         if self.timestep is None:
@@ -296,6 +318,7 @@ class ForceField(object):
                 stress_wt=self.stress_wt,
                 force_multiplier=self.force_multiplier,
                 force_mult_natoms=self.force_mult_natoms,
+                batch_stress=self.batch_stress,
                 # device="cuda" if torch.cuda.is_available() else "cpu",
             )
         )
@@ -340,8 +363,9 @@ class ForceField(object):
         optimizer="FIRE",
         trajectory="opt.traj",
         logfile="opt.log",
-        steps=1000,
-        fmax=0.05,
+        steps=500,
+        fmax=0.1,
+        # fmax=0.05,
         optimize_lattice=True,
         interval=1,
     ):
@@ -364,10 +388,15 @@ class ForceField(object):
         if optimize_lattice:
             self.atoms = ExpCellFilter(self.atoms)
         print("OPTIMIZATION")
-        self.dyn = optimizer(
-            self.atoms, trajectory="opt.traj", logfile="opt.log"
-        )
-        self.dyn.attach(self.print_format, interval=interval)
+        if logfile is not None:
+            self.dyn = optimizer(
+                self.atoms, trajectory=trajectory, logfile=logfile
+            )
+        else:
+            self.dyn = optimizer(self.atoms)
+        if interval is not None:
+            self.dyn.attach(self.print_format, interval=interval)
+
         self.dyn.run(fmax=fmax, steps=steps)
         return (
             ase_to_atoms(self.atoms),
@@ -576,6 +605,148 @@ class ForceField(object):
         return ase_to_atoms(self.atoms)
 
 
+def plot_ff_training(out_dir="/wrk/knc6/ALINN_FC/FD_mult/temp_new"):
+    """Plot FF training results."""
+    json_path = os.path.join(out_dir, "history_val.json")
+    v = loadjson(json_path)
+    ens = []
+    fs = []
+    for i in v:
+        ens.append(i[0])
+        fs.append(i[2])
+    the_grid = GridSpec(1, 2)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(12, 5))
+    plt.subplot(the_grid[0])
+    plt.title("(a) Energy")
+    plt.plot(ens)
+    plt.xlabel("Epochs")
+    plt.ylabel("eV")
+    plt.subplot(the_grid[1])
+    plt.title("(b) Forces")
+    plt.plot(fs)
+    plt.xlabel("Epochs")
+    plt.ylabel("eV/A")
+    plt.tight_layout()
+    plt.savefig("history.png")
+    plt.close()
+
+    # Plot val comparison
+    the_grid = GridSpec(1, 2)
+    json_path = os.path.join(out_dir, "Val_results.json")
+    test = loadjson(json_path)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(12, 5))
+    plt.subplot(the_grid[0])
+    xx = []
+    yy = []
+    factor = 1
+    for i in test:
+        for j, k in zip(i["target_out"], i["pred_out"]):
+            xx.append(j)
+            yy.append(k)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Val")
+    print("Baseline MAE: eV", baseline_mae)
+    print("MAE eV", mean_absolute_error(xx, yy))
+
+    plt.plot(xx, yy, ".")
+    plt.ylabel("ALIGNN Energy (eV)")
+    plt.xlabel("DFT Energy (eV)")
+
+    plt.subplot(the_grid[1])
+    xx = []
+    yy = []
+    for i in test:
+        for j, k in zip(i["target_grad"], i["pred_grad"]):
+            for m, n in zip(j, k):
+                xx.append(m)
+                yy.append(n)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Test")
+    print("Baseline MAE: eV/A", baseline_mae)
+    print("MAE eV/A", mean_absolute_error(xx, yy))
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+    plt.ylabel("ALIGNN Force (eV/A)")
+    plt.xlabel("DFT Force (eV/A)")
+    plt.tight_layout()
+    plt.savefig("val.png")
+    plt.close()
+
+    # Plot train comparison
+    the_grid = GridSpec(1, 2)
+    json_path = os.path.join(out_dir, "Train_results.json")
+    test = loadjson(json_path)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(12, 5))
+    plt.subplot(the_grid[0])
+    xx = []
+    yy = []
+    factor = 1
+    for i in test:
+        for j, k in zip(i["target_out"], i["pred_out"]):
+            xx.append(j)
+            yy.append(k)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Train")
+    print("Baseline MAE: eV", baseline_mae)
+    print("MAE eV", mean_absolute_error(xx, yy))
+
+    plt.plot(xx, yy, ".")
+    plt.ylabel("ALIGNN Energy (eV)")
+    plt.xlabel("DFT Energy (eV)")
+
+    plt.subplot(the_grid[1])
+    xx = []
+    yy = []
+    for i in test:
+        for j, k in zip(i["target_grad"], i["pred_grad"]):
+            for m, n in zip(j, k):
+                xx.append(m)
+                yy.append(n)
+    xx = np.array(xx) * factor
+    yy = np.array(yy) * factor
+
+    x_bar = np.mean(xx)
+    baseline_mae = mean_absolute_error(
+        np.array(xx),
+        np.array([x_bar for i in range(len(xx))]),
+    )
+    print("Baseline MAE: eV/A", baseline_mae)
+    print("MAE eV/A", mean_absolute_error(xx, yy))
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+
+    plt.scatter(xx, yy, c="blueviolet", s=10, alpha=0.5)
+    plt.ylabel("ALIGNN Force (eV/A)")
+    plt.xlabel("DFT Force (eV/A)")
+    plt.tight_layout()
+    plt.savefig("train.png")
+    plt.close()
+
+
 def ev_curve(
     atoms=None,
     dx=np.arange(-0.05, 0.05, 0.01),
@@ -583,6 +754,7 @@ def ev_curve(
     model_filename="best_model.pt",
     fig_name="eos.png",
     on_relaxed_struct=False,
+    stress_wt=1,
 ):
     """Get EV curve."""
     if on_relaxed_struct:
@@ -590,6 +762,7 @@ def ev_curve(
             jarvis_atoms=atoms,
             model_path=model_path,
             model_filename=model_filename,
+            stress_wt=stress_wt,
         )
         relaxed, en, fs = ff.optimize_atoms()
     else:
@@ -616,6 +789,7 @@ def ev_curve(
     eos.plot(fig_name)
     print("E", y)
     print("V", vol)
+    plt.close()
     return x, y, eos, kv
 
 
@@ -813,7 +987,7 @@ def get_interface_energy(
     from_conventional_structure=True,
     gpaw_verify=False,
 ):
-    """Get work of adhesion"""
+    """Get work of adhesion."""
     film_surf = Surface(
         film_atoms,
         indices=film_index,
@@ -929,6 +1103,309 @@ def get_interface_energy(
     info["subs_sl"] = het["subs_sl"].to_dict()
     return info
 
+
+def phonons(
+    atoms=None,
+    enforce_c_size=8,
+    line_density=5,
+    model_path=".",
+    model_filename="best_model.pt",
+    on_relaxed_struct=False,
+    dim=[2, 2, 2],
+    freq_conversion_factor=333.566830,  # ThztoCm-1
+    phonopy_bands_figname="phonopy_bands.png",
+    # phonopy_dos_figname="phonopy_dos.png",
+    write_fc=False,
+):
+    """Make Phonon calculation setup."""
+    calc = AlignnAtomwiseCalculator(
+        path=model_path,
+        force_mult_natoms=False,
+        force_multiplier=1,
+        stress_wt=-4800,
+    )
+
+    from phonopy import Phonopy
+    from phonopy.file_IO import (
+        write_FORCE_CONSTANTS,
+    )
+
+    kpoints = Kpoints().kpath(atoms, line_density=line_density)
+    bulk = atoms.phonopy_converter()
+    phonon = Phonopy(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
+    phonon.generate_displacements(distance=0.01)
+    # print("Len dis", len(phonon.supercells_with_displacements))
+    supercells = phonon.get_supercells_with_displacements()
+    # Force calculations by calculator
+    set_of_forces = []
+    disp = 0
+
+    for scell in supercells:
+        ase_atoms = AseAtoms(
+            symbols=scell.get_chemical_symbols(),
+            scaled_positions=scell.get_scaled_positions(),
+            cell=scell.get_cell(),
+            pbc=True,
+        )
+        ase_atoms.calc = calc
+        # energy = ase_atoms.get_potential_energy()
+        forces = np.array(ase_atoms.get_forces())
+        disp = disp + 1
+
+        drift_force = forces.sum(axis=0)
+        for force in forces:
+            force -= drift_force / forces.shape[0]
+        set_of_forces.append(forces)
+    phonon.produce_force_constants(forces=set_of_forces)
+    if write_fc:
+        write_FORCE_CONSTANTS(
+            phonon.get_force_constants(), filename="FORCE_CONSTANTS"
+        )
+
+    lbls = kpoints.labels
+    lbls_ticks = []
+    freqs = []
+    tmp_kp = []
+    lbls_x = []
+    count = 0
+    for ii, k in enumerate(kpoints.kpts):
+        k_str = ",".join(map(str, k))
+        if ii == 0:
+            tmp = []
+            for i, freq in enumerate(phonon.get_frequencies(k)):
+                tmp.append(freq)
+            freqs.append(tmp)
+            tmp_kp.append(k_str)
+            lbl = "$" + str(lbls[ii]) + "$"
+            lbls_ticks.append(lbl)
+            lbls_x.append(count)
+            count += 1
+            # lbls_x.append(ii)
+        elif k_str != tmp_kp[-1]:
+            tmp_kp.append(k_str)
+            tmp = []
+            for i, freq in enumerate(phonon.get_frequencies(k)):
+                tmp.append(freq)
+            freqs.append(tmp)
+            lbl = lbls[ii]
+            if lbl != "":
+                lbl = "$" + str(lbl) + "$"
+                lbls_ticks.append(lbl)
+                # lbls_x.append(ii)
+                lbls_x.append(count)
+            count += 1
+    # lbls_x = np.arange(len(lbls_ticks))
+
+    freqs = np.array(freqs)
+    freqs = freqs * freq_conversion_factor
+    # print('freqs',freqs,freqs.shape)
+    the_grid = GridSpec(1, 2, width_ratios=[3, 1], wspace=0.0)
+    plt.rcParams.update({"font.size": 18})
+    plt.figure(figsize=(10, 5))
+    plt.subplot(the_grid[0])
+    for i in range(freqs.shape[1]):
+        plt.plot(freqs[:, i], lw=2, c="b")
+    for i in lbls_x:
+        plt.axvline(x=i, c="black")
+    plt.xticks(lbls_x, lbls_ticks)
+    # print('lbls_x',lbls_x,len(lbls_x))
+    # print('lbls_ticks',lbls_ticks,len(lbls_ticks))
+    plt.ylabel("Frequency (cm$^{-1}$)")
+    plt.xlim([0, max(lbls_x)])
+
+    phonon.run_mesh([40, 40, 40], is_gamma_center=True, is_mesh_symmetry=False)
+    phonon.run_total_dos()
+    tdos = phonon._total_dos
+
+    # print('tods',tdos._frequencies.shape)
+    freqs, ds = tdos.get_dos()
+    freqs = np.array(freqs)
+    freqs = freqs * freq_conversion_factor
+    min_freq = -0.05 * freq_conversion_factor
+    max_freq = max(freqs)
+    plt.ylim([min_freq, max_freq])
+
+    plt.subplot(the_grid[1])
+    plt.fill_between(
+        ds, freqs, color=(0.2, 0.4, 0.6, 0.6), edgecolor="k", lw=1, y2=0
+    )
+    plt.xlabel("DOS")
+    # plt.plot(ds,freqs)
+    plt.yticks([])
+    plt.xticks([])
+    plt.ylim([min_freq, max_freq])
+    plt.xlim([0, max(ds)])
+    plt.tight_layout()
+    plt.savefig(phonopy_bands_figname)
+    plt.close()
+    # print('freqs',freqs)
+    # print('ds',ds)
+    # print('tods',tdos.get_dos())
+    # dosfig = phonon.plot_total_dos()
+    # dosfig.savefig(phonopy_dos_figname)
+    # dosfig.close()
+
+    return phonon
+
+
+def phonons3(
+    atoms=None,
+    enforce_c_size=8,
+    line_density=5,
+    model_path=".",
+    model_filename="best_model.pt",
+    on_relaxed_struct=False,
+    dim=[2, 2, 2],
+):
+    """Make Phonon3 calculation setup."""
+    from phono3py import Phono3py
+
+    calc = AlignnAtomwiseCalculator(path=model_path)
+
+    # kpoints = Kpoints().kpath(atoms, line_density=line_density)
+    # dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
+    # atoms = cvn.make_supercell([dim[0], dim[1], dim[2]])
+    bulk = atoms.phonopy_converter()
+    phonon = Phono3py(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
+    phonon.generate_displacements(distance=0.03)
+    # disps = phonon.generate_displacements()
+    supercells = phonon.supercells_with_displacements
+    print(
+        "Len dis", len(phonon.supercells_with_displacements), len(supercells)
+    )
+    # Force calculations by calculator
+    set_of_forces = []
+    disp = 0
+
+    for ii, scell in enumerate(supercells):
+        print("scell=", ii)
+        ase_atoms = AseAtoms(
+            symbols=scell.get_chemical_symbols(),
+            scaled_positions=scell.get_scaled_positions(),
+            cell=scell.get_cell(),
+            pbc=True,
+        )
+        ase_atoms.calc = calc
+        # energy = ase_atoms.get_potential_energy()
+        forces = np.array(ase_atoms.get_forces())
+        disp = disp + 1
+        drift_force = forces.sum(axis=0)
+        for force in forces:
+            force -= drift_force / forces.shape[0]
+        set_of_forces.append(forces)
+    # phonon.save("phono3py_disp.yaml")
+    forces = np.array(set_of_forces).reshape(-1, len(phonon.supercell), 3)
+    phonon.forces = forces
+    phonon.produce_fc3()
+    phonon.mesh_numbers = 30
+    phonon.init_phph_interaction()
+    phonon.run_thermal_conductivity(
+        temperatures=range(0, 1001, 10), write_kappa=True
+    )
+    print(phonon.thermal_conductivity.kappa)
+
+
+def ase_phonon(
+    atoms=[],
+    N=2,
+    path=[],
+    jid=None,
+    npoints=100,
+    dataset="dft_3d",
+    delta=0.01,
+    emin=-0.01,
+    use_cvn=True,
+    filename="Atom_phonon.png",
+    ev_file=None,
+    model_path="",
+):
+    """Get phonon bandstructure and DOS using ASE."""
+    calc = AlignnAtomwiseCalculator(path=model_path)
+    # Setup crystal and EMT calculator
+    # atoms = bulk("Al", "fcc", a=4.05)
+
+    # Phonon calculator
+    # N = 7
+    # ev_file = (None,)
+    if jid is not None:
+        atoms = JarvisAtoms.from_dict(
+            get_jid_data(jid=jid, dataset=dataset)["atoms"]
+        )
+        filename = (
+            jid + "_" + atoms.composition.reduced_formula + "_phonon.png"
+        )
+    if use_cvn:
+        spg = Spacegroup3D(atoms)
+        atoms_cvn = spg.conventional_standard_structure
+        # lat_sys = spg.lattice_system
+    else:
+        atoms_cvn = atoms
+    """
+    if ev_file is not None:
+        ev_curve(
+            atoms=atoms_cvn,
+            fig_name=ev_file,
+            model_path=model_path,
+            dx=np.arange(-0.2, 0.2, 0.05),
+        )
+        plt.clf()
+        plt.close()
+    """
+    cell = Cell(atoms_cvn.lattice_mat)
+    path = cell.bandpath(npoints=npoints)
+    print(path)
+    atoms = atoms_cvn.ase_converter()
+
+    ph = Phonons(atoms, calc, supercell=(N, N, N), delta=delta)
+    # ph = Phonons(atoms, EMT(), supercell=(N, N, N), delta=0.05)
+    ph.run()
+
+    # Read forces and assemble the dynamical matrix
+    ph.read(acoustic=True)
+    ph.clean()
+
+    # path = atoms.cell.bandpath("GXULGK", npoints=100)
+    bs = ph.get_band_structure(path)
+
+    dos = ph.get_dos(kpts=(20, 20, 20)).sample_grid(npts=npoints, width=1e-3)
+
+    # Plot the band structure and DOS:
+    fig = plt.figure(1, figsize=(7, 4))
+    ax = fig.add_axes([0.12, 0.07, 0.67, 0.85])
+    # ax = fig.add_axes([0.12, 0.07, 0.67, 0.85])
+    # print (bs)
+    emax = max(bs.energies.flatten()) + 0.01  # 0.1  # 0.035
+    bs.plot(ax=ax, emin=emin, emax=emax, color="blue")
+    dosax = fig.add_axes([0.8, 0.07, 0.17, 0.85])
+    dosax.fill_between(
+        dos.get_weights(),
+        dos.get_energies(),
+        y2=0,
+        color=(0.2, 0.4, 0.6, 0.6),
+        # color="grey",
+        edgecolor="blue",
+        lw=1,
+        where=dos.get_energies() >= emin,
+    )
+    dosax.set_ylim(emin, emax)
+    dosax.set_yticks([])
+    dosax.set_xticks([])
+    dosax.set_xlabel("DOS", fontsize=18)
+    fig.savefig(filename)
+    plt.close()
+    return bs
+
+
+if __name__ == "__main__":
+    atoms = JarvisAtoms.from_dict(
+        # get_jid_data(jid="JVASP-867", dataset="dft_3d")["atoms"]
+        # get_jid_data(jid="JVASP-1002", dataset="dft_3d")["atoms"]
+        get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    )
+    mlearn = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"  # mlearn_path()
+    phonons(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    # phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    # ase_phonon(atoms=atoms, model_path=mlearn)
 
 """
 if __name__ == "__main__":

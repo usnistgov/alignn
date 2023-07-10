@@ -203,6 +203,7 @@ class TrainingConfig(BaseSettings):
     keep_data_order: bool = True
     normalize_graph_level_loss: bool = False
     distributed: bool = False
+    data_parallel: bool = False
     n_early_stopping: Optional[int] = None  # typically 50
     output_dir: str = os.path.abspath(".")  # typically 50
     # alignn_layers: int = 4

@@ -58,6 +58,7 @@
         "stresswise_weight": 0.0,
         "atomwise_weight": 0.0,
         "link": "identity",
+        "force_mult_natoms": true,
         "zero_inflated": false,
         "classification": false
     }
