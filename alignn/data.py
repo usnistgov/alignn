@@ -92,7 +92,9 @@ def load_graphs(
 
     def atoms_to_graph(atoms):
         """Convert structure dict to DGLGraph."""
-        structure = Atoms.from_dict(atoms) if isinstance(atoms, dict) else atoms
+        structure = (
+            Atoms.from_dict(atoms) if isinstance(atoms, dict) else atoms
+        )
         return Graph.atom_dgl_multigraph(
             structure,
             cutoff=cutoff,
@@ -302,8 +304,8 @@ def get_train_val_loaders(
     else:
         d = jdata(dataset) if dataset_array is None else dataset_array
 
-            # for ii, i in enumerate(pc_y):
-            #    d[ii][target] = pc_y[ii].tolist()
+        # for ii, i in enumerate(pc_y):
+        #    d[ii][target] = pc_y[ii].tolist()
 
         dat = []
         if classification_threshold is not None:
