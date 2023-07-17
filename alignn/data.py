@@ -92,7 +92,9 @@ def load_graphs(
 
     def atoms_to_graph(atoms):
         """Convert structure dict to DGLGraph."""
-        structure = Atoms.from_dict(atoms)
+        structure = (
+            Atoms.from_dict(atoms) if isinstance(atoms, dict) else atoms
+        )
         return Graph.atom_dgl_multigraph(
             structure,
             cutoff=cutoff,
@@ -233,7 +235,7 @@ def get_torch_dataset(
 
 def get_train_val_loaders(
     dataset: str = "dft_3d",
-    dataset_array=[],
+    dataset_array=None,
     target: str = "formation_energy_peratom",
     target_atomwise: str = "",
     target_grad: str = "",
@@ -300,13 +302,10 @@ def get_train_val_loaders(
         # print("val", len(val_loader.dataset))
         # print("test", len(test_loader.dataset))
     else:
-        if not dataset_array:
-            d = jdata(dataset)
-        else:
-            d = dataset_array
+        d = jdata(dataset) if dataset_array is None else dataset_array
 
-            # for ii, i in enumerate(pc_y):
-            #    d[ii][target] = pc_y[ii].tolist()
+        # for ii, i in enumerate(pc_y):
+        #    d[ii][target] = pc_y[ii].tolist()
 
         dat = []
         if classification_threshold is not None:
