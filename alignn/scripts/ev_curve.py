@@ -14,7 +14,7 @@ from alignn.ff.ff import (
 
 model_path = alignnff_fmult()
 
-stress_wt = 0.1
+stress_wt = 0.3
 calc = AlignnAtomwiseCalculator(
     path=model_path,
     force_mult_natoms=False,

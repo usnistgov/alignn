@@ -134,6 +134,7 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
 
 def default_path():
     """Get default model path."""
+    # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
     dpath = get_figshare_model_ff(model_name="alignnff_fmult")
     print("model_path", dpath)
     return dpath
@@ -427,7 +428,7 @@ class ForceField(object):
         optimizer="FIRE",
         trajectory="opt.traj",
         logfile="opt.log",
-        steps=500,
+        steps=100,
         fmax=0.1,
         # fmax=0.05,
         optimize_lattice=True,

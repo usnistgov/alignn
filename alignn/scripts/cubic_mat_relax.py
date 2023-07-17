@@ -5,13 +5,13 @@ from tqdm import tqdm
 
 # from jarvis.core.graphs import Graph
 from alignn.ff.ff import (
-    # default_path,
+    default_path,
     #    ev_curve,
     #    surface_energy,
     #    vacancy_formation,
     ForceField,
     #    fd_path,
-    alignnff_fmult,
+    # alignnff_fmult,
     #    get_interface_energy,
 )
 from jarvis.db.jsonutils import loadjson, dumpjson
@@ -20,7 +20,7 @@ from jarvis.db.jsonutils import loadjson, dumpjson
 
 d = loadjson("data_1.json")
 
-model_path = alignnff_fmult()
+model_path = default_path()  # alignnff_fmult()
 print("model_path", model_path)
 # model_path = "/wrk/knc6/ALINN_FC/ALIGNNFF_DB_FD_mult/temp"
 # model_path = "/wrk/knc6/ALINN_FC/ALIGNNFF_DB/temp_new"

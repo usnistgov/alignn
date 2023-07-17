@@ -14,7 +14,7 @@ from matplotlib.gridspec import GridSpec
 
 model_path = alignnff_fmult()
 on_relaxed_struct = (True,)
-stress_wt = 0.1
+stress_wt = 0.3
 calc = AlignnAtomwiseCalculator(
     path=model_path,
     force_mult_natoms=False,
