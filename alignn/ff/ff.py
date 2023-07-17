@@ -79,9 +79,7 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
     """Get ALIGNN-FF torch models from figshare."""
     # https://doi.org/10.6084/m9.figshare.23695695
     if dir_path is None:
-        dir_path = str(
-            os.path.join(os.path.dirname(__file__), model_name + "_v1")
-        )
+        dir_path = str(os.path.join(os.path.dirname(__file__), model_name))
     # cwd=os.getcwd()
     dir_path = os.path.abspath(dir_path)
     if not os.path.exists(dir_path):
@@ -89,9 +87,11 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
     # os.chdir(dir_path)
     url = all_models_ff[model_name]
     zfile = model_name + ".zip"
-    path = str(os.path.join(os.path.dirname(__file__), zfile))
+    path = str(os.path.join(dir_path, zfile))
+    # path = str(os.path.join(os.path.dirname(__file__), zfile))
     print("dir_path", dir_path)
-    if not os.path.exists(dir_path):
+    best_path = os.path.join(dir_path, "best_model.pt")
+    if not os.path.exists(best_path):
         response = requests.get(url, stream=True)
         total_size_in_bytes = int(response.headers.get("content-length", 0))
         block_size = 1024  # 1 Kibibyte
