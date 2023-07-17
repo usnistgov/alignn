@@ -2,6 +2,9 @@
 from ase.md import MDLogger
 from jarvis.core.atoms import Atoms as JarvisAtoms
 import os
+
+# import json
+import requests
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
@@ -38,6 +41,7 @@ from jarvis.analysis.structure.spacegroup import (
 from jarvis.analysis.interface.zur import make_interface
 from jarvis.analysis.defects.surface import Surface
 from jarvis.core.kpoints import Kpoints3D as Kpoints
+import zipfile
 
 # from jarvis.core.atoms import get_supercell_dims
 from ase import Atoms as AseAtoms
@@ -47,7 +51,7 @@ from jarvis.db.figshare import get_jid_data
 from ase.cell import Cell
 from matplotlib.gridspec import GridSpec
 from sklearn.metrics import mean_absolute_error
-
+from tqdm import tqdm
 
 try:
     from gpaw import GPAW, PW
@@ -60,66 +64,126 @@ plt.switch_backend("agg")
 
 __author__ = "Kamal Choudhary, Brian DeCost, Keith Butler, Lily Major"
 
+all_models_ff = {
+    "alignnff_fmult": "https://figshare.com/ndownloader/files/41583585",
+    "alignnff_wt10": "https://figshare.com/ndownloader/files/41583594",
+    "alignnff_fd": "https://figshare.com/ndownloader/files/41583582",
+    "alignnff_wt01": "https://figshare.com/ndownloader/files/41583588",
+    "alignnff_wt1": "https://figshare.com/ndownloader/files/41583591",
+    "fmult_mlearn_only": "https://figshare.com/ndownloader/files/41583597",
+    "revised": "https://figshare.com/ndownloader/files/41583600",
+}
+
+
+def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
+    """Get ALIGNN-FF torch models from figshare."""
+    # https://doi.org/10.6084/m9.figshare.23695695
+    if dir_path is None:
+        dir_path = str(
+            os.path.join(os.path.dirname(__file__), model_name + "_v1")
+        )
+    # cwd=os.getcwd()
+    dir_path = os.path.abspath(dir_path)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    # os.chdir(dir_path)
+    url = all_models_ff[model_name]
+    zfile = model_name + ".zip"
+    path = str(os.path.join(os.path.dirname(__file__), zfile))
+    print("dir_path", dir_path)
+    if not os.path.exists(dir_path):
+        response = requests.get(url, stream=True)
+        total_size_in_bytes = int(response.headers.get("content-length", 0))
+        block_size = 1024  # 1 Kibibyte
+        progress_bar = tqdm(
+            total=total_size_in_bytes, unit="iB", unit_scale=True
+        )
+        with open(path, "wb") as file:
+            for data in response.iter_content(block_size):
+                progress_bar.update(len(data))
+                file.write(data)
+        progress_bar.close()
+        zp = zipfile.ZipFile(path)
+        names = zp.namelist()
+        chks = []
+        cfg = []
+        for i in names:
+            if "best_model.pt" in i:
+                tmp = i
+                chks.append(i)
+            if "config.json" in i:
+                cfg = i
+
+        config = zipfile.ZipFile(path).read(cfg)
+        # print("Loading the zipfile...", zipfile.ZipFile(path).namelist())
+        data = zipfile.ZipFile(path).read(tmp)
+
+        # new_file, filename = tempfile.mkstemp()
+        filename = os.path.join(dir_path, "best_model.pt")
+        with open(filename, "wb") as f:
+            f.write(data)
+        filename = os.path.join(dir_path, "config.json")
+        with open(filename, "wb") as f:
+            f.write(config)
+        os.remove(path)
+    # print("Using model file", url, "from ", chks)
+    # print("Path", os.path.abspath(path))
+    # print("Config", os.path.abspath(cfg))
+    return dir_path
+
 
 def default_path():
     """Get default model path."""
-    dpath = os.path.abspath(
-        str(os.path.join(os.path.dirname(__file__), "alignnff_wt10"))
-    )
+    dpath = get_figshare_model_ff(model_name="alignnff_fmult")
     print("model_path", dpath)
     return dpath
 
 
 def revised_path():
     """Get defaukt model path."""
-    dpath = os.path.abspath(
-        str(os.path.join(os.path.dirname(__file__), "revised"))
-    )
+    dpath = get_figshare_model_ff(model_name="revised")
+    print("model_path", dpath)
+    return dpath
+
+
+def alignnff_fmult():
+    """Get defaukt model path."""
+    dpath = get_figshare_model_ff(model_name="alignnff_fmult")
     print("model_path", dpath)
     return dpath
 
 
 def mlearn_path():
     """Get model trained on mlearn path."""
-    dpath = os.path.abspath(
-        str(os.path.join(os.path.dirname(__file__), "fmult_mlearn_only"))
-    )
+    dpath = get_figshare_model_ff(model_name="fmult_mlearn_only")
     print("model_path", dpath)
     return dpath
 
 
 def fd_path():
-    """Get model trained on mlearn path."""
-    dpath = os.path.abspath(
-        str(os.path.join(os.path.dirname(__file__), "alignnff_fd"))
-    )
+    """Get defaukt model path."""
+    dpath = get_figshare_model_ff(model_name="alignnff_fd")
     print("model_path", dpath)
     return dpath
 
 
 def wt01_path():
     """Get defaukt model path."""
-    dpath = os.path.abspath(
-        str(os.path.join(os.path.dirname(__file__), "alignnff_wt01"))
-    )
+    dpath = get_figshare_model_ff(model_name="alignnff_wt01")
     print("model_path", dpath)
     return dpath
 
 
 def wt1_path():
     """Get defaukt model path."""
-    dpath = os.path.abspath(
-        str(os.path.join(os.path.dirname(__file__), "alignnff_wt1"))
-    )
+    dpath = get_figshare_model_ff(model_name="alignnff_wt1")
     print("model_path", dpath)
     return dpath
 
 
 def wt10_path():
     """Get defaukt model path."""
-    dpath = os.path.abspath(
-        str(os.path.join(os.path.dirname(__file__), "alignnff_wt10"))
-    )
+    dpath = get_figshare_model_ff(model_name="alignnff_wt10")
     print("model_path", dpath)
     return dpath
 
@@ -752,7 +816,7 @@ def ev_curve(
     dx=np.arange(-0.05, 0.05, 0.01),
     model_path=".",
     model_filename="best_model.pt",
-    fig_name="eos.png",
+    # fig_name="eos.png",
     on_relaxed_struct=False,
     stress_wt=1,
 ):
@@ -786,10 +850,10 @@ def ev_curve(
     kv = B / kJ * 1.0e24  # , 'GPa')
     # print("KV", kv)
     # eos.plot(show=True)
-    eos.plot(fig_name)
+    # eos.plot(fig_name)
     print("E", y)
     print("V", vol)
-    plt.close()
+    # plt.close()
     return x, y, eos, kv
 
 
@@ -1397,6 +1461,7 @@ def ase_phonon(
 
 
 if __name__ == "__main__":
+    """
     atoms = JarvisAtoms.from_dict(
         # get_jid_data(jid="JVASP-867", dataset="dft_3d")["atoms"]
         # get_jid_data(jid="JVASP-1002", dataset="dft_3d")["atoms"]
@@ -1404,6 +1469,9 @@ if __name__ == "__main__":
     )
     mlearn = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"  # mlearn_path()
     phonons(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    """
+    ff = get_figshare_model_ff()
+    print("ff", ff)
     # phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
     # ase_phonon(atoms=atoms, model_path=mlearn)
 
