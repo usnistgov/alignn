@@ -173,6 +173,9 @@ The following [notebook](https://colab.research.google.com/github/knc6/jarvis-to
 
 [![name](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)
 
+
+The following [notebook](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb) provides an example of ALIGNN-FF model.
+
 <a name="webapp"></a>
 Web-app
 ------------
@@ -380,12 +383,11 @@ Useful notes (based on some of the queries we received)
 ---------------------------------------------------------
 
 1) If you are using GPUs, make sure you have a compatible dgl-cuda version installed, for example: dgl-cu101 or dgl-cu111, so e.g. `pip install dgl-cu111` .
-2) The undirected graph and its line graph is constructured in `jarvis-tools` package using [jarvis.core.graphs](https://github.com/usnistgov/jarvis/blob/master/jarvis/core/graphs.py#L197)
-3) While comnventional '.cif' and '.pdb' files can be read using jarvis-tools, for complex files you might have to install `cif2cell` and `pytraj` respectively i.e.`pip install cif2cell==2.0.0a3` and `conda install -c ambermd pytraj`.
-4) Make sure you use `batch_size` as 32 or 64 for large datasets, and not 2 as given in the example config file, else it will take much longer to train, and performnce might drop a lot.
-5) Note that `train_folder.py` and `pretrained.py` in alignn folder are actually python executable scripts. So, even if you don't provide absolute path of these scripts, they should work.
-6) Learn about the issue with QM9 results here: https://github.com/usnistgov/alignn/issues/54
-7) Make sure you have `pandas` version as 1.2.3.
+2) While comnventional '.cif' and '.pdb' files can be read using jarvis-tools, for complex files you might have to install `cif2cell` and `pytraj` respectively i.e.`pip install cif2cell==2.0.0a3` and `conda install -c ambermd pytraj`.
+3) Make sure you use `batch_size` as 32 or 64 for large datasets, and not 2 as given in the example config file, else it will take much longer to train, and performnce might drop a lot.
+4) Note that `train_folder.py` and `pretrained.py` in alignn folder are actually python executable scripts. So, even if you don't provide absolute path of these scripts, they should work.
+5) Learn about the issue with QM9 results here: https://github.com/usnistgov/alignn/issues/54
+6) Make sure you have `pandas` version as 1.2.3.
 
 
 <a name="refs"></a>
@@ -398,8 +400,9 @@ References
 4) [Designing High-Tc Superconductors with BCS-inspired Screening, Density Functional Theory and Deep-learning](https://arxiv.org/abs/2205.00060)
 5) [A Deep-learning Model for Fast Prediction of Vacancy Formation in Diverse Materials](https://arxiv.org/abs/2205.08366)
 6) [Graph neural network predictions of metal organic framework CO2 adsorption properties](https://www.sciencedirect.com/science/article/pii/S092702562200163X)
-7) [Rapid Prediction of Phonon Structure and Properties using an Atomistic Line Graph Neural Network (ALIGNN)](https://arxiv.org/abs/2207.12510)
-8) [Unified graph neural network force-field for the periodic table](https://arxiv.org/abs/2209.05554)
+7) [Rapid Prediction of Phonon Structure and Properties using an Atomistic Line Graph Neural Network (ALIGNN)](https://journals.aps.org/prmaterials/abstract/10.1103/PhysRevMaterials.7.023803)
+8) [Unified graph neural network force-field for the periodic table](https://pubs.rsc.org/en/content/articlehtml/2023/dd/d2dd00096b)
+9) [Large Scale Benchmark of Materials Design Methods](https://arxiv.org/abs/2306.11688)
 
 
 Please see detailed publications list [here](https://jarvis-tools.readthedocs.io/en/master/publications.html).
