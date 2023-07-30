@@ -339,6 +339,7 @@ class ForceField(object):
         force_multiplier=1.0,
         force_mult_natoms=False,
         batch_stress=True,
+        device=None,
     ):
         """Intialize class."""
         self.jarvis_atoms = jarvis_atoms
@@ -384,7 +385,7 @@ class ForceField(object):
                 force_multiplier=self.force_multiplier,
                 force_mult_natoms=self.force_mult_natoms,
                 batch_stress=self.batch_stress,
-                # device="cuda" if torch.cuda.is_available() else "cpu",
+                device=device,
             )
         )
 
@@ -1181,6 +1182,7 @@ def phonons(
     phonopy_bands_figname="phonopy_bands.png",
     # phonopy_dos_figname="phonopy_dos.png",
     write_fc=False,
+    device=None,
 ):
     """Make Phonon calculation setup."""
     calc = AlignnAtomwiseCalculator(
@@ -1188,6 +1190,7 @@ def phonons(
         force_mult_natoms=False,
         force_multiplier=1,
         stress_wt=-4800,
+        device=device,
     )
 
     from phonopy import Phonopy
@@ -1321,11 +1324,12 @@ def phonons3(
     model_filename="best_model.pt",
     on_relaxed_struct=False,
     dim=[2, 2, 2],
+    device=None,
 ):
     """Make Phonon3 calculation setup."""
     from phono3py import Phono3py
 
-    calc = AlignnAtomwiseCalculator(path=model_path)
+    calc = AlignnAtomwiseCalculator(path=model_path, device=device)
 
     # kpoints = Kpoints().kpath(atoms, line_density=line_density)
     # dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
@@ -1383,9 +1387,10 @@ def ase_phonon(
     filename="Atom_phonon.png",
     ev_file=None,
     model_path="",
+    device=None,
 ):
     """Get phonon bandstructure and DOS using ASE."""
-    calc = AlignnAtomwiseCalculator(path=model_path)
+    calc = AlignnAtomwiseCalculator(path=model_path, device=device)
     # Setup crystal and EMT calculator
     # atoms = bulk("Al", "fcc", a=4.05)
 
