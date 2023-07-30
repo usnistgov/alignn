@@ -1061,7 +1061,7 @@ def train_dgl(
         test_loss = evaluator.state.metrics["loss"]
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
-    if config.write_predictions and classification:
+    if config.write_predictions and classification and test_loader is not None:
         net.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
@@ -1098,6 +1098,7 @@ def train_dgl(
         config.write_predictions
         and not classification
         and config.model.output_features > 1
+        and test_loader is not None
     ):
         net.eval()
         mem = []
@@ -1128,6 +1129,7 @@ def train_dgl(
         config.write_predictions
         and not classification
         and config.model.output_features == 1
+        and test_loader is not None
     ):
         net.eval()
         f = open(
