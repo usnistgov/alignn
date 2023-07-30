@@ -1032,13 +1032,13 @@ def train_dgl(
 
             def es_score(engine):
                 """Higher accuracy is better."""
-                engine.state.metrics["accuracy"]
+                return engine.state.metrics["accuracy"]
 
         else:
 
             def es_score(engine):
                 """Lower MAE is better."""
-                -engine.state.metrics["mae"]
+                return -engine.state.metrics["mae"]
 
         es_handler = EarlyStopping(
             patience=config.n_early_stopping,
