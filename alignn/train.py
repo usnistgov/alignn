@@ -945,13 +945,23 @@ def train_dgl(
             "lr_scheduler": scheduler,
             "trainer": trainer,
         }
+        if classification:
+            def cp_score(engine):
+                """Higher accuracy is better."""
+                return engine.state.metrics["accuracy"]
+        else:
+            def cp_score(engine):
+                """Lower MAE is better."""
+                return -engine.state.metrics["mae"]
+
         handler = Checkpoint(
             to_save,
             DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
             n_saved=2,
             global_step_transform=lambda *_: trainer.state.epoch,
+            score_function=cp_score,
         )
-        trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
+        evaluator.add_event_handler(Events.EPOCH_COMPLETED, handler)
     if config.progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
