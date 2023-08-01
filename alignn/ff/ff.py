@@ -28,6 +28,7 @@ from ase.units import kJ
 
 from alignn.config import TrainingConfig
 from alignn.graphs import Graph
+from alignn.models.alignn import ALIGNN, ALIGNNConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
 from alignn.pretrained import get_prediction
 from jarvis.analysis.defects.surface import Surface
@@ -63,7 +64,7 @@ def ase_to_atoms(ase_atoms):
 ignore_bad_restart_file = AseCalculator._deprecated
 
 
-class AlignnAtomwiseCalculator(AseCalculator):
+class AlignnCalculator(AseCalculator):
     '''Module for ASE Calculator interface.'''
 
     def __init__(
@@ -71,7 +72,7 @@ class AlignnAtomwiseCalculator(AseCalculator):
         restart=None,
         ignore_bad_restart_file=ignore_bad_restart_file,
         label=None,
-        include_stress=True,
+        include_stress=False,
         atoms=None,
         directory='.',
         device=None,
@@ -90,8 +91,13 @@ class AlignnAtomwiseCalculator(AseCalculator):
         **kwargs,
     ):
         '''Initialize class.'''
-        super(AlignnAtomwiseCalculator, self).__init__(
-            restart, ignore_bad_restart_file, label, atoms, directory, **kwargs
+        super(AlignnCalculator, self).__init__(
+            restart,
+            ignore_bad_restart_file,
+            label,
+            atoms,
+            directory,
+            **kwargs
         )
         config = loadjson(os.path.join(path, config_filename))
         self.device = device
@@ -132,20 +138,32 @@ class AlignnAtomwiseCalculator(AseCalculator):
             self.device = torch.device(
                 'cuda' if torch.cuda.is_available() else 'cpu'
             )
-        
-        model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config['model']))
-        # model = ALIGNNAtomWise(config.model)
-        model.state_dict()
-        model.load_state_dict(
-            torch.load(
-                os.path.join(path, model_filename), map_location=self.device
+
+        if config['model']['name'] == 'alignn_atomwise':
+            model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config['model']))
+            # model = ALIGNNAtomWise(config.model)
+            model.state_dict()
+            model.load_state_dict(
+                torch.load(
+                    os.path.join(path, model_filename),
+                    map_location=self.device
+                )
             )
-        )
+        if config['model']['name'] == 'alignn':
+            model = ALIGNN(ALIGNNConfig(**config['model']))
+            model.state_dict()
+            model.load_state_dict(
+                torch.load(
+                    os.path.join(path, model_filename),
+                    map_location=self.device
+                )['model']
+            )
         model.to(device)
         model.eval()
 
         self.net = model
         self.net.to(self.device)
+        self.config = config
 
     def calculate(self, atoms, properties=None, system_changes=None):
         '''Calculate properties.'''
@@ -153,28 +171,43 @@ class AlignnAtomwiseCalculator(AseCalculator):
         num_atoms = j_atoms.num_atoms
         g, lg = Graph.atom_dgl_multigraph(j_atoms)
         result = self.net((g.to(self.device), lg.to(self.device)))
-        # print ('stress',result['stress'].detach().numpy())
-        if self.force_mult_natoms:
-            mult = num_atoms
-        else:
-            mult = 1
-        # print('result['stresses']',result['stresses'],result['stresses'].shape)
-        self.results = {
-            'energy': result['out'].detach().cpu().numpy() * num_atoms,
-            'forces': result['grad'].detach().cpu().numpy()
-            * mult
-            * self.force_multiplier,
-            'stress': full_3x3_to_voigt_6_stress(
-                result['stresses'][:3].reshape(3, 3).detach().cpu().numpy()
-            )
-            * self.stress_wt
-            # * num_atoms,
-            / 160.21766208,
-            'dipole': np.zeros(3),
-            'charges': np.zeros(len(atoms)),
-            'magmom': 0.0,
-            'magmoms': np.zeros(len(atoms)),
-        }
+
+        if self.config['model']['name'] == 'alignn_atomwise':
+            # print ('stress',result['stress'].detach().numpy())
+            if self.force_mult_natoms:
+                mult = num_atoms
+            else:
+                mult = 1
+            #print('result["'"stresses"'"]',
+            #      result['stresses'],
+            #      result['stresses'].shape)
+            self.results = {
+                'energy': result['out'].detach().cpu().numpy() * num_atoms,
+                'forces': result['grad'].detach().cpu().numpy()
+                * mult
+                * self.force_multiplier,
+                'stress': full_3x3_to_voigt_6_stress(
+                    result['stresses'][:3].reshape(3, 3)
+                    .detach().cpu().numpy()
+                )
+                * self.stress_wt
+                # * num_atoms,
+                / 160.21766208,
+                'dipole': np.zeros(3),
+                'charges': np.zeros(len(atoms)),
+                'magmom': 0.0,
+                'magmoms': np.zeros(len(atoms)),
+            }
+
+        if self.config['model']['name'] == 'alignn':
+            self.results = {
+                'energy': result.detach().cpu().numpy() * num_atoms,
+                'forces': 0.0,
+                'dipole': np.zeros(3),
+                'charges': np.zeros(len(atoms)),
+                'magmom': 0.0,
+                'magmoms': np.zeros(len(atoms)),
+            }
 
 
 class ForceField(object):
@@ -230,7 +263,7 @@ class ForceField(object):
         # print (ase_to_atoms(self.atoms))
         # print ()
         self.atoms.set_calculator(
-            AlignnAtomwiseCalculator(
+            AlignnCalculator(
                 path=self.model_path,
                 include_stress=self.include_stress,
                 model_filename=self.model_filename,
@@ -833,9 +866,9 @@ def get_interface_energy(
     if gpaw_verify:
         try:
             from gpaw import GPAW, PW
-        except:
+        except Exception:
             raise
-        
+
         name = 'film'
         calc = GPAW(
             mode=PW(300),  # cutoff
