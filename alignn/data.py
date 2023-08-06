@@ -174,7 +174,7 @@ def get_id_train_val_test(
     # full train/val test split
     # ids = ids[::-1]
     id_train = ids[:n_train]
-    id_val = ids[-(n_val + n_test) : -n_test]  if n_test > 0 else ids[-(n_val + n_test) :] # noqa:E203
+    id_val = ids[-(n_val + n_test) : -n_test] if n_test > 0 else ids[-(n_val + n_test) :]  # noqa:E203
     id_test = ids[-n_test:] if n_test > 0 else []
     return id_train, id_val, id_test
 
@@ -553,8 +553,10 @@ def get_train_val_loaders(
                 torch.save(test_loader, test_sample)
 
     print("n_train:", len(train_loader.dataset))
-    print("n_val  :", len(  val_loader.dataset) if  val_loader is not None else 0)
-    print("n_test :", len( test_loader.dataset) if test_loader is not None else 0)
+    print("n_val  :", len(val_loader.dataset)
+          if val_loader is not None else 0)
+    print("n_test :", len(test_loader.dataset)
+          if test_loader is not None else 0)
     return (
         train_loader,
         val_loader,
