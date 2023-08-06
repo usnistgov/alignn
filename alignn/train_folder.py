@@ -69,6 +69,7 @@ parser.add_argument(
     default=None,
     help="set device for training the model [e.g. cpu, cuda, cuda:2]",
 )
+
 parser.add_argument(
     "--restart_model_path",
     default=None,
