@@ -527,7 +527,7 @@ def get_train_val_loaders(
 
         val_loader = DataLoader(
             val_data,
-            batch_size=1,
+            batch_size=batch_size,
             shuffle=False,
             collate_fn=collate_fn,
             drop_last=True,
