@@ -62,10 +62,6 @@ intf_line = (
 )
 parser.add_argument("--interface_info", default=None, help=intf_line)
 
-parser.add_argument(
-    "--device", default=None, help="set device for executing the model [e.g. cpu, cuda, cuda:2]"
-)
-
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     model_path = args.model_path
@@ -76,7 +72,6 @@ if __name__ == "__main__":
     initial_temperature_K = float(args.initial_temperature_K)
     on_relaxed_struct_yn = args.on_relaxed_struct
     timestep = float(args.timestep)
-    device = args.device
     if on_relaxed_struct_yn.lower() == "yes":
         on_relaxed_struct = True
     else:
@@ -100,7 +95,6 @@ if __name__ == "__main__":
         ff = ForceField(
             jarvis_atoms=atoms,
             model_path=model_path,
-            device=device,
         )
         energy = ff.unrelaxed_atoms()
         print("Energy(eV)", energy)
@@ -108,7 +102,6 @@ if __name__ == "__main__":
         ff = ForceField(
             jarvis_atoms=atoms,
             model_path=model_path,
-            device=device,
         )
         opt, en, fs = ff.optimize_atoms()
         print("initial struct:")
@@ -122,7 +115,6 @@ if __name__ == "__main__":
             jarvis_atoms=atoms,
             model_path=model_path,
             timestep=timestep,
-            device=device,
         )
         nptt = ff.run_nvt_berendsen(
             steps=steps,
@@ -135,7 +127,6 @@ if __name__ == "__main__":
         ff = ForceField(
             jarvis_atoms=atoms,
             model_path=model_path,
-            device=device,
         )
         ev = ev_curve(
             atoms=atoms,
@@ -146,7 +137,6 @@ if __name__ == "__main__":
         ff = ForceField(
             jarvis_atoms=atoms,
             model_path=model_path,
-            device=device,
         )
         vac = vacancy_formation(
             atoms=atoms,
@@ -158,7 +148,6 @@ if __name__ == "__main__":
         ff = ForceField(
             jarvis_atoms=atoms,
             model_path=model_path,
-            device=device,
         )
         surf = surface_energy(
             atoms=atoms,
@@ -208,7 +197,6 @@ if __name__ == "__main__":
             jarvis_atoms=atoms,
             model_path=model_path,
             timestep=timestep,
-            device=device,
         )
         nptt = ff.run_npt_berendsen(
             steps=steps,
@@ -224,7 +212,6 @@ if __name__ == "__main__":
             jarvis_atoms=atoms,
             model_path=model_path,
             timestep=timestep,
-            device=device,
         )
         lang = ff.run_nvt_langevin(
             steps=steps,
@@ -241,7 +228,6 @@ if __name__ == "__main__":
             jarvis_atoms=atoms,
             model_path=model_path,
             timestep=timestep,
-            device=device,
         )
         vv = ff.run_nve_velocity_verlet(
             steps=steps, initial_temperature_K=initial_temperature_K
@@ -255,7 +241,6 @@ if __name__ == "__main__":
             jarvis_atoms=atoms,
             model_path=model_path,
             timestep=timestep,
-            device=device,
         )
         nptt = ff.run_npt_nose_hoover(
             steps=steps,

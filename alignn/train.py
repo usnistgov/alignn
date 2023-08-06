@@ -70,6 +70,11 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 # torch config
 torch.set_default_dtype(torch.float32)
 
+device = "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
+
 def activated_output_transform(output):
     """Exponentiate output."""
     y_pred, y = output
@@ -82,8 +87,8 @@ def make_standard_scalar_and_pca(output):
     """Use standard scalar and PCS for multi-output data."""
     sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
     y_pred, y = output
-    y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=y_pred.device)
-    y = torch.tensor(sc.transform(y.cpu().numpy()), device=y.device)
+    y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
+    y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
     # pc = pk.load(open("pca.pkl", "rb"))
     # y_pred = torch.tensor(pc.transform(y_pred), device=device)
     # y = torch.tensor(pc.transform(y), device=device)
@@ -142,7 +147,6 @@ def train_dgl(
     # checkpoint_dir: Path = Path("./"),
     train_val_test_loaders=[],
     # log_tensorboard: bool = False,
-    device=None,
 ):
     """Training entry point for DGL networks.
 
@@ -176,10 +180,6 @@ def train_dgl(
     if config.random_seed is not None:
         deterministic = True
         ignite.utils.manual_seed(config.random_seed)
-    if device is None:
-        device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
 
     line_graph = False
     alignn_models = {
@@ -242,7 +242,9 @@ def train_dgl(
         val_loader = train_val_test_loaders[1]
         test_loader = train_val_test_loaders[2]
         prepare_batch = train_val_test_loaders[3]
-
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
     if config.distributed:
         print(
             "Using Accelerator, currently experimental, use at your own risk."

@@ -16,6 +16,11 @@ from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
 import torch
 import time
 
+device = "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
+
 parser = argparse.ArgumentParser(
     description="Atomistic Line Graph Neural Network"
 )
@@ -101,9 +106,6 @@ parser.add_argument(
     help="Checkpoint file path for model",
 )
 
-parser.add_argument(
-    "--device", default=None, help="set device for training the model [e.g. cpu, cuda, cuda:2]"
-)
 
 def train_for_folder(
     root_dir="examples/sample_data",
@@ -122,7 +124,6 @@ def train_for_folder(
     # subtract_mean=False,
     # normalize_with_natoms=False,
     output_dir=None,
-    device=None,
 ):
     """Train for a folder."""
     dat = loadjson(os.path.join(root_dir, "id_prop.json"))
@@ -310,7 +311,6 @@ def train_for_folder(
             test_loader,
             prepare_batch,
         ],
-        device=device,
     )
     t2 = time.time()
     print("Time taken (s)", t2 - t1)
@@ -337,5 +337,4 @@ if __name__ == "__main__":
         # subtract_mean=(args.subtract_mean),
         # normalize_with_natoms=(args.normalize_with_natoms),
         file_format=(args.file_format),
-        device=(args.device),
     )
