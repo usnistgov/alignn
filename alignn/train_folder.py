@@ -73,7 +73,6 @@ def train_for_folder(
     epochs=None,
     file_format="poscar",
     output_dir=None,
-    device=None,
 ):
     """Train for a folder."""
     # config_dat=os.path.join(root_dir,config_name)
@@ -192,7 +191,6 @@ def train_for_folder(
             test_loader,
             prepare_batch,
         ],
-        device=device,
     )
     t2 = time.time()
     print("Time taken (s):", t2 - t1)
@@ -211,5 +209,4 @@ if __name__ == "__main__":
         batch_size=(args.batch_size),
         epochs=(args.epochs),
         file_format=(args.file_format),
-        device=(args.device),
     )
