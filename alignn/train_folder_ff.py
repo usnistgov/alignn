@@ -102,8 +102,11 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--device", default=None, help="set device for training the model [e.g. cpu, cuda, cuda:2]"
+    "--device",
+    default=None,
+    help="set device for training the model [e.g. cpu, cuda, cuda:2]"
 )
+
 
 def train_for_folder(
     root_dir="examples/sample_data",
