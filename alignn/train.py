@@ -956,14 +956,22 @@ def train_dgl(
                 """Lower MAE is better."""
                 return -engine.state.metrics["mae"]
 
-        handler = Checkpoint(
+        # save last two epochs
+        evaluator.add_event_handler(Events.EPOCH_COMPLETED, Checkpoint(
             to_save,
             DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
             n_saved=2,
             global_step_transform=lambda *_: trainer.state.epoch,
+        ))
+        # save best model
+        evaluator.add_event_handler(Events.EPOCH_COMPLETED, Checkpoint(
+            to_save,
+            DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
+            filename_pattern='best_model.{ext}',
+            n_saved=1,
+            global_step_transform=lambda *_: trainer.state.epoch,
             score_function=cp_score,
-        )
-        evaluator.add_event_handler(Events.EPOCH_COMPLETED, handler)
+        ))
     if config.progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
