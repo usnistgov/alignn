@@ -345,3 +345,4 @@ if __name__ == "__main__":
         # normalize_with_natoms=(args.normalize_with_natoms),
         file_format=(args.file_format),
     )
+    
