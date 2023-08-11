@@ -90,8 +90,9 @@ def make_standard_scalar_and_pca(output):
     """Use standard scalar and PCS for multi-output data."""
     sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
     y_pred, y = output
-    y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()),
-                          device=y_pred.device)
+    y_pred = torch.tensor(
+        sc.transform(y_pred.cpu().numpy()), device=y_pred.device
+    )
     y = torch.tensor(sc.transform(y.cpu().numpy()), device=y.device)
     # pc = pk.load(open("pca.pkl", "rb"))
     # y_pred = torch.tensor(pc.transform(y_pred), device=device)
@@ -1226,4 +1227,3 @@ if __name__ == "__main__":
         random_seed=123, epochs=10, n_train=32, n_val=32, batch_size=16
     )
     history = train_dgl(config, progress=True)
-    

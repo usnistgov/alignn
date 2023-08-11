@@ -110,7 +110,7 @@ parser.add_argument(
 parser.add_argument(
     "--device",
     default=None,
-    help="set device for training the model [e.g. cpu, cuda, cuda:2]"
+    help="set device for training the model [e.g. cpu, cuda, cuda:2]",
 )
 
 
@@ -345,4 +345,3 @@ if __name__ == "__main__":
         # normalize_with_natoms=(args.normalize_with_natoms),
         file_format=(args.file_format),
     )
-    
