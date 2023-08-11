@@ -62,12 +62,6 @@ intf_line = (
 )
 parser.add_argument("--interface_info", default=None, help=intf_line)
 
-parser.add_argument(
-    "--device",
-    default=None,
-    help="set device for executing the model [e.g. cpu, cuda, cuda:2]"
-)
-
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     model_path = args.model_path

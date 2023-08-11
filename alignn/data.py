@@ -174,8 +174,8 @@ def get_id_train_val_test(
     # full train/val test split
     # ids = ids[::-1]
     id_train = ids[:n_train]
-    id_val = ids[-(n_val + n_test) : -n_test] if n_test > 0 else ids[-(n_val + n_test) :]  # noqa:E203
-    id_test = ids[-n_test:] if n_test > 0 else []
+    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
+    id_test = ids[-n_test:]
     return id_train, id_val, id_test
 
 
@@ -489,7 +489,7 @@ def get_train_val_loaders(
             classification=classification_threshold is not None,
             output_dir=output_dir,
             tmp_name="val_data",
-        ) if len(dataset_val) > 0 else None
+        )
         test_data = get_torch_dataset(
             dataset=dataset_test,
             id_tag=id_tag,
@@ -507,7 +507,7 @@ def get_train_val_loaders(
             classification=classification_threshold is not None,
             output_dir=output_dir,
             tmp_name="test_data",
-        ) if len(dataset_test) > 0 else None
+        )
 
         collate_fn = train_data.collate
         # print("line_graph,line_dih_graph", line_graph, line_dih_graph)
@@ -543,20 +543,14 @@ def get_train_val_loaders(
             drop_last=False,
             num_workers=workers,
             pin_memory=pin_memory,
-        ) if len(dataset_test) > 0 else None
-
+        )
         if save_dataloader:
             torch.save(train_loader, train_sample)
-            if val_loader is not None:
-                torch.save(val_loader, val_sample)
-            if test_loader is not None:
-                torch.save(test_loader, test_sample)
-
+            torch.save(val_loader, val_sample)
+            torch.save(test_loader, test_sample)
     print("n_train:", len(train_loader.dataset))
-    print("n_val  :", len(val_loader.dataset)
-          if val_loader is not None else 0)
-    print("n_test :", len(test_loader.dataset)
-          if test_loader is not None else 0)
+    print("n_val:", len(val_loader.dataset))
+    print("n_test:", len(test_loader.dataset))
     return (
         train_loader,
         val_loader,

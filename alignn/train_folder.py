@@ -57,12 +57,6 @@ parser.add_argument(
     help="Folder to save outputs",
 )
 
-parser.add_argument(
-    "--device",
-    default=None,
-    help="set device for training the model [e.g. cpu, cuda, cuda:2]"
-)
-
 
 def train_for_folder(
     root_dir="examples/sample_data",
