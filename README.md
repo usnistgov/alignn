@@ -101,7 +101,8 @@ python -m pip install -e .
 
 As an alternate method, ALIGNN can also be installed using `pip` command as follows:
 ```
-python -m pip install alignn
+pip install alignn
+pip install dgl==1.0.1+cu117 -f https://data.dgl.ai/wheels/cu117/repo.html
 ```
 
 <a name="example"></a>
