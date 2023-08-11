@@ -59,11 +59,9 @@ from jarvis.db.jsonutils import dumpjson
 import json
 import pprint
 
-
 # from accelerate import Accelerator
 import os
 import warnings
-
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 # from sklearn.decomposition import PCA, KernelPCA
@@ -71,7 +69,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # torch config
 torch.set_default_dtype(torch.float32)
-
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -90,10 +87,8 @@ def make_standard_scalar_and_pca(output):
     """Use standard scalar and PCS for multi-output data."""
     sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
     y_pred, y = output
-    y_pred = torch.tensor(
-        sc.transform(y_pred.cpu().numpy()), device=y_pred.device
-    )
-    y = torch.tensor(sc.transform(y.cpu().numpy()), device=y.device)
+    y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
+    y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
     # pc = pk.load(open("pca.pkl", "rb"))
     # y_pred = torch.tensor(pc.transform(y_pred), device=device)
     # y = torch.tensor(pc.transform(y), device=device)
@@ -952,13 +947,44 @@ def train_dgl(
             "lr_scheduler": scheduler,
             "trainer": trainer,
         }
-        handler = Checkpoint(
-            to_save,
-            DiskSaver(checkpoint_dir, create_dir=True, require_empty=False),
-            n_saved=2,
-            global_step_transform=lambda *_: trainer.state.epoch,
+        if classification:
+
+            def cp_score(engine):
+                """Higher accuracy is better."""
+                return engine.state.metrics["accuracy"]
+
+        else:
+
+            def cp_score(engine):
+                """Lower MAE is better."""
+                return -engine.state.metrics["mae"]
+
+        # save last two epochs
+        evaluator.add_event_handler(
+            Events.EPOCH_COMPLETED,
+            Checkpoint(
+                to_save,
+                DiskSaver(
+                    checkpoint_dir, create_dir=True, require_empty=False
+                ),
+                n_saved=2,
+                global_step_transform=lambda *_: trainer.state.epoch,
+            ),
         )
-        trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
+        # save best model
+        evaluator.add_event_handler(
+            Events.EPOCH_COMPLETED,
+            Checkpoint(
+                to_save,
+                DiskSaver(
+                    checkpoint_dir, create_dir=True, require_empty=False
+                ),
+                filename_pattern="best_model.{ext}",
+                n_saved=1,
+                global_step_transform=lambda *_: trainer.state.epoch,
+                score_function=cp_score,
+            ),
+        )
     if config.progress:
         pbar = ProgressBar()
         pbar.attach(trainer, output_transform=lambda x: {"loss": x})
@@ -1029,13 +1055,13 @@ def train_dgl(
 
             def es_score(engine):
                 """Higher accuracy is better."""
-                engine.state.metrics["accuracy"]
+                return engine.state.metrics["accuracy"]
 
         else:
 
             def es_score(engine):
                 """Lower MAE is better."""
-                -engine.state.metrics["mae"]
+                return -engine.state.metrics["mae"]
 
         es_handler = EarlyStopping(
             patience=config.n_early_stopping,
@@ -1068,7 +1094,7 @@ def train_dgl(
         test_loss = evaluator.state.metrics["loss"]
         tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
         tb_logger.close()
-    if config.write_predictions and classification and test_loader is not None:
+    if config.write_predictions and classification:
         net.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
@@ -1105,7 +1131,6 @@ def train_dgl(
         config.write_predictions
         and not classification
         and config.model.output_features > 1
-        and test_loader is not None
     ):
         net.eval()
         mem = []
@@ -1136,7 +1161,6 @@ def train_dgl(
         config.write_predictions
         and not classification
         and config.model.output_features == 1
-        and test_loader is not None
     ):
         net.eval()
         f = open(
