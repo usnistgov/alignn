@@ -11,6 +11,13 @@ from alignn.train import train_dgl
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
+import glob
+import torch
+
+device = "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
 
 parser = argparse.ArgumentParser(
     description="Atomistic Line Graph Neural Network"
@@ -60,7 +67,12 @@ parser.add_argument(
 parser.add_argument(
     "--device",
     default=None,
-    help="set device for training the model [e.g. cpu, cuda, cuda:2]"
+    help="set device for training the model [e.g. cpu, cuda, cuda:2]",
+)
+parser.add_argument(
+    "--restart_model_path",
+    default=None,
+    help="Checkpoint file path for model",
 )
 
 
@@ -71,6 +83,7 @@ def train_for_folder(
     classification_threshold=None,
     batch_size=None,
     epochs=None,
+    restart_model_path=None,
     file_format="poscar",
     output_dir=None,
 ):
@@ -93,6 +106,22 @@ def train_for_folder(
         config.batch_size = int(batch_size)
     if epochs is not None:
         config.epochs = int(epochs)
+    if restart_model_path is not None:
+        print("Restarting model from:", restart_model_path)
+        from alignn.models.alignn import ALIGNN, ALIGNNConfig
+
+        rest_config = loadjson(os.path.join(restart_model_path, "config.json"))
+        print("rest_config", rest_config)
+        model = ALIGNN(ALIGNNConfig(**rest_config["model"]))
+        chk_glob = os.path.join(restart_model_path, "*.pt")
+        tmp = "na"
+        for i in glob.glob(chk_glob):
+            tmp = i
+        print("Checkpoint file", tmp)
+        model.load_state_dict(torch.load(tmp, map_location=device)["model"])
+        model.to(device)
+    else:
+        model = None
     with open(id_prop_dat, "r") as f:
         reader = csv.reader(f)
         data = [row for row in reader]
@@ -185,6 +214,7 @@ def train_for_folder(
     t1 = time.time()
     train_dgl(
         config,
+        model,
         train_val_test_loaders=[
             train_loader,
             val_loader,
@@ -209,4 +239,5 @@ if __name__ == "__main__":
         batch_size=(args.batch_size),
         epochs=(args.epochs),
         file_format=(args.file_format),
+        restart_model_path=(args.restart_model_path),
     )

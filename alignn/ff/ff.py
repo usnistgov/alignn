@@ -64,6 +64,12 @@ plt.switch_backend("agg")
 
 __author__ = "Kamal Choudhary, Brian DeCost, Keith Butler, Lily Major"
 
+scf_fd_top_10_en_42_fmax_600_wt01 = (
+    "https://figshare.com/ndownloader/files/41967375"
+)
+scf_fd_top_10_en_42_fmax_600_wt10 = (
+    "https://figshare.com/ndownloader/files/41967372"
+)
 all_models_ff = {
     "alignnff_fmult": "https://figshare.com/ndownloader/files/41583585",
     "alignnff_wt10": "https://figshare.com/ndownloader/files/41583594",
@@ -72,6 +78,8 @@ all_models_ff = {
     "alignnff_wt1": "https://figshare.com/ndownloader/files/41583591",
     "fmult_mlearn_only": "https://figshare.com/ndownloader/files/41583597",
     "revised": "https://figshare.com/ndownloader/files/41583600",
+    "scf_fd_top_10_en_42_fmax_600_wt01": scf_fd_top_10_en_42_fmax_600_wt01,
+    "scf_fd_top_10_en_42_fmax_600_wt10": scf_fd_top_10_en_42_fmax_600_wt10,
 }
 
 

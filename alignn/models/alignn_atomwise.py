@@ -15,6 +15,7 @@ from pydantic.typing import Literal
 from torch import nn
 from torch.nn import functional as F
 from alignn.models.utils import RBFExpansion
+from alignn.graphs import compute_bond_cosines
 from alignn.utils import BaseSettings
 
 
@@ -51,6 +52,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     inner_cutoff: float = 6  # Ansgtrom
     stress_multiplier: float = 1
     add_reverse_forces: bool = False  # will make True as default soon
+    lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
 
     class Config:
@@ -328,6 +330,13 @@ class ALIGNNAtomWise(nn.Module):
         r = g.edata["r"]
         if self.config.calculate_gradient:
             r.requires_grad_(True)
+        if self.config.lg_on_fly and len(self.alignn_layers) > 0:
+            # re-compute bond angle cosines here to ensure
+            # the three-body interactions are fully included
+            # in the autograd graph. don't rely on dataloader/caching.
+            lg.ndata["r"] = r  # overwrites precomputed r values
+            lg.apply_edges(compute_bond_cosines)  # overwrites precomputed h
+            z = self.angle_embedding(lg.edata.pop("h"))
 
         # r = g.edata["r"].clone().detach().requires_grad_(True)
         bondlength = torch.norm(r, dim=1)

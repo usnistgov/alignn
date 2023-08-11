@@ -110,7 +110,7 @@ parser.add_argument(
 parser.add_argument(
     "--device",
     default=None,
-    help="set device for training the model [e.g. cpu, cuda, cuda:2]"
+    help="set device for training the model [e.g. cpu, cuda, cuda:2]",
 )
 
 
@@ -218,22 +218,28 @@ def train_for_folder(
 
     model = None
     if restart_model_path is not None:
+        # Should be best_model.pt file
         print("Restarting the model training:", restart_model_path)
         if config.model.name == "alignn_atomwise":
-            tmp = ALIGNNAtomWiseConfig(
-                name="alignn_atomwise",
-                output_features=config.model.output_features,
-                alignn_layers=config.model.alignn_layers,
-                atomwise_weight=config.model.atomwise_weight,
-                stresswise_weight=config.model.stresswise_weight,
-                graphwise_weight=config.model.graphwise_weight,
-                gradwise_weight=config.model.gradwise_weight,
-                gcn_layers=config.model.gcn_layers,
-                atom_input_features=config.model.atom_input_features,
-                edge_input_features=config.model.edge_input_features,
-                triplet_input_features=config.model.triplet_input_features,
-                embedding_features=config.model.embedding_features,
+            rest_config = loadjson(
+                restart_model_path.replace("best_model.pt", "config.json")
             )
+
+            tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
+            # tmp = ALIGNNAtomWiseConfig(
+            #    name="alignn_atomwise",
+            #    output_features=config.model.output_features,
+            #    alignn_layers=config.model.alignn_layers,
+            #    atomwise_weight=config.model.atomwise_weight,
+            #    stresswise_weight=config.model.stresswise_weight,
+            #    graphwise_weight=config.model.graphwise_weight,
+            #    gradwise_weight=config.model.gradwise_weight,
+            #    gcn_layers=config.model.gcn_layers,
+            #    atom_input_features=config.model.atom_input_features,
+            #    edge_input_features=config.model.edge_input_features,
+            #    triplet_input_features=config.model.triplet_input_features,
+            #    embedding_features=config.model.embedding_features,
+            # )
             print("Rest config", tmp)
             # for i,j in config_dict['model'].items():
             #    print ('i',i)
