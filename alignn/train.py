@@ -787,6 +787,11 @@ def train_dgl(
             filename=os.path.join(config.output_dir, "Test_results.json"),
             data=test_result,
         )
+        last_model_name = "last_model.pt"
+        torch.save(
+            net.state_dict(),
+            os.path.join(config.output_dir, last_model_name),
+        )
         return test_result
 
     if config.distributed:
