@@ -276,6 +276,7 @@ class Graph(object):
         use_canonize: bool = False,
     ):
         """Obtain a DGLGraph for Atoms object."""
+        # print('id',id)
         if neighbor_strategy == "k-nearest":
             edges = nearest_neighbor_edges(
                 atoms=atoms,

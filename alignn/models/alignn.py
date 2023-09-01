@@ -292,20 +292,18 @@ class ALIGNN(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
-            if self.config.extra_features != 0:
-                g, lg = g
-                features = g.ndata["extra_features"]
-                # print('g',g)
-                # print('features1',features.shape)
-                features = self.extra_feature_embedding(features)
-                # print('features2',features.shape)
+            # print('features2',features.shape)
 
-            else:
-                g, lg = g
+            g, lg = g
             lg = lg.local_var()
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
+        if self.config.extra_features != 0:
+            features = g.ndata["extra_features"]
+            # print('g',g)
+            # print('features1',features.shape)
+            features = self.extra_feature_embedding(features)
 
         g = g.local_var()
         # initial node features: atom feature network...
