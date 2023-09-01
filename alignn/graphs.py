@@ -314,6 +314,13 @@ class Graph(object):
         vol = atoms.volume
         g.ndata["V"] = torch.tensor([vol for ii in range(atoms.num_atoms)])
         g.ndata["coords"] = torch.tensor(atoms.cart_coords)
+        lattice_prop = np.array(
+            [atoms.lattice.lat_lengths(), atoms.lattice.lat_angles()]
+        ).flatten()
+        # print('lattice_prop',lattice_prop)
+        g.ndata["extra_features"] = torch.tensor(
+            [lattice_prop for ii in range(atoms.num_atoms)]
+        ).type(torch.get_default_dtype())
         # print("g", g)
         # g.edata["V"] = torch.tensor(
         #    [vol for ii in range(g.num_edges())]
