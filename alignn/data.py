@@ -77,7 +77,7 @@ def load_graphs(
     cachedir: Optional[Path] = None,
     use_canonize: bool = False,
     id_tag="jid",
-    extra_feats_json=None,
+    # extra_feats_json=None,
 ):
     """Construct crystal graphs.
 
@@ -118,6 +118,7 @@ def load_graphs(
         # print('dataset',dataset,type(dataset))
         print("Converting to graphs!")
         graphs = []
+        # columns=dataset.columns
         for ii, i in tqdm(dataset.iterrows()):
             # print('iooooo',i)
             atoms = i["atoms"]
@@ -134,10 +135,13 @@ def load_graphs(
                 neighbor_strategy=neighbor_strategy,
                 id=i[id_tag],
             )
+            # print ('ii',ii)
             if "extra_features" in i:
-                g.ndata["extra_features"] = torch.tensor(extra_features).type(
-                    torch.get_default_dtype()
-                )
+                natoms = len(atoms["elements"])
+                # if "extra_features" in columns:
+                g.ndata["extra_features"] = torch.tensor(
+                    [i["extra_features"] for n in range(natoms)]
+                ).type(torch.get_default_dtype())
             graphs.append(g)
 
         # df = pd.DataFrame(dataset)

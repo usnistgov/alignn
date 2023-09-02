@@ -290,6 +290,7 @@ class ALIGNNAtomWise(nn.Module):
             self.extra_feature_embedding = MLPLayer(
                 config.extra_features, config.extra_features
             )
+            # print('config.output_features',config.output_features)
             self.fc3 = nn.Linear(
                 config.hidden_features + config.extra_features,
                 config.output_features,
@@ -391,6 +392,7 @@ class ALIGNNAtomWise(nn.Module):
                 h = self.fc1(h)
                 h = self.fc2(h)
                 out = self.fc3(h)
+                # print('out',out)
             else:
                 out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
