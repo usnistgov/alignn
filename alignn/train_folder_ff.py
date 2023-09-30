@@ -187,7 +187,8 @@ def train_for_folder(
         if train_stress:
             info["stresses"] = i[stresswise_key]  # - mean_force
             target_stress = "stresses"
-
+        if "extra_features" in i:
+            info["extra_features"] = i["extra_features"]
         info["atoms"] = i["atoms"]
         info["jid"] = i[id_key]
         dataset.append(info)
@@ -215,6 +216,7 @@ def train_for_folder(
         lists_length_equal = False not in [
             len(i) == len(n_outputs[0]) for i in n_outputs
         ]
+        print("lists_length_equal", lists_length_equal)
 
     model = None
     if restart_model_path is not None:
@@ -263,16 +265,16 @@ def train_for_folder(
             model = model.to(device)
 
     # print ('n_outputs',n_outputs[0])
-    if multioutput and classification_threshold is not None:
-        raise ValueError("Classification for multi-output not implemented.")
-    if multioutput and lists_length_equal:
-        config.model.output_features = len(n_outputs[0])
-    else:
-        # TODO: Pad with NaN
-        if not lists_length_equal:
-            raise ValueError("Make sure the outputs are of same size.")
-        else:
-            config.model.output_features = 1
+    # if multioutput and classification_threshold is not None:
+    #    raise ValueError("Classification for multi-output not implemented.")
+    # if multioutput and lists_length_equal:
+    #    config.model.output_features = len(n_outputs[0])
+    # else:
+    #    # TODO: Pad with NaN
+    #    if not lists_length_equal:
+    #        raise ValueError("Make sure the outputs are of same size.")
+    #    else:
+    #        config.model.output_features = 1
     # print('config.neighbor_strategy',config.neighbor_strategy)
     # import sys
     # sys.exit()

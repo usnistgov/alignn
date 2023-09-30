@@ -40,6 +40,7 @@ class ALIGNNConfig(BaseSettings):
     zero_inflated: bool = False
     classification: bool = False
     num_classes: int = 2
+    extra_features: int = 0
 
     class Config:
         """Configure model settings behavior."""
@@ -135,7 +136,9 @@ class ALIGNNConv(nn.Module):
     """Line graph update."""
 
     def __init__(
-        self, in_features: int, out_features: int,
+        self,
+        in_features: int,
+        out_features: int,
     ):
         """Set up ALIGNN parameters."""
         super().__init__()
@@ -195,6 +198,7 @@ class ALIGNN(nn.Module):
         """Initialize class with number of input features, conv layers."""
         super().__init__()
         # print(config)
+        self.config = config
         self.classification = config.classification
 
         self.atom_embedding = MLPLayer(
@@ -202,13 +206,19 @@ class ALIGNN(nn.Module):
         )
 
         self.edge_embedding = nn.Sequential(
-            RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_input_features,),
+            RBFExpansion(
+                vmin=0,
+                vmax=8.0,
+                bins=config.edge_input_features,
+            ),
             MLPLayer(config.edge_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
         )
         self.angle_embedding = nn.Sequential(
             RBFExpansion(
-                vmin=-1, vmax=1.0, bins=config.triplet_input_features,
+                vmin=-1,
+                vmax=1.0,
+                bins=config.triplet_input_features,
             ),
             MLPLayer(config.triplet_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
@@ -216,7 +226,10 @@ class ALIGNN(nn.Module):
 
         self.alignn_layers = nn.ModuleList(
             [
-                ALIGNNConv(config.hidden_features, config.hidden_features,)
+                ALIGNNConv(
+                    config.hidden_features,
+                    config.hidden_features,
+                )
                 for idx in range(config.alignn_layers)
             ]
         )
@@ -230,12 +243,32 @@ class ALIGNN(nn.Module):
         )
 
         self.readout = AvgPooling()
-
+        self.readout_feat = AvgPooling()
         if self.classification:
             self.fc = nn.Linear(config.hidden_features, config.num_classes)
             self.softmax = nn.LogSoftmax(dim=1)
         else:
             self.fc = nn.Linear(config.hidden_features, config.output_features)
+
+        if config.extra_features != 0:
+            # Credit for extra_features work:
+            # Gong et al., https://doi.org/10.48550/arXiv.2208.05039
+            self.extra_feature_embedding = MLPLayer(
+                config.extra_features, config.extra_features
+            )
+            self.fc3 = nn.Linear(
+                config.hidden_features + config.extra_features,
+                config.output_features,
+            )
+            self.fc1 = MLPLayer(
+                config.extra_features + config.hidden_features,
+                config.extra_features + config.hidden_features,
+            )
+            self.fc2 = MLPLayer(
+                config.extra_features + config.hidden_features,
+                config.extra_features + config.hidden_features,
+            )
+
         self.link = None
         self.link_name = config.link
         if config.link == "identity":
@@ -259,17 +292,25 @@ class ALIGNN(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
+            # print('features2',features.shape)
+
             g, lg = g
             lg = lg.local_var()
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
+        if self.config.extra_features != 0:
+            features = g.ndata["extra_features"]
+            # print('g',g)
+            # print('features1',features.shape)
+            features = self.extra_feature_embedding(features)
 
         g = g.local_var()
-
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
+        # print('x1',x.shape)
         x = self.atom_embedding(x)
+        # print('x2',x.shape)
 
         # initial bond features
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
@@ -285,7 +326,22 @@ class ALIGNN(nn.Module):
 
         # norm-activation-pool-classify
         h = self.readout(g, x)
-        out = self.fc(h)
+        # print('h',h.shape)
+        # print('features',features.shape)
+        if self.config.extra_features != 0:
+            h_feat = self.readout_feat(g, features)
+            # print('h1',h.shape)
+            # print('h_feat',h_feat.shape)
+            h = torch.cat((h, h_feat), 1)
+            # print('h2',h.shape)
+
+            h = self.fc1(h)
+
+            h = self.fc2(h)
+
+            out = self.fc3(h)
+        else:
+            out = self.fc(h)
 
         if self.link:
             out = self.link(out)

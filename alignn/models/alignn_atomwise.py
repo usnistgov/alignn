@@ -54,6 +54,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     add_reverse_forces: bool = False  # will make True as default soon
     lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
+    extra_features: int = 0
 
     class Config:
         """Configure model settings behavior."""
@@ -281,6 +282,28 @@ class ALIGNNAtomWise(nn.Module):
         )
 
         self.readout = AvgPooling()
+
+        if config.extra_features != 0:
+            self.readout_feat = AvgPooling()
+            # Credit for extra_features work:
+            # Gong et al., https://doi.org/10.48550/arXiv.2208.05039
+            self.extra_feature_embedding = MLPLayer(
+                config.extra_features, config.extra_features
+            )
+            # print('config.output_features',config.output_features)
+            self.fc3 = nn.Linear(
+                config.hidden_features + config.extra_features,
+                config.output_features,
+            )
+            self.fc1 = MLPLayer(
+                config.extra_features + config.hidden_features,
+                config.extra_features + config.hidden_features,
+            )
+            self.fc2 = MLPLayer(
+                config.extra_features + config.hidden_features,
+                config.extra_features + config.hidden_features,
+            )
+
         if config.atomwise_output_features > 0:
             # if config.atomwise_output_features is not None:
             self.fc_atomwise = nn.Linear(
@@ -320,6 +343,10 @@ class ALIGNNAtomWise(nn.Module):
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
+        if self.config.extra_features != 0:
+            features = g.ndata["extra_features"]
+            # print('features',features,features.shape)
+            features = self.extra_feature_embedding(features)
 
         g = g.local_var()
         result = {}
@@ -358,7 +385,16 @@ class ALIGNNAtomWise(nn.Module):
         if self.config.output_features is not None:
             h = self.readout(g, x)
             out = self.fc(h)
-            out = torch.squeeze(out)
+            if self.config.extra_features != 0:
+                h_feat = self.readout_feat(g, features)
+                # print('h_feat',h_feat)
+                h = torch.cat((h, h_feat), 1)
+                h = self.fc1(h)
+                h = self.fc2(h)
+                out = self.fc3(h)
+                # print('out',out)
+            else:
+                out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
         if (
             self.config.atomwise_output_features > 0
