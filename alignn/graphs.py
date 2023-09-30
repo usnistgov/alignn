@@ -158,9 +158,92 @@ def build_undirected_edgedata(
 
     return u, v, r
 
+def radius_graph(
+    atoms=None,
+    cutoff=5,
+    bond_tol=0.5,
+    id=None,
+    atol=1e-5,
+):
+    def temp_graph(cutoff=5):
+        print(atoms)
+        """Construct edge list for radius graph."""
+        cart_coords = torch.tensor(atoms.cart_coords).type(
+            torch.get_default_dtype()
+        )
+        frac_coords = torch.tensor(atoms.frac_coords).type(
+            torch.get_default_dtype()
+        )
+        lattice_mat = torch.tensor(atoms.lattice_mat).type(
+            torch.get_default_dtype()
+        )
+        # elements = atoms.elements
+        X_src = cart_coords
+        num_atoms = X_src.shape[0]
+        # determine how many supercells are needed for the cutoff radius
+        recp = 2 * math.pi * torch.linalg.inv(lattice_mat).T
+        recp_len = torch.tensor(
+            [i for i in (torch.sqrt(torch.sum(recp**2, dim=1)))]
+        )
+        maxr = torch.ceil((cutoff + bond_tol) * recp_len / (2 * math.pi))
+        nmin = torch.floor(torch.min(frac_coords, dim=0)[0]) - maxr
+        nmax = torch.ceil(torch.max(frac_coords, dim=0)[0]) + maxr
+        # construct the supercell index list
+
+        all_ranges = [
+            torch.arange(x, y, dtype=torch.get_default_dtype())
+            for x, y in zip(nmin, nmax)
+        ]
+        cell_images = torch.cartesian_prod(*all_ranges)
+
+        # tile periodic images into X_dst
+        # index id_dst into X_dst maps to atom id as id_dest % num_atoms
+        X_dst = (cell_images @ lattice_mat)[:, None, :] + X_src
+        X_dst = X_dst.reshape(-1, 3)
+        # pairwise distances between atoms in (0,0,0) cell
+        # and atoms in all periodic image
+        dist = torch.cdist(
+            X_src, X_dst, compute_mode="donot_use_mm_for_euclid_dist"
+        )
+        # u, v = torch.nonzero(dist <= cutoff, as_tuple=True)
+        # print("u1v1", u, v, u.shape, v.shape)
+        neighbor_mask = torch.bitwise_and(
+            dist <= cutoff,
+            ~torch.isclose(
+                dist,
+                torch.tensor([0]).type(torch.get_default_dtype()),
+                atol=atol,
+            ),
+        )
+        # get node indices for edgelist from neighbor mask
+        u, v = torch.where(neighbor_mask)
+        # print("u2v2", u, v, u.shape, v.shape)
+        # print("v1", v, v.shape)
+        # print("v2", v % num_atoms, (v % num_atoms).shape)
+
+        r = (X_dst[v] - X_src[u]).float()
+        # gk = dgl.knn_graph(X_dst, 12)
+        # print("r", r, r.shape)
+        # print("gk", gk)
+        v = v % num_atoms
+        g = dgl.graph((u, v))
+        return g, u, v, r
+    g, u, v, r = temp_graph(cutoff)
+    while (g.num_nodes()) != len(atoms.elements):
+        try:
+            cutoff += 0.5
+            g, u, v, r = temp_graph(cutoff)
+            print("cutoff", cutoff)
+
+        except:
+            pass
+        return u, v, r
+
+    return u, v, r
+
 
 ###
-def radius_graph(
+def radius_graph_old(
     atoms=None,
     cutoff=5,
     bond_tol=0.5,
