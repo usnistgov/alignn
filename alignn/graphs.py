@@ -164,9 +164,10 @@ def radius_graph(
     bond_tol=0.5,
     id=None,
     atol=1e-5,
+    cutoff_extra=3.5,
 ):
     def temp_graph(cutoff=5):
-        print(atoms)
+        
         """Construct edge list for radius graph."""
         cart_coords = torch.tensor(atoms.cart_coords).type(
             torch.get_default_dtype()
@@ -231,9 +232,10 @@ def radius_graph(
     g, u, v, r = temp_graph(cutoff)
     while (g.num_nodes()) != len(atoms.elements):
         try:
-            cutoff += 0.5
+            cutoff += cutoff_extra
             g, u, v, r = temp_graph(cutoff)
-            print("cutoff", cutoff)
+            print("cutoff", id, cutoff)
+            print(atoms)
 
         except:
             pass
