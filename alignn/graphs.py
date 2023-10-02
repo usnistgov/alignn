@@ -167,6 +167,7 @@ def radius_graph(
     atol=1e-5,
     cutoff_extra=3.5,
 ):
+    """Construct edge list for radius graph."""
     def temp_graph(cutoff=5):
         """Construct edge list for radius graph."""
         cart_coords = torch.tensor(atoms.cart_coords).type(
