@@ -20,6 +20,7 @@ setuptools.setup(
         "jarvis-tools>=2021.07.19",
         "torch>=1.8",
         "dgl>=0.6.0",
+        "spglib==2.0.2",
         "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",
         "tqdm>=4.60.0",
