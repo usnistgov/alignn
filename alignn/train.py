@@ -647,6 +647,11 @@ def train_dgl(
             mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
                 val_result
             )
+            current_model_name = "current_model.pt"
+            torch.save(
+                net.state_dict(),
+                os.path.join(config.output_dir, current_model_name),
+            )
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_model_name = "best_model.pt"

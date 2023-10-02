@@ -142,8 +142,8 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
 
 def default_path():
     """Get default model path."""
-    # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
-    dpath = get_figshare_model_ff(model_name="alignnff_fmult")
+    dpath = get_figshare_model_ff(model_name="alignnff_wt10")
+    # dpath = get_figshare_model_ff(model_name="alignnff_fmult")
     print("model_path", dpath)
     return dpath
 
