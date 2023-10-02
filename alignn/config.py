@@ -199,6 +199,7 @@ class TrainingConfig(BaseSettings):
     use_canonize: bool = True
     num_workers: int = 4
     cutoff: float = 8.0
+    cutoff_extra: float = 3.0
     max_neighbors: int = 12
     keep_data_order: bool = True
     normalize_graph_level_loss: bool = False

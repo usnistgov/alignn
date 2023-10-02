@@ -307,6 +307,7 @@ def train_for_folder(
         use_canonize=config.use_canonize,
         filename=config.filename,
         cutoff=config.cutoff,
+        cutoff_extra=config.cutoff_extra,
         max_neighbors=config.max_neighbors,
         output_features=config.model.output_features,
         classification_threshold=config.classification_threshold,

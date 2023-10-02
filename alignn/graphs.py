@@ -168,6 +168,7 @@ def radius_graph(
     cutoff_extra=3.5,
 ):
     """Construct edge list for radius graph."""
+
     def temp_graph(cutoff=5):
         """Construct edge list for radius graph."""
         cart_coords = torch.tensor(atoms.cart_coords).type(
@@ -363,6 +364,7 @@ class Graph(object):
         compute_line_graph: bool = True,
         use_canonize: bool = False,
         use_lattice_prop: bool = False,
+        cutoff_extra=3.5,
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
@@ -379,7 +381,9 @@ class Graph(object):
             # print('HERE')
             # import sys
             # sys.exit()
-            u, v, r = radius_graph(atoms, cutoff=cutoff)
+            u, v, r = radius_graph(
+                atoms, cutoff=cutoff, cutoff_extra=cutoff_extra
+            )
         else:
             raise ValueError("Not implemented yet", neighbor_strategy)
         # elif neighbor_strategy == "voronoi":
