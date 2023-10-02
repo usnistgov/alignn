@@ -158,6 +158,7 @@ def build_undirected_edgedata(
 
     return u, v, r
 
+
 def radius_graph(
     atoms=None,
     cutoff=5,
@@ -167,7 +168,6 @@ def radius_graph(
     cutoff_extra=3.5,
 ):
     def temp_graph(cutoff=5):
-        
         """Construct edge list for radius graph."""
         cart_coords = torch.tensor(atoms.cart_coords).type(
             torch.get_default_dtype()
@@ -229,6 +229,7 @@ def radius_graph(
         v = v % num_atoms
         g = dgl.graph((u, v))
         return g, u, v, r
+
     g, u, v, r = temp_graph(cutoff)
     while (g.num_nodes()) != len(atoms.elements):
         try:
@@ -237,7 +238,8 @@ def radius_graph(
             print("cutoff", id, cutoff)
             print(atoms)
 
-        except:
+        except Exception as exp:
+            print("Graph exp", exp)
             pass
         return u, v, r
 

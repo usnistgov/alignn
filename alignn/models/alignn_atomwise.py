@@ -62,8 +62,6 @@ class ALIGNNAtomWiseConfig(BaseSettings):
         env_prefix = "jv_model"
 
 
-
-
 def cutoff_function_based_edges_old(r, inner_cutoff=4):
     """Apply smooth cutoff to pairwise interactions
 
@@ -101,8 +99,6 @@ def cutoff_function_based_edges(r, inner_cutoff=4, exponent=3):
         + c3 * ratio ** (exponent + 2)
     )
     return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
-
-
 
 
 class EdgeGatedGraphConv(nn.Module):
