@@ -54,6 +54,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     add_reverse_forces: bool = False  # will make True as default soon
     lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
+    extra_features: int = 0
 
     class Config:
         """Configure model settings behavior."""
@@ -61,7 +62,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
         env_prefix = "jv_model"
 
 
-def cutoff_function_based_edges(r, inner_cutoff=4):
+def cutoff_function_based_edges_old(r, inner_cutoff=4):
     """Apply smooth cutoff to pairwise interactions
 
     r: bond lengths
@@ -76,6 +77,28 @@ def cutoff_function_based_edges(r, inner_cutoff=4):
         1 - 6 * ratio**5 + 15 * ratio**4 - 10 * ratio**3,
         torch.zeros_like(r),
     )
+
+
+def cutoff_function_based_edges(r, inner_cutoff=4, exponent=3):
+    """Apply smooth cutoff to pairwise interactions
+
+    r: bond lengths
+    inner_cutoff: cutoff radius
+
+    inside cutoff radius, apply smooth cutoff envelope
+    outside cutoff radius: hard zeros
+    """
+    ratio = r / inner_cutoff
+    c1 = -(exponent + 1) * (exponent + 2) / 2
+    c2 = exponent * (exponent + 2)
+    c3 = -exponent * (exponent + 1) / 2
+    envelope = (
+        1
+        + c1 * ratio**exponent
+        + c2 * ratio ** (exponent + 1)
+        + c3 * ratio ** (exponent + 2)
+    )
+    return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
 
 
 class EdgeGatedGraphConv(nn.Module):
@@ -281,6 +304,28 @@ class ALIGNNAtomWise(nn.Module):
         )
 
         self.readout = AvgPooling()
+
+        if config.extra_features != 0:
+            self.readout_feat = AvgPooling()
+            # Credit for extra_features work:
+            # Gong et al., https://doi.org/10.48550/arXiv.2208.05039
+            self.extra_feature_embedding = MLPLayer(
+                config.extra_features, config.extra_features
+            )
+            # print('config.output_features',config.output_features)
+            self.fc3 = nn.Linear(
+                config.hidden_features + config.extra_features,
+                config.output_features,
+            )
+            self.fc1 = MLPLayer(
+                config.extra_features + config.hidden_features,
+                config.extra_features + config.hidden_features,
+            )
+            self.fc2 = MLPLayer(
+                config.extra_features + config.hidden_features,
+                config.extra_features + config.hidden_features,
+            )
+
         if config.atomwise_output_features > 0:
             # if config.atomwise_output_features is not None:
             self.fc_atomwise = nn.Linear(
@@ -320,6 +365,10 @@ class ALIGNNAtomWise(nn.Module):
 
             # angle features (fixed)
             z = self.angle_embedding(lg.edata.pop("h"))
+        if self.config.extra_features != 0:
+            features = g.ndata["extra_features"]
+            # print('features',features,features.shape)
+            features = self.extra_feature_embedding(features)
 
         g = g.local_var()
         result = {}
@@ -358,7 +407,16 @@ class ALIGNNAtomWise(nn.Module):
         if self.config.output_features is not None:
             h = self.readout(g, x)
             out = self.fc(h)
-            out = torch.squeeze(out)
+            if self.config.extra_features != 0:
+                h_feat = self.readout_feat(g, features)
+                # print('h_feat',h_feat)
+                h = torch.cat((h, h_feat), 1)
+                h = self.fc1(h)
+                h = self.fc2(h)
+                out = self.fc3(h)
+                # print('out',out)
+            else:
+                out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
         if (
             self.config.atomwise_output_features > 0

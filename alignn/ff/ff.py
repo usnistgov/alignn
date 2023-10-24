@@ -77,13 +77,16 @@ all_models_ff = {
     "alignnff_wt01": "https://figshare.com/ndownloader/files/41583588",
     "alignnff_wt1": "https://figshare.com/ndownloader/files/41583591",
     "fmult_mlearn_only": "https://figshare.com/ndownloader/files/41583597",
+    "aff_Oct23": "https://figshare.com/ndownloader/files/42880573",
     "revised": "https://figshare.com/ndownloader/files/41583600",
     "scf_fd_top_10_en_42_fmax_600_wt01": scf_fd_top_10_en_42_fmax_600_wt01,
     "scf_fd_top_10_en_42_fmax_600_wt10": scf_fd_top_10_en_42_fmax_600_wt10,
 }
 
 
-def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
+def get_figshare_model_ff(
+    model_name="alignnff_fmult", dir_path=None, filename="best_model.pt"
+):
     """Get ALIGNN-FF torch models from figshare."""
     # https://doi.org/10.6084/m9.figshare.23695695
     if dir_path is None:
@@ -98,7 +101,7 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
     path = str(os.path.join(dir_path, zfile))
     # path = str(os.path.join(os.path.dirname(__file__), zfile))
     print("dir_path", dir_path)
-    best_path = os.path.join(dir_path, "best_model.pt")
+    best_path = os.path.join(dir_path, filename)
     if not os.path.exists(best_path):
         response = requests.get(url, stream=True)
         total_size_in_bytes = int(response.headers.get("content-length", 0))
@@ -116,7 +119,7 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
         chks = []
         cfg = []
         for i in names:
-            if "best_model.pt" in i:
+            if filename in i:
                 tmp = i
                 chks.append(i)
             if "config.json" in i:
@@ -127,7 +130,7 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
         data = zipfile.ZipFile(path).read(tmp)
 
         # new_file, filename = tempfile.mkstemp()
-        filename = os.path.join(dir_path, "best_model.pt")
+        filename = os.path.join(dir_path, filename)
         with open(filename, "wb") as f:
             f.write(data)
         filename = os.path.join(dir_path, "config.json")
@@ -142,8 +145,8 @@ def get_figshare_model_ff(model_name="alignnff_fmult", dir_path=None):
 
 def default_path():
     """Get default model path."""
-    # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
-    dpath = get_figshare_model_ff(model_name="alignnff_fmult")
+    dpath = get_figshare_model_ff(model_name="alignnff_wt10")
+    # dpath = get_figshare_model_ff(model_name="alignnff_fmult")
     print("model_path", dpath)
     return dpath
 
@@ -302,7 +305,14 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         """Calculate properties."""
         j_atoms = ase_to_atoms(atoms)
         num_atoms = j_atoms.num_atoms
-        g, lg = Graph.atom_dgl_multigraph(j_atoms)
+        g, lg = Graph.atom_dgl_multigraph(
+            j_atoms,
+            neighbor_strategy=self.config["neighbor_strategy"],
+            cutoff=self.config["cutoff"],
+            max_neighbors=self.config["max_neighbors"],
+            atom_features=self.config["atom_features"],
+            use_canonize=self.config["use_canonize"],
+        )
         result = self.net((g.to(self.device), lg.to(self.device)))
         # print ('stress',result["stress"].detach().numpy())
         if self.force_mult_natoms:

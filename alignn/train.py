@@ -70,10 +70,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 # torch config
 torch.set_default_dtype(torch.float32)
 
-device = "cpu"
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-
 
 def activated_output_transform(output):
     """Exponentiate output."""
@@ -87,8 +83,10 @@ def make_standard_scalar_and_pca(output):
     """Use standard scalar and PCS for multi-output data."""
     sc = pk.load(open(os.path.join(tmp_output_dir, "sc.pkl"), "rb"))
     y_pred, y = output
-    y_pred = torch.tensor(sc.transform(y_pred.cpu().numpy()), device=device)
-    y = torch.tensor(sc.transform(y.cpu().numpy()), device=device)
+    y_pred = torch.tensor(
+        sc.transform(y_pred.cpu().numpy()), device=y_pred.device
+    )
+    y = torch.tensor(sc.transform(y.cpu().numpy()), device=y.device)
     # pc = pk.load(open("pca.pkl", "rb"))
     # y_pred = torch.tensor(pc.transform(y_pred), device=device)
     # y = torch.tensor(pc.transform(y), device=device)
@@ -353,6 +351,8 @@ def train_dgl(
                 # if i["target_out"]:
                 target_out = np.array(target_out)
                 pred_out = np.array(pred_out)
+                # print('target_out',target_out,target_out.shape)
+                # print('pred_out',pred_out,pred_out.shape)
                 mean_out = mean_absolute_error(target_out, pred_out)
             if "target_stress" in i:
                 # if i["target_stress"]:
@@ -393,10 +393,13 @@ def train_dgl(
             # optimizer.zero_grad()
             running_loss = 0
             train_result = []
-            for dats in train_loader:
+            # for dats in train_loader:
+            for dats, jid in zip(train_loader, train_loader.dataset.ids):
+                info = {}
+                info["id"] = jid
                 optimizer.zero_grad()
                 result = net([dats[0].to(device), dats[1].to(device)])
-                info = {}
+                # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
                 info["target_atomwise_pred"] = []
@@ -511,7 +514,7 @@ def train_dgl(
                 else:
                     loss.backward()
                 optimizer.step()
-                # optimizer.zero_grad()
+                # optimizer.zero_grad() #never
                 running_loss += loss.item()
             mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
                 train_result
@@ -561,10 +564,13 @@ def train_dgl(
             )
             val_loss = 0
             val_result = []
-            for dats in val_loader:
+            # for dats in val_loader:
+            for dats, jid in zip(val_loader, val_loader.dataset.ids):
+                info = {}
+                info["id"] = jid
                 optimizer.zero_grad()
                 result = net([dats[0].to(device), dats[1].to(device)])
-                info = {}
+                # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
                 info["target_atomwise_pred"] = []
@@ -641,6 +647,11 @@ def train_dgl(
             mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
                 val_result
             )
+            current_model_name = "current_model.pt"
+            torch.save(
+                net.state_dict(),
+                os.path.join(config.output_dir, current_model_name),
+            )
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_model_name = "best_model.pt"
@@ -710,14 +721,19 @@ def train_dgl(
 
         test_loss = 0
         test_result = []
-        for dats in test_loader:
+        for dats, jid in zip(test_loader, test_loader.dataset.ids):
+            # for dats in test_loader:
+            info = {}
+            info["id"] = jid
             optimizer.zero_grad()
+            # print('dats[0]',dats[0])
+            # print('test_loader',test_loader)
+            # print('test_loader.dataset.ids',test_loader.dataset.ids)
             result = net([dats[0].to(device), dats[1].to(device)])
             loss1 = 0  # Such as energy
             loss2 = 0  # Such as bader charges
             loss3 = 0  # Such as forces
             loss4 = 0  # Such as stresses
-            info = {}
             if config.model.output_features is not None:
                 loss1 = config.model.graphwise_weight * criterion(
                     result["out"], dats[2].to(device)

@@ -73,9 +73,12 @@ def load_graphs(
     name: str = "dft_3d",
     neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
+    cutoff_extra: float = 3,
     max_neighbors: int = 12,
     cachedir: Optional[Path] = None,
     use_canonize: bool = False,
+    id_tag="jid",
+    # extra_feats_json=None,
 ):
     """Construct crystal graphs.
 
@@ -98,6 +101,7 @@ def load_graphs(
         return Graph.atom_dgl_multigraph(
             structure,
             cutoff=cutoff,
+            cutoff_extra=cutoff_extra,
             atom_features="atomic_number",
             max_neighbors=max_neighbors,
             compute_line_graph=False,
@@ -113,9 +117,41 @@ def load_graphs(
     if cachefile is not None and cachefile.is_file():
         graphs, labels = dgl.load_graphs(str(cachefile))
     else:
-        df = pd.DataFrame(dataset)
+        # print('dataset',dataset,type(dataset))
+        print("Converting to graphs!")
+        graphs = []
+        # columns=dataset.columns
+        for ii, i in tqdm(dataset.iterrows()):
+            # print('iooooo',i)
+            atoms = i["atoms"]
+            structure = (
+                Atoms.from_dict(atoms) if isinstance(atoms, dict) else atoms
+            )
+            g = Graph.atom_dgl_multigraph(
+                structure,
+                cutoff=cutoff,
+                cutoff_extra=cutoff_extra,
+                atom_features="atomic_number",
+                max_neighbors=max_neighbors,
+                compute_line_graph=False,
+                use_canonize=use_canonize,
+                neighbor_strategy=neighbor_strategy,
+                id=i[id_tag],
+            )
+            # print ('ii',ii)
+            if "extra_features" in i:
+                natoms = len(atoms["elements"])
+                # if "extra_features" in columns:
+                g.ndata["extra_features"] = torch.tensor(
+                    [i["extra_features"] for n in range(natoms)]
+                ).type(torch.get_default_dtype())
+            graphs.append(g)
 
-        graphs = df["atoms"].progress_apply(atoms_to_graph).values
+        # df = pd.DataFrame(dataset)
+        # print ('df',df)
+
+        # graphs = df["atoms"].progress_apply(atoms_to_graph).values
+        # print ('graphs',graphs,graphs[0])
         if cachefile is not None:
             dgl.save_graphs(str(cachefile), graphs.tolist())
 
@@ -174,7 +210,11 @@ def get_id_train_val_test(
     # full train/val test split
     # ids = ids[::-1]
     id_train = ids[:n_train]
-    id_val = ids[-(n_val + n_test) : -n_test] if n_test > 0 else ids[-(n_val + n_test) :]  # noqa:E203
+    id_val = (
+        ids[-(n_val + n_test) : -n_test]
+        if n_test > 0
+        else ids[-(n_val + n_test) :]
+    )  # noqa:E203
     id_test = ids[-n_test:] if n_test > 0 else []
     return id_train, id_val, id_test
 
@@ -192,6 +232,7 @@ def get_torch_dataset(
     name="",
     line_graph="",
     cutoff=8.0,
+    cutoff_extra=3.0,
     max_neighbors=12,
     classification=False,
     output_dir=".",
@@ -216,7 +257,9 @@ def get_torch_dataset(
         neighbor_strategy=neighbor_strategy,
         use_canonize=use_canonize,
         cutoff=cutoff,
+        cutoff_extra=cutoff_extra,
         max_neighbors=max_neighbors,
+        id_tag=id_tag,
     )
     data = StructureDataset(
         df,
@@ -259,6 +302,7 @@ def get_train_val_loaders(
     id_tag: str = "jid",
     use_canonize: bool = False,
     cutoff: float = 8.0,
+    cutoff_extra: float = 3.0,
     max_neighbors: int = 12,
     classification_threshold: Optional[float] = None,
     target_multiplication_factor: Optional[float] = None,
@@ -467,47 +511,58 @@ def get_train_val_loaders(
             name=dataset,
             line_graph=line_graph,
             cutoff=cutoff,
+            cutoff_extra=cutoff_extra,
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
             output_dir=output_dir,
             tmp_name="train_data",
         )
-        val_data = get_torch_dataset(
-            dataset=dataset_val,
-            id_tag=id_tag,
-            atom_features=atom_features,
-            target=target,
-            target_atomwise=target_atomwise,
-            target_grad=target_grad,
-            target_stress=target_stress,
-            neighbor_strategy=neighbor_strategy,
-            use_canonize=use_canonize,
-            name=dataset,
-            line_graph=line_graph,
-            cutoff=cutoff,
-            max_neighbors=max_neighbors,
-            classification=classification_threshold is not None,
-            output_dir=output_dir,
-            tmp_name="val_data",
-        ) if len(dataset_val) > 0 else None
-        test_data = get_torch_dataset(
-            dataset=dataset_test,
-            id_tag=id_tag,
-            atom_features=atom_features,
-            target=target,
-            target_atomwise=target_atomwise,
-            target_grad=target_grad,
-            target_stress=target_stress,
-            neighbor_strategy=neighbor_strategy,
-            use_canonize=use_canonize,
-            name=dataset,
-            line_graph=line_graph,
-            cutoff=cutoff,
-            max_neighbors=max_neighbors,
-            classification=classification_threshold is not None,
-            output_dir=output_dir,
-            tmp_name="test_data",
-        ) if len(dataset_test) > 0 else None
+        val_data = (
+            get_torch_dataset(
+                dataset=dataset_val,
+                id_tag=id_tag,
+                atom_features=atom_features,
+                target=target,
+                target_atomwise=target_atomwise,
+                target_grad=target_grad,
+                target_stress=target_stress,
+                neighbor_strategy=neighbor_strategy,
+                use_canonize=use_canonize,
+                name=dataset,
+                line_graph=line_graph,
+                cutoff=cutoff,
+                cutoff_extra=cutoff_extra,
+                max_neighbors=max_neighbors,
+                classification=classification_threshold is not None,
+                output_dir=output_dir,
+                tmp_name="val_data",
+            )
+            if len(dataset_val) > 0
+            else None
+        )
+        test_data = (
+            get_torch_dataset(
+                dataset=dataset_test,
+                id_tag=id_tag,
+                atom_features=atom_features,
+                target=target,
+                target_atomwise=target_atomwise,
+                target_grad=target_grad,
+                target_stress=target_stress,
+                neighbor_strategy=neighbor_strategy,
+                use_canonize=use_canonize,
+                name=dataset,
+                line_graph=line_graph,
+                cutoff=cutoff,
+                cutoff_extra=cutoff_extra,
+                max_neighbors=max_neighbors,
+                classification=classification_threshold is not None,
+                output_dir=output_dir,
+                tmp_name="test_data",
+            )
+            if len(dataset_test) > 0
+            else None
+        )
 
         collate_fn = train_data.collate
         # print("line_graph,line_dih_graph", line_graph, line_dih_graph)
@@ -535,15 +590,19 @@ def get_train_val_loaders(
             pin_memory=pin_memory,
         )
 
-        test_loader = DataLoader(
-            test_data,
-            batch_size=1,
-            shuffle=False,
-            collate_fn=collate_fn,
-            drop_last=False,
-            num_workers=workers,
-            pin_memory=pin_memory,
-        ) if len(dataset_test) > 0 else None
+        test_loader = (
+            DataLoader(
+                test_data,
+                batch_size=1,
+                shuffle=False,
+                collate_fn=collate_fn,
+                drop_last=False,
+                num_workers=workers,
+                pin_memory=pin_memory,
+            )
+            if len(dataset_test) > 0
+            else None
+        )
 
         if save_dataloader:
             torch.save(train_loader, train_sample)
@@ -553,10 +612,10 @@ def get_train_val_loaders(
                 torch.save(test_loader, test_sample)
 
     print("n_train:", len(train_loader.dataset))
-    print("n_val  :", len(val_loader.dataset)
-          if val_loader is not None else 0)
-    print("n_test :", len(test_loader.dataset)
-          if test_loader is not None else 0)
+    print("n_val  :", len(val_loader.dataset) if val_loader is not None else 0)
+    print(
+        "n_test :", len(test_loader.dataset) if test_loader is not None else 0
+    )
     return (
         train_loader,
         val_loader,
