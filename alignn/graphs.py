@@ -13,12 +13,13 @@ import math
 from collections import defaultdict
 from typing import List, Tuple, Sequence, Optional
 
+import torch
+import dgl
+
 try:
-    import torch
     from tqdm import tqdm
-    import dgl
 except Exception as exp:
-    print("dgl/torch/tqdm is not installed.", exp)
+    print("tqdm is not installed.", exp)
     pass
 
 
