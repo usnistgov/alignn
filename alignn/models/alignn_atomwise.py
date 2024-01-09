@@ -24,32 +24,57 @@ if torch.cuda.is_available():
 
 
 def compute_pair_vector_and_distance(g: dgl.DGLGraph):
+    bond_vec = g.edata["bond_vec"]  # torch.zeros(g.num_edges(), 3)
+    dst_pos = g.ndata["pos"][g.edges()[1]] + g.edata["pbc"]
+    src_pos = g.ndata["pos"][g.edges()[0]]
+    bond_vec = (dst_pos - src_pos).float()
     """
-    Calculate bond vectors and distances using dgl graphs
-
-    Args:
-    g: DGL graph
-
-    Returns:
-    bond_vec (torch.tensor): bond distance between two atoms
-    bond_dist (torch.tensor): vector from src node to dst node
-    """
+    bond_dist = torch.norm(bond_vec, dim=1)
     # bond_vec = g.edata['r'] #torch.zeros(g.num_edges(), 3)
     bond_vec = g.edata["bond_vec"]  # torch.zeros(g.num_edges(), 3)
     # bond_dist = torch.zeros(g.num_edges())
-    for i in range(g.num_edges()):
-        bond_vec[i, :] = (
-            g.ndata["pos"][g.edges()[1][i], :]
-            + torch.sum(
-                torch.squeeze(
-                    g.edata["pbc"][i][:] * g.edata["lattice"][i][:, None]
-                ),
-                dim=0,
-            )
-            - g.ndata["pos"][g.edges()[0][i], :]
+    """
+
+    """
+    edges = g.edges()
+    bond_vec = (
+        g.ndata["pos"][edges[1], :]
+        + torch.sum(
+            torch.squeeze(g.edata["pbc"] * g.edata["lattice"][:, :, None]),
+            dim=0,
         )
-    bond_dist = torch.norm(bond_vec, dim=1)
-    return bond_vec  # , bond_dist
+        - g.ndata["pos"][edges[0], :]
+    )
+
+    bond_vec = (
+        g.ndata["pos"][
+            g.edges()[1]
+        ]  # Access positions of destination nodes directly
+        + torch.sum(
+            torch.mul(g.edata["pbc"][:,None], g.edata["lattice"][:, None]), dim=1
+        )  # Element-wise multiplication and sum across edges
+        - g.ndata["pos"][
+            g.edges()[0]
+        ]  # Access positions of source nodes directly
+    )
+    bond_vec = g.edata["bond_vec"]  # torch.zeros(g.num_edges(), 3)
+
+    ##############################
+    for i in range(g.num_edges()):
+       bond_vec[i, :] = (
+           g.ndata["pos"][g.edges()[1][i], :]
+           + torch.sum(
+               torch.squeeze(
+                   g.edata["pbc"][i][:] * g.edata["lattice"][i][:, None]
+               ),
+               dim=0,
+           )
+           - g.ndata["pos"][g.edges()[0][i], :]
+       )
+    #bond_dist = torch.norm(bond_vec, dim=1)
+    """
+    return bond_vec
+    # return bond_vec  # , bond_dist
 
 
 class ALIGNNAtomWiseConfig(BaseSettings):
@@ -333,8 +358,8 @@ class ALIGNNAtomWise(nn.Module):
         # initial node features: atom feature network...
         x = g.ndata["atom_features"]
         x = self.atom_embedding(x)
-        pos = g.ndata["pos"]
-        pbc = g.edata["pbc"]
+        # pos = g.ndata["pos"]
+        # pbc = g.edata["pbc"]
         ###r = g.edata["r"]
         # r = bond_vec
         if self.config.calculate_gradient:
@@ -383,17 +408,15 @@ class ALIGNNAtomWise(nn.Module):
 
             # tmp_out = out*len(x)
             # print ('tmp_out',tmp_out)
-            dy = (
-                self.config.grad_multiplier
-                * grad(
-                    # tmp_out,
-                    out / len(x),
-                    [g.ndata["pos"]],
-                    grad_outputs=torch.ones_like(out),
-                    create_graph=create_graph,
-                    retain_graph=True,
-                )[0]
-            )
+            dy = self.config.grad_multiplier * grad(
+                # tmp_out,
+                out,
+                # out / len(x),
+                [g.ndata["pos"]],
+                grad_outputs=torch.ones_like(out),
+                create_graph=create_graph,
+                retain_graph=True,
+            )[0]
             gradient = dy
             # print("gradient", gradient)
             """
