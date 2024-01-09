@@ -11,6 +11,7 @@ from functools import partial
 from typing import Any, Dict, Union
 import ignite
 import torch
+import random
 from ignite.contrib.handlers import TensorboardLogger
 from sklearn.metrics import mean_absolute_error
 
@@ -301,6 +302,12 @@ def train_dgl(
         )
 
     if config.model.name == "alignn_atomwise":
+        if config.random_seed is not None:
+            random.seed(config.random_seed)
+            np.random.seed(config.random_seed)
+            torch.manual_seed(config.random_seed)
+            torch.cuda.manual_seed_all(config.random_seed)
+            torch.backends.cudnn.deterministic = True
 
         def get_batch_errors(dat=[]):
             """Get errors for samples."""
