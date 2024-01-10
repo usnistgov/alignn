@@ -370,6 +370,8 @@ class ALIGNNAtomWise(nn.Module):
         # r = g.edata["r"].clone().detach().requires_grad_(True)
         # bondlength = bond_dist
         r = compute_pair_vector_and_distance(g)  # +g.edata['r']
+        if self.config.calculate_gradient:
+            r.requires_grad_(True)
 
         # print('r',r)
         # print('pos',pos)
@@ -410,9 +412,10 @@ class ALIGNNAtomWise(nn.Module):
             # print ('tmp_out',tmp_out)
             dy = self.config.grad_multiplier * grad(
                 # tmp_out,
-                out,
-                # out / len(x),
-                [g.ndata["pos"]],
+                # out,
+                out / len(x),
+                [g.ndata["pos"], r],
+                # [g.ndata["pos"]],
                 grad_outputs=torch.ones_like(out),
                 create_graph=create_graph,
                 retain_graph=True,
