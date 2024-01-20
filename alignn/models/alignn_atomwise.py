@@ -55,6 +55,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
     extra_features: int = 0
+    sph_lmax: int = 0
 
     class Config:
         """Configure model settings behavior."""
@@ -302,6 +303,15 @@ class ALIGNNAtomWise(nn.Module):
                 for idx in range(config.gcn_layers)
             ]
         )
+        if self.config.sph_lmax > 0:
+            import e3nn
+
+            sh_irreps = e3nn.o3.Irreps.spherical_harmonics(
+                self.config.sph_lmax
+            )
+            self.spherical_harmonics = e3nn.o3.SphericalHarmonics(
+                sh_irreps, normalize=True, normalization="component"
+            )
 
         self.readout = AvgPooling()
 
@@ -388,17 +398,18 @@ class ALIGNNAtomWise(nn.Module):
             z = self.angle_embedding(lg.edata.pop("h"))
 
         # r = g.edata["r"].clone().detach().requires_grad_(True)
+        if self.config.sph_lmax > 0:
+            s = self.spherical_harmonics(lg.ndata["r"])
+            # r = torch.cat([lg.ndata["r"], s], dim=1)
         bondlength = torch.norm(r, dim=1)
         if self.config.use_cutoff_function:
             bondlength = cutoff_function_based_edges(
                 bondlength, inner_cutoff=self.config.inner_cutoff
             )
         y = self.edge_embedding(bondlength)
-
         # ALIGNN updates: update node, edge, triplet features
         for alignn_layer in self.alignn_layers:
             x, y, z = alignn_layer(g, lg, x, y, z)
-
         # gated GCN updates: update node, edge features
         for gcn_layer in self.gcn_layers:
             x, y = gcn_layer(g, x, y)
