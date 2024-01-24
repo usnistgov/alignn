@@ -266,6 +266,22 @@ def train_dgl(
         "alignn_cgcnn": ACGCNN,
         "alignn_layernorm": ALIGNN_LN,
     }
+    if config.random_seed is not None:
+        random.seed(config.random_seed)
+        torch.manual_seed(config.random_seed)
+        np.random.seed(config.random_seed)
+        torch.cuda.manual_seed_all(config.random_seed)
+        try:
+            import torch_xla.core.xla_model as xm
+
+            xm.set_rng_state(config.random_seed)
+        except ImportError:
+            pass
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        os.environ["PYTHONHASHSEED"] = str(config.random_seed)
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = str(":4096:8")
+        torch.use_deterministic_algorithms(True)
     if model is None:
         net = _model.get(config.model.name)(config.model)
     else:
@@ -277,7 +293,6 @@ def train_dgl(
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
-
     if config.scheduler == "none":
         # always return multiplier of 1 (i.e. do nothing)
         scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -302,12 +317,6 @@ def train_dgl(
         )
 
     if config.model.name == "alignn_atomwise":
-        if config.random_seed is not None:
-            random.seed(config.random_seed)
-            np.random.seed(config.random_seed)
-            torch.manual_seed(config.random_seed)
-            torch.cuda.manual_seed_all(config.random_seed)
-            torch.backends.cudnn.deterministic = True
 
         def get_batch_errors(dat=[]):
             """Get errors for samples."""
