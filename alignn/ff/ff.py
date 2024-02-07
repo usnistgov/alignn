@@ -1194,18 +1194,23 @@ def phonons(
     model_path=".",
     model_filename="best_model.pt",
     on_relaxed_struct=False,
+    force_mult_natoms=False,
+    stress_wt=-4800,
     dim=[2, 2, 2],
-    freq_conversion_factor=333.566830,  # ThztoCm-1
+    freq_conversion_factor=33.3566830,  # ThztoCm-1
     phonopy_bands_figname="phonopy_bands.png",
     # phonopy_dos_figname="phonopy_dos.png",
     write_fc=False,
+    min_freq_tol=-0.05,
+    distance=0.2,
+    force_multiplier=1,
 ):
     """Make Phonon calculation setup."""
     calc = AlignnAtomwiseCalculator(
         path=model_path,
-        force_mult_natoms=False,
-        force_multiplier=1,
-        stress_wt=-4800,
+        force_mult_natoms=force_mult_natoms,
+        force_multiplier=force_multiplier,
+        stress_wt=stress_wt,
     )
 
     from phonopy import Phonopy
@@ -1216,7 +1221,7 @@ def phonons(
     kpoints = Kpoints().kpath(atoms, line_density=line_density)
     bulk = atoms.phonopy_converter()
     phonon = Phonopy(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
-    phonon.generate_displacements(distance=0.01)
+    phonon.generate_displacements(distance=distance)
     # print("Len dis", len(phonon.supercells_with_displacements))
     supercells = phonon.get_supercells_with_displacements()
     # Force calculations by calculator
@@ -1304,7 +1309,7 @@ def phonons(
     freqs, ds = tdos.get_dos()
     freqs = np.array(freqs)
     freqs = freqs * freq_conversion_factor
-    min_freq = -0.05 * freq_conversion_factor
+    min_freq = min_freq_tol * freq_conversion_factor
     max_freq = max(freqs)
     plt.ylim([min_freq, max_freq])
 
@@ -1339,18 +1344,23 @@ def phonons3(
     model_filename="best_model.pt",
     on_relaxed_struct=False,
     dim=[2, 2, 2],
+    distance=0.2,
+    stress_wt=-4800,
+    force_multiplier=2,
 ):
     """Make Phonon3 calculation setup."""
     from phono3py import Phono3py
 
-    calc = AlignnAtomwiseCalculator(path=model_path)
+    calc = AlignnAtomwiseCalculator(
+        path=model_path, force_multiplier=force_multiplier, stress_wt=stress_wt
+    )
 
     # kpoints = Kpoints().kpath(atoms, line_density=line_density)
     # dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
     # atoms = cvn.make_supercell([dim[0], dim[1], dim[2]])
     bulk = atoms.phonopy_converter()
     phonon = Phono3py(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
-    phonon.generate_displacements(distance=0.03)
+    phonon.generate_displacements(distance=distance)
     # disps = phonon.generate_displacements()
     supercells = phonon.supercells_with_displacements
     print(
@@ -1401,9 +1411,12 @@ def ase_phonon(
     filename="Atom_phonon.png",
     ev_file=None,
     model_path="",
+    force_multiplier=1,
 ):
     """Get phonon bandstructure and DOS using ASE."""
-    calc = AlignnAtomwiseCalculator(path=model_path)
+    calc = AlignnAtomwiseCalculator(
+        path=model_path, force_multiplier=force_multiplier
+    )
     # Setup crystal and EMT calculator
     # atoms = bulk("Al", "fcc", a=4.05)
 
