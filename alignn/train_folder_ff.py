@@ -2,8 +2,7 @@
 
 """Module to train for a folder with formatted dataset."""
 import os
-
-# import numpy as np
+import csv
 import sys
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
@@ -11,10 +10,9 @@ from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-
-# from alignn.models.alignn import ALIGNN, ALIGNNConfig
 import torch
 import time
+from jarvis.core.atoms import Atoms
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -133,7 +131,19 @@ def train_for_folder(
     output_dir=None,
 ):
     """Train for a folder."""
-    dat = loadjson(os.path.join(root_dir, "id_prop.json"))
+    id_prop_json = os.path.join(root_dir, "id_prop.json")
+    id_prop_csv = os.path.join(root_dir, "id_prop.csv")
+    id_prop_csv_file = False
+    multioutput = False
+    # lists_length_equal = True
+    if os.path.exists(id_prop_json):
+        dat = loadjson(os.path.join(root_dir, "id_prop.json"))
+    if os.path.exists(id_prop_csv):
+        id_prop_csv_file = True
+        with open(id_prop_csv, "r") as f:
+            reader = csv.reader(f)
+            dat = [row for row in reader]
+        print("id_prop_csv_file exists", id_prop_csv_file)
     config_dict = loadjson(config_name)
     config = TrainingConfig(**config_dict)
     if type(config) is dict:
@@ -154,20 +164,30 @@ def train_for_folder(
 
     train_grad = False
     train_stress = False
-    if config.model.gradwise_weight != 0:
-        train_grad = True
-    if config.model.stresswise_weight != 0:
-        train_stress = True
     train_atom = False
-    if config.model.atomwise_weight != 0:
-        train_atom = True
-
-    if config.model.atomwise_weight == 0:
-        train_atom = False
-    if config.model.gradwise_weight == 0:
+    if "gradwise_weight" in config.model and config.model.gradwise_weight != 0:
+        train_grad = True
+    else:
         train_grad = False
-    if config.model.stresswise_weight == 0:
+
+    if (
+        "stresswise_weight" in config.model
+        and config.model.stresswise_weight != 0
+    ):
+        train_stress = True
+    else:
         train_stress = False
+    if "atomwise_weight" in config.model and config.model.atomwise_weight != 0:
+        train_atom = True
+    else:
+        train_atom = False
+
+    # if config.model.atomwise_weight == 0:
+    #    train_atom = False
+    # if config.model.gradwise_weight == 0:
+    #    train_grad = False
+    # if config.model.stresswise_weight == 0:
+    #    train_stress = False
     target_atomwise = None  # "atomwise_target"
     target_grad = None  # "atomwise_grad"
     target_stress = None  # "stresses"
@@ -177,7 +197,23 @@ def train_for_folder(
     dataset = []
     for i in dat:
         info = {}
-        info["target"] = i[target_key]
+        if id_prop_csv_file:
+            file_name = i[0]
+            tmp = [float(j) for j in i[1:]]  # float(i[1])
+            info["jid"] = file_name
+
+            if len(tmp) == 1:
+                tmp = tmp[0]
+            else:
+                multioutput = True
+            info["target"] = tmp
+            file_path = os.path.join(root_dir, file_name)
+            atoms = Atoms.from_poscar(file_path)
+            info["atoms"] = atoms.to_dict()
+        else:
+            info["target"] = i[target_key]
+            info["atoms"] = i["atoms"]
+            info["jid"] = i[id_key]
         if train_atom:
             target_atomwise = "atomwise_target"
             info["atomwise_target"] = i[atomwise_key]  # such as charges
@@ -189,8 +225,6 @@ def train_for_folder(
             target_stress = "stresses"
         if "extra_features" in i:
             info["extra_features"] = i["extra_features"]
-        info["atoms"] = i["atoms"]
-        info["jid"] = i[id_key]
         dataset.append(info)
     print("len dataset", len(dataset))
     n_outputs = []
