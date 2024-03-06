@@ -4,6 +4,8 @@
 import os
 import csv
 import sys
+import json
+import zipfile
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
 from alignn.config import TrainingConfig
@@ -132,18 +134,25 @@ def train_for_folder(
 ):
     """Train for a folder."""
     id_prop_json = os.path.join(root_dir, "id_prop.json")
+    id_prop_json_zip = os.path.join(root_dir, "id_prop.json.zip")
     id_prop_csv = os.path.join(root_dir, "id_prop.csv")
     id_prop_csv_file = False
     multioutput = False
     # lists_length_equal = True
-    if os.path.exists(id_prop_json):
+    if os.path.exists(id_prop_json_zip):
+        dat = json.loads(
+            zipfile.ZipFile(id_prop_json_zip).read("id_prop.json")
+        )
+    elif os.path.exists(id_prop_json):
         dat = loadjson(os.path.join(root_dir, "id_prop.json"))
-    if os.path.exists(id_prop_csv):
+    elif os.path.exists(id_prop_csv):
         id_prop_csv_file = True
         with open(id_prop_csv, "r") as f:
             reader = csv.reader(f)
             dat = [row for row in reader]
         print("id_prop_csv_file exists", id_prop_csv_file)
+    else:
+        print("Check dataset file.")
     config_dict = loadjson(config_name)
     config = TrainingConfig(**config_dict)
     if type(config) is dict:
@@ -165,19 +174,15 @@ def train_for_folder(
     train_grad = False
     train_stress = False
     train_atom = False
-    if "gradwise_weight" in config.model and config.model.gradwise_weight != 0:
+    if config.model.calculate_gradient and config.model.gradwise_weight != 0:
         train_grad = True
     else:
         train_grad = False
-
-    if (
-        "stresswise_weight" in config.model
-        and config.model.stresswise_weight != 0
-    ):
+    if config.model.calculate_gradient and config.model.stresswise_weight != 0:
         train_stress = True
     else:
         train_stress = False
-    if "atomwise_weight" in config.model and config.model.atomwise_weight != 0:
+    if config.model.atomwise_weight != 0:
         train_atom = True
     else:
         train_atom = False
@@ -227,6 +232,7 @@ def train_for_folder(
             info["extra_features"] = i["extra_features"]
         dataset.append(info)
     print("len dataset", len(dataset))
+    del dat
     n_outputs = []
     multioutput = False
     lists_length_equal = True
@@ -350,7 +356,7 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
     )
-
+    # print("dataset", dataset[0])
     t1 = time.time()
     train_dgl(
         config,
