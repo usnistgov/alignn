@@ -197,6 +197,46 @@ def test_calculator():
     # assert round(max(stress.flatten()),2)==round(0.002801671050217803,2)
 
 
+def test_del_files():
+    fnames = [
+        "temp",
+        "ase_nve.traj",
+        "ase_nvt_langevin.traj",
+        "ase_nvt_andersen.traj",
+        "opt.log",
+        "opt.traj",
+        "alignn_ff.log",
+        "dataset_data_range",
+        "pred_data.json",
+        "prediction_results_train_set.csv",
+        "multi_out_predictions.json",
+        "checkpoint_2.pt",
+        "checkpoint_3.pt",
+        "prediction_results_test_set.csv",
+        "mad",
+        "ids_train_val_test.json",
+        "train_data_data_range",
+        "val_data_data_range",
+        "test_data_data_range",
+        "config.json",
+        "history_train.json",
+        "current_model.pt",
+        "best_model.pt",
+        "Train_results.json",
+        "Val_results.json",
+        "history_val.json",
+        "Test_results.json",
+        "Test_results.json",
+        "last_model.pt",
+        "temp",
+        "alignn/jv_formation_energy_peratom_alignn.zip",
+        "alignn/jv_optb88vdw_total_energy_alignn.zip",
+    ]
+    for i in fnames:
+        cmd = "rm -r " + i
+        os.system(cmd)
+
+
 # test_minor_configs()
 # test_pretrained()
 # test_runtime_training()
