@@ -50,12 +50,13 @@ from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
-from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
-from alignn.models.modified_cgcnn import CGCNN
-from alignn.models.dense_alignn import DenseALIGNN
-from alignn.models.densegcn import DenseGCN
-from alignn.models.icgcnn import iCGCNN
-from alignn.models.alignn_cgcnn import ACGCNN
+
+# from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
+# from alignn.models.modified_cgcnn import CGCNN
+# from alignn.models.dense_alignn import DenseALIGNN
+# from alignn.models.densegcn import DenseGCN
+# from alignn.models.icgcnn import iCGCNN
+# from alignn.models.alignn_cgcnn import ACGCNN
 from jarvis.db.jsonutils import dumpjson
 import json
 import pprint
@@ -257,14 +258,14 @@ def train_dgl(
         config.model.classification = True
     # define network, optimizer, scheduler
     _model = {
-        "cgcnn": CGCNN,
-        "icgcnn": iCGCNN,
-        "densegcn": DenseGCN,
+        # "cgcnn": CGCNN,
+        # "icgcnn": iCGCNN,
+        # "densegcn": DenseGCN,
         "alignn": ALIGNN,
         "alignn_atomwise": ALIGNNAtomWise,
-        "dense_alignn": DenseALIGNN,
-        "alignn_cgcnn": ACGCNN,
-        "alignn_layernorm": ALIGNN_LN,
+        # "dense_alignn": DenseALIGNN,
+        # "alignn_cgcnn": ACGCNN,
+        # "alignn_layernorm": ALIGNN_LN,
     }
     if config.random_seed is not None:
         random.seed(config.random_seed)
@@ -287,8 +288,10 @@ def train_dgl(
     else:
         net = model
     if config.data_parallel and torch.cuda.device_count() > 1:
+        # For multi-GPU training make data_parallel:true in config.json file
+        device_ids = [cid for cid in range(torch.cuda.device_count())]
         print("Let's use", torch.cuda.device_count(), "GPUs!")
-        net = torch.nn.DataParallel(net)
+        net = torch.nn.DataParallel(net, device_ids=device_ids).cuda()
     net.to(device)
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
@@ -895,7 +898,7 @@ def train_dgl(
         "mse": nn.MSELoss(),
         "l1": nn.L1Loss(),
         "poisson": nn.PoissonNLLLoss(log_input=False, full=True),
-        "zig": models.modified_cgcnn.ZeroInflatedGammaLoss(),
+        # "zig": models.modified_cgcnn.ZeroInflatedGammaLoss(),
     }
     criterion = criteria[config.criterion]
 

@@ -1,4 +1,5 @@
 """Training script test suite."""
+
 import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -59,17 +60,6 @@ def test_minor_configs():
 
 
 def test_models():
-    """Test CGCNN end to end training."""
-    config["model"]["name"] = "dense_alignn"
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Toal time:", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
 
     config["write_predictions"] = True
     config["model"]["name"] = "alignn"
@@ -94,100 +84,7 @@ def test_models():
     print()
     print()
 
-    config["model"]["name"] = "cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "densegcn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "icgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "alignn_cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    # Classification
-    config["model"]["name"] = "dense_alignn"
-    config["classification_threshold"] = 0.0
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Toal time:", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
     config["model"]["name"] = "alignn"
-    config["classification_threshold"] = 0.0
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    config["classification_threshold"] = 0.0
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "alignn_cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = True
     config["classification_threshold"] = 0.0
     t1 = time.time()
     result = train_dgl(config)

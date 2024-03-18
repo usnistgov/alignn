@@ -92,6 +92,7 @@ def train_for_folder(
     # config_dat=os.path.join(root_dir,config_name)
     id_prop_dat = os.path.join(root_dir, "id_prop.csv")
     config = loadjson(config_name)
+    config = TrainingConfig(**config)
     if type(config) is dict:
         try:
             config = TrainingConfig(**config)
@@ -102,6 +103,7 @@ def train_for_folder(
     if classification_threshold is not None:
         config.classification_threshold = float(classification_threshold)
     if output_dir is not None:
+        print("config", config, type(config))
         config.output_dir = output_dir
     if batch_size is not None:
         config.batch_size = int(batch_size)

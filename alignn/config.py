@@ -3,18 +3,19 @@
 import subprocess
 from typing import Optional, Union
 import os
-from pydantic import root_validator
-from pydantic.typing import Literal
+from typing import Literal
 from alignn.utils import BaseSettings
-from alignn.models.modified_cgcnn import CGCNNConfig
-from alignn.models.icgcnn import ICGCNNConfig
-from alignn.models.gcn import SimpleGCNConfig
-from alignn.models.densegcn import DenseGCNConfig
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
-from alignn.models.dense_alignn import DenseALIGNNConfig
-from alignn.models.alignn_cgcnn import ACGCNNConfig
-from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
+
+# from alignn.models.modified_cgcnn import CGCNNConfig
+# from alignn.models.icgcnn import ICGCNNConfig
+# from alignn.models.gcn import SimpleGCNConfig
+# from alignn.models.densegcn import DenseGCNConfig
+# from pydantic import model_validator
+# from alignn.models.dense_alignn import DenseALIGNNConfig
+# from alignn.models.alignn_cgcnn import ACGCNNConfig
+# from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
 
 # from typing import List
 
@@ -161,9 +162,9 @@ class TrainingConfig(BaseSettings):
     ] = "dft_3d"
     target: TARGET_ENUM = "formation_energy_peratom"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
-    neighbor_strategy: Literal[
-        "k-nearest", "voronoi", "radius_graph"
-    ] = "k-nearest"
+    neighbor_strategy: Literal["k-nearest", "voronoi", "radius_graph"] = (
+        "k-nearest"
+    )
     id_tag: Literal["jid", "id", "_oqmd_entry_id"] = "jid"
 
     # logging configuration
@@ -216,26 +217,26 @@ class TrainingConfig(BaseSettings):
 
     # model configuration
     model: Union[
-        CGCNNConfig,
-        ICGCNNConfig,
-        SimpleGCNConfig,
-        DenseGCNConfig,
         ALIGNNConfig,
         ALIGNNAtomWiseConfig,
-        ALIGNN_LN_Config,
-        DenseALIGNNConfig,
-        ACGCNNConfig,
+        # CGCNNConfig,
+        # ICGCNNConfig,
+        # SimpleGCNConfig,
+        # DenseGCNConfig,
+        # ALIGNN_LN_Config,
+        # DenseALIGNNConfig,
+        # ACGCNNConfig,
     ] = ALIGNNConfig(name="alignn")
-    # ] = CGCNNConfig(name="cgcnn")
 
-    @root_validator()
-    def set_input_size(cls, values):
-        """Automatically configure node feature dimensionality."""
-        values["model"].atom_input_features = FEATURESET_SIZE[
-            values["atom_features"]
-        ]
+    # @root_validator()
+    # @model_validator(mode='before')
+    ##def set_input_size(cls, values):
+    #    """Automatically configure node feature dimensionality."""
+    #    values["model"].atom_input_features = FEATURESET_SIZE[
+    #        values["atom_features"]
+    #    ]
 
-        return values
+    #    return values
 
     # @property
     # def atom_input_features(self):
