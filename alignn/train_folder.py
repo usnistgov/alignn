@@ -92,7 +92,7 @@ def train_for_folder(
     # config_dat=os.path.join(root_dir,config_name)
     id_prop_dat = os.path.join(root_dir, "id_prop.csv")
     config = loadjson(config_name)
-    config = TrainingConfig(**config)
+    # config = TrainingConfig(**config)
     if type(config) is dict:
         try:
             config = TrainingConfig(**config)

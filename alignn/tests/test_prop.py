@@ -73,17 +73,6 @@ def test_models():
     print()
     print()
 
-    config["model"]["name"] = "alignn_layernorm"
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
     config["model"]["name"] = "alignn"
     config["classification_threshold"] = 0.0
     t1 = time.time()

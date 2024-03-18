@@ -184,16 +184,16 @@ def train_dgl(
     line_graph = False
     alignn_models = {
         "alignn",
-        "dense_alignn",
-        "alignn_cgcnn",
-        "alignn_layernorm",
+        # "dense_alignn",
+        # "alignn_cgcnn",
+        # "alignn_layernorm",
     }
-    if config.model.name == "clgn":
-        line_graph = True
-    if config.model.name == "cgcnn":
-        line_graph = True
-    if config.model.name == "icgcnn":
-        line_graph = True
+    # if config.model.name == "clgn":
+    #    line_graph = True
+    # if config.model.name == "cgcnn":
+    #    line_graph = True
+    # if config.model.name == "icgcnn":
+    #    line_graph = True
     if config.model.name in alignn_models and config.model.alignn_layers > 0:
         line_graph = True
     # print ('output_dir train', config.output_dir)
