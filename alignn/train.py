@@ -45,12 +45,12 @@ import numpy as np
 from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
 from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
-from alignn import models
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn import ALIGNN
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
 
+# from alignn import models
 # from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
 # from alignn.models.modified_cgcnn import CGCNN
 # from alignn.models.dense_alignn import DenseALIGNN

@@ -230,7 +230,7 @@ class TrainingConfig(BaseSettings):
 
     # @root_validator()
     # @model_validator(mode='before')
-    ##def set_input_size(cls, values):
+    # def set_input_size(cls, values):
     #    """Automatically configure node feature dimensionality."""
     #    values["model"].atom_input_features = FEATURESET_SIZE[
     #        values["atom_features"]
