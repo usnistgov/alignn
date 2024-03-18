@@ -109,7 +109,9 @@ pip install dgl==1.0.1+cu117 -f https://data.dgl.ai/wheels/cu117/repo.html
 Examples
 ---------
 
-#### Dataset
+Here, we provide examples for property prediction tasks, development of machine-learning force-fields (MLFF), usage of pre-trained property predictor, MLFFs, webapps etc.
+
+#### Dataset preparation for property prediction tasks
 The main script to train model is `train_folder.py`. A user needs at least the following info to train a model: 1) `id_prop.csv` with name of the file and corresponding value, 2) `config_example.json` a config file with training and hyperparameters.
 
 Users can keep their structure files in `POSCAR`, `.cif`, `.xyz` or `.pdb` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop.csv` file.
@@ -148,6 +150,10 @@ train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "al
 Users can try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the [alignn/scripts/train_*.py](https://github.com/usnistgov/alignn/tree/main/alignn/scripts) folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.
 These scripts automatically download datasets from [Databases in jarvis-tools](https://jarvis-tools.readthedocs.io/en/master/databases.html) and train several models. Make sure you specify your specific queuing system details in the scripts.
 
+#### other examples
+
+Additional example trainings for [2D-exfoliation energy](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb), [superconductor transition temperature](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Sc.ipynb).
+
 <a name="pretrained"></a>
 Using pre-trained models
 -------------------------
@@ -177,6 +183,8 @@ The following [notebook](https://colab.research.google.com/github/knc6/jarvis-to
 
 The following [notebook](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb) provides an example of ALIGNN-FF model.
 
+For additional notebooks, checkout [JARVIS-Tools-Notebooks](https://github.com/JARVIS-Materials-Design/jarvis-tools-notebooks?tab=readme-ov-file#artificial-intelligencemachine-learning)
+
 <a name="webapp"></a>
 Web-app
 ------------
@@ -190,6 +198,8 @@ A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https:
 <a name="alignnff"></a>
 ALIGNN-FF
 -------------------------
+
+Atomisitic line graph neural network-based FF (ALIGNN-FF) can be used to model both structurally and chemically diverse systems with any combination of 89 elements from the periodic table. To train the ALIGNN-FF model, we have used the JARVIS-DFT dataset which contains around 75000 materials and 4 million energy-force entries, out of which 307113 are used in the training. These models can be further finetuned, or new models can be developed from scratch on a new dataset.
 
 [ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html) provides interface to various codes. An example for ALIGNN-FF is give below. Note that there are multiple pretrained ALIGNN-FF models available, here we use the deafult_path model. As more accurate models are developed, they will be made available as well:
 
@@ -228,11 +238,18 @@ plt.show()
 
 To train ALIGNN-FF use `train_folder_ff.py` script which uses `atomwise_alignn` model:
 
-AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data_ff directory). Note ALIGNN-FF requires energy stored as energy per atom:
+AtomWise prediction example which looks for similar setup as before but unstead of `id_prop.csv`, it requires `id_prop.json` file (see example in the sample_data_ff directory). An example to compile vasprun.xml files into a id_prop.json is kept [here](https://colab.research.google.com/gist/knc6/5513b21f5fd83a7943509ffdf5c3608b/make_id_prop.ipynb). Note ALIGNN-FF requires energy stored as energy per atom:
+
 
 ```
 train_folder_ff.py --root_dir "alignn/examples/sample_data_ff" --config "alignn/examples/sample_data_ff/config_example_atomwise.json" --output_dir=temp
 ```
+
+
+To finetune model, use `--restart_model_path` tag as well in the above with the path of a pretrained ALIGNN-FF model with same model confurations.
+
+An example for training MLFF for silicon is provided [here](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb). It is highly recommeded to get familiar with this example before developing a new model. Note: new model configs such as `lg_on_fly` and `add_reverse_forces` should be defaulted to True for newer versions. For MD runs, `use_cutoff_function` is recommended. 
+
 
 A pretrained ALIGNN-FF (under active development right now) can be used for predicting several properties, such as:
 
@@ -248,7 +265,7 @@ To know about other tasks, type.
 run_alignn_ff.py -h
 ```
 
-
+Several supporting scripts for stucture optimization, equation of states, phonon and related calculations are provided in the repo as well. If you need further assistance for a particular task, feel free to raise an GitHus issue.
 
 <a name="performances"></a>
 
