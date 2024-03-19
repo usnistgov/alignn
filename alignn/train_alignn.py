@@ -215,7 +215,21 @@ def train_for_folder(
                 n_outputs.append(tmp)
             info["target"] = tmp
             file_path = os.path.join(root_dir, file_name)
-            atoms = Atoms.from_poscar(file_path)
+            if file_format == "poscar":
+                atoms = Atoms.from_poscar(file_path)
+            elif file_format == "cif":
+                atoms = Atoms.from_cif(file_path)
+            elif file_format == "xyz":
+                atoms = Atoms.from_xyz(file_path, box_size=500)
+            elif file_format == "pdb":
+                # Note using 500 angstrom as box size
+                # Recommended install pytraj
+                # conda install -c ambermd pytraj
+                atoms = Atoms.from_pdb(file_path, max_lat=500)
+            else:
+                raise NotImplementedError(
+                    "File format not implemented", file_format
+                )
             info["atoms"] = atoms.to_dict()
         else:
             info["target"] = i[target_key]

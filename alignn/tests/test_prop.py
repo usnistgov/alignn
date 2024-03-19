@@ -9,8 +9,7 @@ from alignn.pretrained import get_multiple_predictions
 from sklearn.metrics import mean_absolute_error
 import os
 from jarvis.core.atoms import Atoms
-from alignn.train_folder import train_for_folder
-from alignn.train_folder_ff import train_for_folder as train_for_folder_ff
+from alignn.train_alignn import train_for_folder
 from jarvis.db.figshare import get_jid_data
 from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, revised_path
 
@@ -175,7 +174,7 @@ def test_alignn_train():
             "../examples/sample_data_ff/config_example_atomwise.json",
         )
     )
-    train_for_folder_ff(root_dir=root_dir, config_name=config)
+    train_for_folder(root_dir=root_dir, config_name=config)
 
 
 def test_calculator():
