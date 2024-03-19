@@ -241,5 +241,5 @@ def test_del_files():
 # test_pretrained()
 # test_runtime_training()
 # test_alignn_train()
-test_models()
+# test_models()
 # test_calculator()

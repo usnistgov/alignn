@@ -37,19 +37,9 @@ setuptools.setup(
         # "accelerate>=0.20.3",
         # "dgl-cu101>=0.6.0",
     ],
-    # package_data={
-    #    "alignn.ff.alignnff_wt10": ["best_model.pt", "config.json"],
-    #    "alignn.ff.alignnff_wt1": ["best_model.pt", "config.json"],
-    #    "alignn.ff.alignnff_wt01": ["best_model.pt", "config.json"],
-    #    "alignn.ff.revised": ["best_model.pt", "config.json"],
-    #    "alignn.ff.fmult_mlearn_only": ["best_model.pt", "config.json"],
-    #    "alignn.ff.alignnff_fd": ["best_model.pt", "config.json"],
-    #    "alignn.ff.alignnff_fmult": ["best_model.pt", "config.json"],
-    # },
     scripts=[
         "alignn/pretrained.py",
-        "alignn/train_folder.py",
-        "alignn/train_folder_ff.py",
+        "alignn/train_alignn.py",
         "alignn/run_alignn_ff.py",
     ],
     long_description=long_description,
@@ -58,8 +48,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: NIST License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.9",
 )
