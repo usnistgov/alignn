@@ -36,7 +36,6 @@ def test_alignnff():
     print("atoms", atoms)
     # atoms = atoms.make_supercell_matrix([2, 2, 2])
     # atoms=atoms.strain_atoms(.05)
-    # print(atoms)
     ev = ev_curve(atoms=atoms, model_path=model_path)
     # surf = surface_energy(atoms=atoms, model_path=model_path)
     # print('surf',surf)
