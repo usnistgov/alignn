@@ -405,7 +405,8 @@ Useful notes (based on some of the queries we received)
 3) Make sure you use `batch_size` as 32 or 64 for large datasets, and not 2 as given in the example config file, else it will take much longer to train, and performnce might drop a lot.
 4) Note that `train_alignn.py` and `pretrained.py` in alignn folder are actually python executable scripts. So, even if you don't provide absolute path of these scripts, they should work.
 5) Learn about the issue with QM9 results here: https://github.com/usnistgov/alignn/issues/54
-6) Make sure you have `pandas` version as 1.2.3.
+6) Make sure you have `pandas` version as >1.2.3.
+7) Starting March 2024, pytroch-ignite dependency will be removed to enable conda-forge build.
 
 
 <a name="refs"></a>

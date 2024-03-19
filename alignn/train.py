@@ -711,7 +711,8 @@ def train_dgl(
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])["out"]
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 # out_data = torch.exp(out_data.cpu())
                 # print('target',target)
                 # print('out_data',out_data)
@@ -744,7 +745,8 @@ def train_dgl(
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])["out"]
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(open("sc.pkl", "rb"))
@@ -782,7 +784,8 @@ def train_dgl(
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])["out"]
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
@@ -818,7 +821,8 @@ def train_dgl(
             ids = train_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(train_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])["out"]
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
