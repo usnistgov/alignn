@@ -44,8 +44,8 @@ jobs:
         coverage report -m -i
         codecov
         codecov --token="85bd9c5d-9e55-4f6d-bd69-350ee5e3bb41"
-        echo 'Train folder'
-        train_folder.py -h 
+        echo 'Train alignn'
+        train_alignn.py -h 
         echo 'Pre-trained models'
         pretrained.py -h
         #train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp
