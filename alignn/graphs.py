@@ -1,4 +1,5 @@
 """Module to generate networkx graphs."""
+
 from jarvis.core.atoms import get_supercell_dims
 from jarvis.core.specie import Specie
 from jarvis.core.utils import random_colors
@@ -861,7 +862,7 @@ class StructureDataset(torch.utils.data.Dataset):
         """Get StructureDataset sample."""
         g = self.graphs[idx]
         label = self.labels[idx]
-
+        # id = self.ids[idx]
         if self.transform:
             g = self.transform(g)
 

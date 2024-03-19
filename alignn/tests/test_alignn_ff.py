@@ -9,6 +9,18 @@ from alignn.ff.ff import (
     get_interface_energy,
 )
 from alignn.graphs import Graph
+from alignn.ff.ff import phonons
+from jarvis.core.atoms import ase_to_atoms
+from jarvis.db.figshare import get_jid_data
+from jarvis.core.atoms import Atoms
+from alignn.ff.ff import (
+    AlignnAtomwiseCalculator,
+    default_path,
+    wt10_path,
+    alignnff_fmult,
+    fd_path,
+    ForceField,
+)
 
 
 def test_alignnff():
@@ -24,7 +36,6 @@ def test_alignnff():
     print("atoms", atoms)
     # atoms = atoms.make_supercell_matrix([2, 2, 2])
     # atoms=atoms.strain_atoms(.05)
-    # print(atoms)
     ev = ev_curve(atoms=atoms, model_path=model_path)
     # surf = surface_energy(atoms=atoms, model_path=model_path)
     # print('surf',surf)
@@ -51,13 +62,21 @@ def test_alignnff():
         get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
     )
     intf = get_interface_energy(
-       film_atoms=atoms_al,
-       subs_atoms=atoms_al,
-       model_path=model_path,
-       film_thickness=10,
-       subs_thickness=10
-       # film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
+        film_atoms=atoms_al,
+        subs_atoms=atoms_al,
+        model_path=model_path,
+        film_thickness=10,
+        subs_thickness=10,
+        # film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
     )
+
+
+def test_phonons():
+    atoms = Atoms.from_dict(
+        get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    )
+    ph_path = fd_path()
+    ph = phonons(model_path=ph_path, atoms=(atoms))
 
 
 # test_alignnff()

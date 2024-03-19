@@ -2,6 +2,7 @@
 
 A prototype crystal line graph network dgl implementation.
 """
+
 from typing import Tuple, Union
 from torch.autograd import grad
 import dgl
@@ -11,7 +12,7 @@ from dgl.nn import AvgPooling
 import torch
 
 # from dgl.nn.functional import edge_softmax
-from pydantic.typing import Literal
+from typing import Literal
 from torch import nn
 from torch.nn import functional as F
 from alignn.models.utils import RBFExpansion
@@ -333,8 +334,9 @@ class ALIGNNAtomWise(nn.Module):
             )
 
         if self.classification:
-            self.fc = nn.Linear(config.hidden_features, 2)
-            self.softmax = nn.LogSoftmax(dim=1)
+            self.fc = nn.Linear(config.hidden_features, 1)
+            self.softmax = nn.Sigmoid()
+            # self.softmax = nn.LogSoftmax(dim=1)
         else:
             self.fc = nn.Linear(config.hidden_features, config.output_features)
         self.link = None
@@ -543,6 +545,7 @@ class ALIGNNAtomWise(nn.Module):
             out = self.link(out)
 
         if self.classification:
+            # out = torch.max(out,dim=1)
             out = self.softmax(out)
         result["out"] = out
         result["grad"] = forces

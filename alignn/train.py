@@ -6,69 +6,26 @@ then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 
 from functools import partial
-
-# from pathlib import Path
 from typing import Any, Dict, Union
-import ignite
 import torch
 import random
-from ignite.contrib.handlers import TensorboardLogger
 from sklearn.metrics import mean_absolute_error
-
-try:
-    from ignite.contrib.handlers.stores import EpochOutputStore
-
-    # For different version of pytorch-ignite
-except Exception:
-    from ignite.handlers.stores import EpochOutputStore
-
-    pass
-from ignite.handlers import EarlyStopping
-from ignite.contrib.handlers.tensorboard_logger import (
-    global_step_from_engine,
-)
-from ignite.contrib.handlers.tqdm_logger import ProgressBar
-from ignite.engine import (
-    Events,
-    create_supervised_evaluator,
-    create_supervised_trainer,
-)
-from ignite.contrib.metrics import ROC_AUC, RocCurve
-from ignite.metrics import (
-    Accuracy,
-    Precision,
-    Recall,
-    ConfusionMatrix,
-)
+from sklearn.metrics import log_loss
 import pickle as pk
 import numpy as np
-from ignite.handlers import Checkpoint, DiskSaver, TerminateOnNan
-from ignite.metrics import Loss, MeanAbsoluteError
 from torch import nn
-from alignn import models
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
-from alignn.models.alignn import ALIGNN
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
-from alignn.models.alignn_layernorm import ALIGNN as ALIGNN_LN
-from alignn.models.modified_cgcnn import CGCNN
-from alignn.models.dense_alignn import DenseALIGNN
-from alignn.models.densegcn import DenseGCN
-from alignn.models.icgcnn import iCGCNN
-from alignn.models.alignn_cgcnn import ACGCNN
 from jarvis.db.jsonutils import dumpjson
 import json
 import pprint
-
-# from accelerate import Accelerator
 import os
 import warnings
+import time
+from sklearn.metrics import roc_auc_score
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-# from sklearn.decomposition import PCA, KernelPCA
-# from sklearn.preprocessing import StandardScaler
-
-# torch config
 torch.set_default_dtype(torch.float32)
 
 
@@ -91,7 +48,6 @@ def make_standard_scalar_and_pca(output):
     # pc = pk.load(open("pca.pkl", "rb"))
     # y_pred = torch.tensor(pc.transform(y_pred), device=device)
     # y = torch.tensor(pc.transform(y), device=device)
-
     # y_pred = torch.tensor(pca_sc.inverse_transform(y_pred),device=device)
     # y = torch.tensor(pca_sc.inverse_transform(y),device=device)
     # print (y.shape,y_pred.shape)
@@ -159,7 +115,6 @@ def train_dgl(
             config = TrainingConfig(**config)
         except Exception as exp:
             print("Check", exp)
-    import os
 
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
@@ -176,26 +131,10 @@ def train_dgl(
     pprint.pprint(tmp)  # , sort_dicts=False)
     if config.classification_threshold is not None:
         classification = True
-    if config.random_seed is not None:
-        deterministic = True
-        ignite.utils.manual_seed(config.random_seed)
 
     line_graph = False
-    alignn_models = {
-        "alignn",
-        "dense_alignn",
-        "alignn_cgcnn",
-        "alignn_layernorm",
-    }
-    if config.model.name == "clgn":
+    if config.model.alignn_layers > 0:
         line_graph = True
-    if config.model.name == "cgcnn":
-        line_graph = True
-    if config.model.name == "icgcnn":
-        line_graph = True
-    if config.model.name in alignn_models and config.model.alignn_layers > 0:
-        line_graph = True
-    # print ('output_dir train', config.output_dir)
     if not train_val_test_loaders:
         # use input standardization for all real-valued feature sets
         # print("config.neighbor_strategy",config.neighbor_strategy)
@@ -207,7 +146,6 @@ def train_dgl(
             test_loader,
             prepare_batch,
         ) = get_train_val_loaders(
-            # ) = data.get_train_val_loaders(
             dataset=config.dataset,
             target=config.target,
             n_train=config.n_train,
@@ -244,27 +182,11 @@ def train_dgl(
     device = "cpu"
     if torch.cuda.is_available():
         device = torch.device("cuda")
-    if config.distributed:
-        print(
-            "Using Accelerator, currently experimental, use at your own risk."
-        )
-        from accelerate import Accelerator
-
-        accelerator = Accelerator()
-        device = accelerator.device
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True
-    # define network, optimizer, scheduler
     _model = {
-        "cgcnn": CGCNN,
-        "icgcnn": iCGCNN,
-        "densegcn": DenseGCN,
-        "alignn": ALIGNN,
         "alignn_atomwise": ALIGNNAtomWise,
-        "dense_alignn": DenseALIGNN,
-        "alignn_cgcnn": ACGCNN,
-        "alignn_layernorm": ALIGNN_LN,
     }
     if config.random_seed is not None:
         random.seed(config.random_seed)
@@ -286,10 +208,12 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
-    if config.data_parallel and torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        net = torch.nn.DataParallel(net)
     net.to(device)
+    if config.data_parallel and torch.cuda.device_count() > 1:
+        # For multi-GPU training make data_parallel:true in config.json file
+        device_ids = [cid for cid in range(torch.cuda.device_count())]
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        net = torch.nn.DataParallel(net, device_ids=device_ids).cuda()
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
@@ -369,7 +293,10 @@ def train_dgl(
                 pred_out = np.array(pred_out)
                 # print('target_out',target_out,target_out.shape)
                 # print('pred_out',pred_out,pred_out.shape)
-                mean_out = mean_absolute_error(target_out, pred_out)
+                if classification:
+                    mean_out = log_loss(target_out, pred_out)
+                else:
+                    mean_out = mean_absolute_error(target_out, pred_out)
             if "target_stress" in i:
                 # if i["target_stress"]:
                 mean_stress = np.array(stress).mean()
@@ -387,32 +314,22 @@ def train_dgl(
 
         best_loss = np.inf
         criterion = nn.L1Loss()
-        # criterion = nn.MSELoss()
+        if classification:
+            criterion = nn.NLLLoss()
         params = group_decay(net)
         optimizer = setup_optimizer(params, config)
         # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
-        if config.distributed:
-            from accelerate import Accelerator
-
-            accelerator = Accelerator()
-            print("Using Accelerator device", accelerator.device)
-
-            device = accelerator.device
-            # print('model',net)
-            net.to(device)
-            train_loader, val_loader, model, optimizer = accelerator.prepare(
-                train_loader, val_loader, net, optimizer
-            )
         history_train = []
         history_val = []
         for e in range(config.epochs):
             # optimizer.zero_grad()
+            train_init_time = time.time()
             running_loss = 0
             train_result = []
             # for dats in train_loader:
             for dats, jid in zip(train_loader, train_loader.dataset.ids):
                 info = {}
-                info["id"] = jid
+                # info["id"] = jid
                 optimizer.zero_grad()
                 result = net([dats[0].to(device), dats[1].to(device)])
                 # info = {}
@@ -430,6 +347,8 @@ def train_dgl(
                 loss3 = 0  # Such as forces
                 loss4 = 0  # Such as stresses
                 if config.model.output_features is not None:
+                    # print('result["out"]',result["out"])
+                    # print('dats[2]',dats[2])
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"], dats[2].to(device)
                     )
@@ -522,13 +441,7 @@ def train_dgl(
                     # print("pred_stress", info["pred_stress"][0])
                 train_result.append(info)
                 loss = loss1 + loss2 + loss3 + loss4
-                if config.distributed:
-                    from accelerate import Accelerator
-
-                    accelerator = Accelerator()
-                    accelerator.backward(loss)
-                else:
-                    loss.backward()
+                loss.backward()
                 optimizer.step()
                 # optimizer.zero_grad() #never
                 running_loss += loss.item()
@@ -537,42 +450,25 @@ def train_dgl(
             )
             # dumpjson(filename="Train_results.json", data=train_result)
             scheduler.step()
-            if config.distributed:
-                from accelerate import Accelerator
-
-                accelerator = Accelerator()
-                accelerator.print(
-                    "TrainLoss",
-                    "Epoch",
-                    e,
-                    "total",
-                    running_loss,
-                    "out",
-                    mean_out,
-                    "atom",
-                    mean_atom,
-                    "grad",
-                    mean_grad,
-                    "stress",
-                    mean_stress,
-                )
-
-            else:
-                print(
-                    "TrainLoss",
-                    "Epoch",
-                    e,
-                    "total",
-                    running_loss,
-                    "out",
-                    mean_out,
-                    "atom",
-                    mean_atom,
-                    "grad",
-                    mean_grad,
-                    "stress",
-                    mean_stress,
-                )
+            train_final_time = time.time()
+            train_ep_time = train_final_time - train_init_time
+            print(
+                "TrainLoss",
+                "Epoch",
+                e,
+                "total",
+                running_loss,
+                "out",
+                mean_out,
+                "atom",
+                mean_atom,
+                "grad",
+                mean_grad,
+                "stress",
+                mean_stress,
+                "time",
+                train_ep_time,
+            )
             history_train.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_train.json"),
@@ -668,6 +564,7 @@ def train_dgl(
                 net.state_dict(),
                 os.path.join(config.output_dir, current_model_name),
             )
+            saving_msg = ""
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_model_name = "best_model.pt"
@@ -675,13 +572,8 @@ def train_dgl(
                     net.state_dict(),
                     os.path.join(config.output_dir, best_model_name),
                 )
-                if config.distributed:
-                    from accelerate import Accelerator
-
-                    accelerator = Accelerator()
-                    accelerator.print("Saving data for epoch:", e)
-                else:
-                    print("Saving data for epoch:", e)
+                # print("Saving data for epoch:", e)
+                saving_msg = "Saving model"
                 dumpjson(
                     filename=os.path.join(
                         config.output_dir, "Train_results.json"
@@ -694,41 +586,23 @@ def train_dgl(
                     ),
                     data=val_result,
                 )
-            if config.distributed:
-                from accelerate import Accelerator
-
-                accelerator = Accelerator()
-                accelerator.print(
-                    "ValLoss",
-                    "Epoch",
-                    e,
-                    "total",
-                    val_loss,
-                    "out",
-                    mean_out,
-                    "atom",
-                    mean_atom,
-                    "grad",
-                    mean_grad,
-                    "stress",
-                    mean_stress,
-                )
-            else:
-                print(
-                    "ValLoss",
-                    "Epoch",
-                    e,
-                    "total",
-                    val_loss,
-                    "out",
-                    mean_out,
-                    "atom",
-                    mean_atom,
-                    "grad",
-                    mean_grad,
-                    "stress",
-                    mean_stress,
-                )
+                best_model = net
+            print(
+                "ValLoss",
+                "Epoch",
+                e,
+                "total",
+                val_loss,
+                "out",
+                mean_out,
+                "atom",
+                mean_atom,
+                "grad",
+                mean_grad,
+                "stress",
+                mean_stress,
+                saving_msg,
+            )
             history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_val.json"),
@@ -750,7 +624,9 @@ def train_dgl(
             loss2 = 0  # Such as bader charges
             loss3 = 0  # Such as forces
             loss4 = 0  # Such as stresses
-            if config.model.output_features is not None:
+            if config.model.output_features is not None and not classification:
+                # print('result["out"]',result["out"])
+                # print('dats[2]',dats[2])
                 loss1 = config.model.graphwise_weight * criterion(
                     result["out"], dats[2].to(device)
                 )
@@ -807,14 +683,9 @@ def train_dgl(
                 )
             test_result.append(info)
             loss = loss1 + loss2 + loss3 + loss4
-            test_loss += loss.item()
-        if config.distributed:
-            from accelerate import Accelerator
-
-            accelerator = Accelerator()
-            accelerator.print("TestLoss", e, test_loss)
-        else:
-            print("TestLoss", e, test_loss)
+            if not classification:
+                test_loss += loss.item()
+        print("TestLoss", e, test_loss)
         dumpjson(
             filename=os.path.join(config.output_dir, "Test_results.json"),
             data=test_result,
@@ -824,315 +695,11 @@ def train_dgl(
             net.state_dict(),
             os.path.join(config.output_dir, last_model_name),
         )
-        return test_result
+        # return test_result
 
-    if config.distributed:
-        import torch.distributed as dist
-        import os
-
-        print()
-        print()
-        print()
-        gpus = torch.cuda.device_count()
-        print("Using DistributedDataParallel !!!", gpus)
-
-        def setup(rank, world_size):
-            os.environ["MASTER_ADDR"] = "localhost"
-            os.environ["MASTER_PORT"] = "12355"
-
-            # initialize the process group
-            dist.init_process_group("gloo", rank=rank, world_size=world_size)
-
-        def cleanup():
-            dist.destroy_process_group()
-
-        setup(2, 2)
-        local_rank = [0, 1]
-        # net=torch.nn.parallel.DataParallel(net
-        # ,device_ids=[local_rank, ],output_device=local_rank)
-        net = torch.nn.parallel.DistributedDataParallel(
-            net,
-            device_ids=[
-                local_rank,
-            ],
-            output_device=local_rank,
-        )
-        print()
-        print()
-        print()
-        # )  # ,device_ids=[local_rank, ],output_device=local_rank)
-    """
-    # group parameters to skip weight decay for bias and batchnorm
-    params = group_decay(net)
-    optimizer = setup_optimizer(params, config)
-
-    if config.scheduler == "none":
-        # always return multiplier of 1 (i.e. do nothing)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer, lambda epoch: 1.0
-        )
-
-    elif config.scheduler == "onecycle":
-        steps_per_epoch = len(train_loader)
-        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer,
-            max_lr=config.learning_rate,
-            epochs=config.epochs,
-            steps_per_epoch=steps_per_epoch,
-            # pct_start=pct_start,
-            pct_start=0.3,
-        )
-    elif config.scheduler == "step":
-        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer,
-        )
-
-    """
-    # select configured loss function
-    criteria = {
-        "mse": nn.MSELoss(),
-        "l1": nn.L1Loss(),
-        "poisson": nn.PoissonNLLLoss(log_input=False, full=True),
-        "zig": models.modified_cgcnn.ZeroInflatedGammaLoss(),
-    }
-    criterion = criteria[config.criterion]
-
-    # set up training engine and evaluators
-    metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
-    if config.model.output_features > 1 and config.standard_scalar_and_pca:
-        # metrics = {"loss": Loss(criterion), "mae": MeanAbsoluteError()}
-        metrics = {
-            "loss": Loss(
-                criterion, output_transform=make_standard_scalar_and_pca
-            ),
-            "mae": MeanAbsoluteError(
-                output_transform=make_standard_scalar_and_pca
-            ),
-        }
-
-    if config.criterion == "zig":
-
-        def zig_prediction_transform(x):
-            output, y = x
-            return criterion.predict(output), y
-
-        metrics = {
-            "loss": Loss(criterion),
-            "mae": MeanAbsoluteError(
-                output_transform=zig_prediction_transform
-            ),
-        }
-
-    if classification:
-        criterion = nn.NLLLoss()
-
-        metrics = {
-            "accuracy": Accuracy(
-                output_transform=thresholded_output_transform
-            ),
-            "precision": Precision(
-                output_transform=thresholded_output_transform
-            ),
-            "recall": Recall(output_transform=thresholded_output_transform),
-            "rocauc": ROC_AUC(output_transform=activated_output_transform),
-            "roccurve": RocCurve(output_transform=activated_output_transform),
-            "confmat": ConfusionMatrix(
-                output_transform=thresholded_output_transform, num_classes=2
-            ),
-        }
-    trainer = create_supervised_trainer(
-        net,
-        optimizer,
-        criterion,
-        prepare_batch=prepare_batch,
-        device=device,
-        deterministic=deterministic,
-        # output_transform=make_standard_scalar_and_pca,
-    )
-
-    evaluator = create_supervised_evaluator(
-        net,
-        metrics=metrics,
-        prepare_batch=prepare_batch,
-        device=device,
-        # output_transform=make_standard_scalar_and_pca,
-    )
-
-    train_evaluator = create_supervised_evaluator(
-        net,
-        metrics=metrics,
-        prepare_batch=prepare_batch,
-        device=device,
-        # output_transform=make_standard_scalar_and_pca,
-    )
-
-    # ignite event handlers:
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, TerminateOnNan())
-
-    # apply learning rate scheduler
-    trainer.add_event_handler(
-        Events.ITERATION_COMPLETED, lambda engine: scheduler.step()
-    )
-
-    if config.write_checkpoint:
-        # model checkpointing
-        to_save = {
-            "model": net,
-            "optimizer": optimizer,
-            "lr_scheduler": scheduler,
-            "trainer": trainer,
-        }
-        if classification:
-
-            def cp_score(engine):
-                """Higher accuracy is better."""
-                return engine.state.metrics["accuracy"]
-
-        else:
-
-            def cp_score(engine):
-                """Lower MAE is better."""
-                return -engine.state.metrics["mae"]
-
-        # save last two epochs
-        evaluator.add_event_handler(
-            Events.EPOCH_COMPLETED,
-            Checkpoint(
-                to_save,
-                DiskSaver(
-                    checkpoint_dir, create_dir=True, require_empty=False
-                ),
-                n_saved=2,
-                global_step_transform=lambda *_: trainer.state.epoch,
-            ),
-        )
-        # save best model
-        evaluator.add_event_handler(
-            Events.EPOCH_COMPLETED,
-            Checkpoint(
-                to_save,
-                DiskSaver(
-                    checkpoint_dir, create_dir=True, require_empty=False
-                ),
-                filename_pattern="best_model.{ext}",
-                n_saved=1,
-                global_step_transform=lambda *_: trainer.state.epoch,
-                score_function=cp_score,
-            ),
-        )
-    if config.progress:
-        pbar = ProgressBar()
-        pbar.attach(trainer, output_transform=lambda x: {"loss": x})
-        # pbar.attach(evaluator,output_transform=lambda x: {"mae": x})
-
-    history = {
-        "train": {m: [] for m in metrics.keys()},
-        "validation": {m: [] for m in metrics.keys()},
-    }
-
-    if config.store_outputs:
-        # log_results handler will save epoch output
-        # in history["EOS"]
-        eos = EpochOutputStore()
-        eos.attach(evaluator)
-        train_eos = EpochOutputStore()
-        train_eos.attach(train_evaluator)
-
-    # collect evaluation performance
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def log_results(engine):
-        """Print training and validation metrics to console."""
-        train_evaluator.run(train_loader)
-        evaluator.run(val_loader)
-
-        tmetrics = train_evaluator.state.metrics
-        vmetrics = evaluator.state.metrics
-        for metric in metrics.keys():
-            tm = tmetrics[metric]
-            vm = vmetrics[metric]
-            if metric == "roccurve":
-                tm = [k.tolist() for k in tm]
-                vm = [k.tolist() for k in vm]
-            if isinstance(tm, torch.Tensor):
-                tm = tm.cpu().numpy().tolist()
-                vm = vm.cpu().numpy().tolist()
-
-            history["train"][metric].append(tm)
-            history["validation"][metric].append(vm)
-
-        # for metric in metrics.keys():
-        #    history["train"][metric].append(tmetrics[metric])
-        #    history["validation"][metric].append(vmetrics[metric])
-
-        if config.store_outputs:
-            history["EOS"] = eos.data
-            history["trainEOS"] = train_eos.data
-            dumpjson(
-                filename=os.path.join(config.output_dir, "history_val.json"),
-                data=history["validation"],
-            )
-            dumpjson(
-                filename=os.path.join(config.output_dir, "history_train.json"),
-                data=history["train"],
-            )
-        if config.progress:
-            pbar = ProgressBar()
-            if not classification:
-                pbar.log_message(f"Val_MAE: {vmetrics['mae']:.4f}")
-                pbar.log_message(f"Train_MAE: {tmetrics['mae']:.4f}")
-            else:
-                pbar.log_message(f"Train ROC AUC: {tmetrics['rocauc']:.4f}")
-                pbar.log_message(f"Val ROC AUC: {vmetrics['rocauc']:.4f}")
-
-    if config.n_early_stopping is not None:
-        # early stopping if no improvement (improvement = higher score)
-        if classification:
-
-            def es_score(engine):
-                """Higher accuracy is better."""
-                return engine.state.metrics["accuracy"]
-
-        else:
-
-            def es_score(engine):
-                """Lower MAE is better."""
-                return -engine.state.metrics["mae"]
-
-        es_handler = EarlyStopping(
-            patience=config.n_early_stopping,
-            score_function=es_score,
-            trainer=trainer,
-        )
-        evaluator.add_event_handler(Events.EPOCH_COMPLETED, es_handler)
-
-    # optionally log results to tensorboard
-    if config.log_tensorboard:
-        tb_logger = TensorboardLogger(
-            log_dir=os.path.join(config.output_dir, "tb_logs", "test")
-        )
-        for tag, evaluator in [
-            ("training", train_evaluator),
-            ("validation", evaluator),
-        ]:
-            tb_logger.attach_output_handler(
-                evaluator,
-                event_name=Events.EPOCH_COMPLETED,
-                tag=tag,
-                metric_names=["loss", "mae"],
-                global_step_transform=global_step_from_engine(trainer),
-            )
-
-    # train the model!
-    trainer.run(train_loader, max_epochs=config.epochs)
-
-    if config.log_tensorboard:
-        test_loss = evaluator.state.metrics["loss"]
-        tb_logger.writer.add_hparams(config, {"hparam/test_loss": test_loss})
-        tb_logger.close()
     if config.write_predictions and classification:
-        net.eval()
+        best_model.eval()
+        # net.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
             "w",
@@ -1144,8 +711,11 @@ def train_dgl(
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 # out_data = torch.exp(out_data.cpu())
+                # print('target',target)
+                # print('out_data',out_data)
                 top_p, top_class = torch.topk(torch.exp(out_data), k=1)
                 target = int(target.cpu().numpy().flatten().tolist()[0])
 
@@ -1155,7 +725,6 @@ def train_dgl(
                     top_class.cpu().numpy().flatten().tolist()[0]
                 )
         f.close()
-        from sklearn.metrics import roc_auc_score
 
         print("predictions", predictions)
         print("targets", targets)
@@ -1169,13 +738,15 @@ def train_dgl(
         and not classification
         and config.model.output_features > 1
     ):
-        net.eval()
+        best_model.eval()
+        # net.eval()
         mem = []
         with torch.no_grad():
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(open("sc.pkl", "rb"))
@@ -1198,8 +769,10 @@ def train_dgl(
         config.write_predictions
         and not classification
         and config.model.output_features == 1
+        and config.model.gradwise_weight == 0
     ):
-        net.eval()
+        best_model.eval()
+        # net.eval()
         f = open(
             os.path.join(config.output_dir, "prediction_results_test_set.csv"),
             "w",
@@ -1211,7 +784,8 @@ def train_dgl(
             ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(test_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 out_data = out_data.cpu().numpy().tolist()
                 if config.standard_scalar_and_pca:
                     sc = pk.load(
@@ -1232,59 +806,45 @@ def train_dgl(
             "Test MAE:",
             mean_absolute_error(np.array(targets), np.array(predictions)),
         )
-        if config.store_outputs and not classification:
-            # save training targets and predictions here
-            # TODO: Add IDs
-            resultsfile = os.path.join(
+        best_model.eval()
+        # net.eval()
+        f = open(
+            os.path.join(
                 config.output_dir, "prediction_results_train_set.csv"
-            )
-
-            target_vals, predictions = [], []
-
-            for tgt, pred in history["trainEOS"]:
-                target_vals.append(tgt.cpu().numpy().tolist())
-                predictions.append(pred.cpu().numpy().tolist())
-
-            target_vals = np.array(target_vals, dtype="float").flatten()
-            predictions = np.array(predictions, dtype="float").flatten()
-
-            with open(resultsfile, "w") as f:
-                print("target,prediction", file=f)
-                for target_val, predicted_val in zip(target_vals, predictions):
-                    print(f"{target_val}, {predicted_val}", file=f)
-
-    # TODO: Fix IDs for train loader
-    """
-    if config.write_train_predictions:
-        net.eval()
-        f = open("train_prediction_results.csv", "w")
-        f.write("id,target,prediction\n")
+            ),
+            "w",
+        )
+        f.write("target,prediction\n")
+        targets = []
+        predictions = []
         with torch.no_grad():
-            ids = train_loader.dataset.dataset.ids[
-                train_loader.dataset.indices
-            ]
-            print("lens", len(ids), len(train_loader.dataset.dataset))
-            x = []
-            y = []
-
+            ids = train_loader.dataset.ids  # [test_loader.dataset.indices]
             for dat, id in zip(train_loader, ids):
                 g, lg, target = dat
-                out_data = net([g.to(device), lg.to(device)])
+                out_data = best_model([g.to(device), lg.to(device)])["out"]
+                # out_data = net([g.to(device), lg.to(device)])["out"]
                 out_data = out_data.cpu().numpy().tolist()
+                if config.standard_scalar_and_pca:
+                    sc = pk.load(
+                        open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                    )
+                    out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
+                        0
+                    ][0]
                 target = target.cpu().numpy().flatten().tolist()
-                for i, j in zip(out_data, target):
-                    x.append(i)
-                    y.append(j)
-            for i, j, k in zip(ids, x, y):
-                f.write("%s, %6f, %6f\n" % (i, j, k))
+                # if len(target) == 1:
+                #    target = target[0]
+                # if len(out_data) == 1:
+                #    out_data = out_data[0]
+                for ii, jj in zip(target, out_data):
+                    f.write("%6f, %6f\n" % (ii, jj))
+                    targets.append(ii)
+                    predictions.append(jj)
         f.close()
-
-    """
-    return history
 
 
 if __name__ == "__main__":
     config = TrainingConfig(
         random_seed=123, epochs=10, n_train=32, n_val=32, batch_size=16
     )
-    history = train_dgl(config, progress=True)
+    history = train_dgl(config)

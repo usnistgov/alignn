@@ -2,6 +2,7 @@
 
 A prototype crystal line graph network dgl implementation.
 """
+
 from typing import Tuple, Union
 
 import dgl
@@ -11,7 +12,7 @@ import torch
 from dgl.nn import AvgPooling
 
 # from dgl.nn.functional import edge_softmax
-from pydantic.typing import Literal
+from typing import Literal
 from torch import nn
 from torch.nn import functional as F
 

@@ -1,4 +1,5 @@
 """Training script test suite."""
+
 import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,8 +9,7 @@ from alignn.pretrained import get_multiple_predictions
 from sklearn.metrics import mean_absolute_error
 import os
 from jarvis.core.atoms import Atoms
-from alignn.train_folder import train_for_folder
-from alignn.train_folder_ff import train_for_folder as train_for_folder_ff
+from alignn.train_alignn import train_for_folder
 from jarvis.db.figshare import get_jid_data
 from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, revised_path
 
@@ -49,152 +49,37 @@ config = {
 #    os.system(cmd3)
 
 
-def test_minor_configs():
-    tmp = config
-    # tmp["log_tensorboard"] = True
-    tmp["n_early_stopping"] = 2
-    tmp["model"]["name"] = "alignn"
-    config["write_predictions"] = True
-    result = train_dgl(tmp)
+# def test_minor_configs():
+#    tmp = config
+#    # tmp["log_tensorboard"] = True
+#    tmp["n_early_stopping"] = 2
+#    tmp["model"]["name"] = "alignn"
+#    config["write_predictions"] = True
+#    result = train_dgl(tmp)
 
 
 def test_models():
-    """Test CGCNN end to end training."""
-    config["model"]["name"] = "dense_alignn"
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Toal time:", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
 
     config["write_predictions"] = True
-    config["model"]["name"] = "alignn"
+    config["model"]["name"] = "alignn_atomwise"
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
     print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
+    # print("train=", result["train"])
+    # print("validation=", result["validation"])
     print()
     print()
     print()
 
-    config["model"]["name"] = "alignn_layernorm"
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "densegcn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "icgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "alignn_cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    # Classification
-    config["model"]["name"] = "dense_alignn"
-    config["classification_threshold"] = 0.0
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Toal time:", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "alignn"
+    config["model"]["name"] = "alignn_atomwise"
     config["classification_threshold"] = 0.0
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
     print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    config["classification_threshold"] = 0.0
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-
-    config["model"]["name"] = "alignn_cgcnn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = True
-    config["classification_threshold"] = 0.0
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
+    # print("train=", result["train"])
+    # print("validation=", result["validation"])
     print()
     print()
     print()
@@ -289,7 +174,7 @@ def test_alignn_train():
             "../examples/sample_data_ff/config_example_atomwise.json",
         )
     )
-    train_for_folder_ff(root_dir=root_dir, config_name=config)
+    train_for_folder(root_dir=root_dir, config_name=config)
 
 
 def test_calculator():
@@ -309,6 +194,46 @@ def test_calculator():
     # assert round(energy,3)==round(-60.954999923706055,3)
     # assert round(max(forces.flatten()),2)==round(0.08332983,2)
     # assert round(max(stress.flatten()),2)==round(0.002801671050217803,2)
+
+
+def test_del_files():
+    fnames = [
+        "temp",
+        "ase_nve.traj",
+        "ase_nvt_langevin.traj",
+        "ase_nvt_andersen.traj",
+        "opt.log",
+        "opt.traj",
+        "alignn_ff.log",
+        "dataset_data_range",
+        "pred_data.json",
+        "prediction_results_train_set.csv",
+        "multi_out_predictions.json",
+        "checkpoint_2.pt",
+        "checkpoint_3.pt",
+        "prediction_results_test_set.csv",
+        "mad",
+        "ids_train_val_test.json",
+        "train_data_data_range",
+        "val_data_data_range",
+        "test_data_data_range",
+        "config.json",
+        "history_train.json",
+        "current_model.pt",
+        "best_model.pt",
+        "Train_results.json",
+        "Val_results.json",
+        "history_val.json",
+        "Test_results.json",
+        "Test_results.json",
+        "last_model.pt",
+        "temp",
+        "alignn/jv_formation_energy_peratom_alignn.zip",
+        "alignn/jv_optb88vdw_total_energy_alignn.zip",
+    ]
+    for i in fnames:
+        cmd = "rm -r " + i
+        os.system(cmd)
 
 
 # test_minor_configs()

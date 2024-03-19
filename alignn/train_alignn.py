@@ -2,19 +2,19 @@
 
 """Module to train for a folder with formatted dataset."""
 import os
-
-# import numpy as np
+import csv
 import sys
+import json
+import zipfile
 from alignn.data import get_train_val_loaders
 from alignn.train import train_dgl
 from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-
-# from alignn.models.alignn import ALIGNN, ALIGNNConfig
 import torch
 import time
+from jarvis.core.atoms import Atoms
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -133,7 +133,26 @@ def train_for_folder(
     output_dir=None,
 ):
     """Train for a folder."""
-    dat = loadjson(os.path.join(root_dir, "id_prop.json"))
+    id_prop_json = os.path.join(root_dir, "id_prop.json")
+    id_prop_json_zip = os.path.join(root_dir, "id_prop.json.zip")
+    id_prop_csv = os.path.join(root_dir, "id_prop.csv")
+    id_prop_csv_file = False
+    multioutput = False
+    # lists_length_equal = True
+    if os.path.exists(id_prop_json_zip):
+        dat = json.loads(
+            zipfile.ZipFile(id_prop_json_zip).read("id_prop.json")
+        )
+    elif os.path.exists(id_prop_json):
+        dat = loadjson(os.path.join(root_dir, "id_prop.json"))
+    elif os.path.exists(id_prop_csv):
+        id_prop_csv_file = True
+        with open(id_prop_csv, "r") as f:
+            reader = csv.reader(f)
+            dat = [row for row in reader]
+        print("id_prop_csv_file exists", id_prop_csv_file)
+    else:
+        print("Check dataset file.")
     config_dict = loadjson(config_name)
     config = TrainingConfig(**config_dict)
     if type(config) is dict:
@@ -154,30 +173,68 @@ def train_for_folder(
 
     train_grad = False
     train_stress = False
-    if config.model.gradwise_weight != 0:
-        train_grad = True
-    if config.model.stresswise_weight != 0:
-        train_stress = True
     train_atom = False
+    if config.model.calculate_gradient and config.model.gradwise_weight != 0:
+        train_grad = True
+    else:
+        train_grad = False
+    if config.model.calculate_gradient and config.model.stresswise_weight != 0:
+        train_stress = True
+    else:
+        train_stress = False
     if config.model.atomwise_weight != 0:
         train_atom = True
-
-    if config.model.atomwise_weight == 0:
+    else:
         train_atom = False
-    if config.model.gradwise_weight == 0:
-        train_grad = False
-    if config.model.stresswise_weight == 0:
-        train_stress = False
+
+    # if config.model.atomwise_weight == 0:
+    #    train_atom = False
+    # if config.model.gradwise_weight == 0:
+    #    train_grad = False
+    # if config.model.stresswise_weight == 0:
+    #    train_stress = False
     target_atomwise = None  # "atomwise_target"
     target_grad = None  # "atomwise_grad"
     target_stress = None  # "stresses"
 
     # mem = []
     # enp = []
+    n_outputs = []
     dataset = []
     for i in dat:
         info = {}
-        info["target"] = i[target_key]
+        if id_prop_csv_file:
+            file_name = i[0]
+            tmp = [float(j) for j in i[1:]]  # float(i[1])
+            info["jid"] = file_name
+
+            if len(tmp) == 1:
+                tmp = tmp[0]
+            else:
+                multioutput = True
+                n_outputs.append(tmp)
+            info["target"] = tmp
+            file_path = os.path.join(root_dir, file_name)
+            if file_format == "poscar":
+                atoms = Atoms.from_poscar(file_path)
+            elif file_format == "cif":
+                atoms = Atoms.from_cif(file_path)
+            elif file_format == "xyz":
+                atoms = Atoms.from_xyz(file_path, box_size=500)
+            elif file_format == "pdb":
+                # Note using 500 angstrom as box size
+                # Recommended install pytraj
+                # conda install -c ambermd pytraj
+                atoms = Atoms.from_pdb(file_path, max_lat=500)
+            else:
+                raise NotImplementedError(
+                    "File format not implemented", file_format
+                )
+            info["atoms"] = atoms.to_dict()
+        else:
+            info["target"] = i[target_key]
+            info["atoms"] = i["atoms"]
+            info["jid"] = i[id_key]
         if train_atom:
             target_atomwise = "atomwise_target"
             info["atomwise_target"] = i[atomwise_key]  # such as charges
@@ -189,35 +246,32 @@ def train_for_folder(
             target_stress = "stresses"
         if "extra_features" in i:
             info["extra_features"] = i["extra_features"]
-        info["atoms"] = i["atoms"]
-        info["jid"] = i[id_key]
         dataset.append(info)
     print("len dataset", len(dataset))
-    n_outputs = []
-    multioutput = False
+    del dat
+    # multioutput = False
     lists_length_equal = True
     line_graph = False
     alignn_models = {
-        "alignn",
+        # "alignn",
         # "alignn_layernorm",
         "alignn_atomwise",
     }
 
-    if config.model.name == "clgn":
-        line_graph = True
-    if config.model.name == "cgcnn":
-        line_graph = True
-    if config.model.name == "icgcnn":
-        line_graph = True
-    if config.model.name in alignn_models and config.model.alignn_layers > 0:
+    if config.model.alignn_layers > 0:
         line_graph = True
 
     if multioutput:
+        print("multioutput", multioutput)
         lists_length_equal = False not in [
             len(i) == len(n_outputs[0]) for i in n_outputs
         ]
-        print("lists_length_equal", lists_length_equal)
+        print("lists_length_equal", lists_length_equal, len(n_outputs[0]))
+        if lists_length_equal:
+            config.model.output_features = len(n_outputs[0])
 
+        else:
+            raise ValueError("Make sure the outputs are of same size.")
     model = None
     if restart_model_path is not None:
         # Should be best_model.pt file
@@ -316,7 +370,7 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
     )
-
+    # print("dataset", dataset[0])
     t1 = time.time()
     train_dgl(
         config,
