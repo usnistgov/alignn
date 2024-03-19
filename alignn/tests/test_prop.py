@@ -50,37 +50,37 @@ config = {
 #    os.system(cmd3)
 
 
-def test_minor_configs():
-    tmp = config
-    # tmp["log_tensorboard"] = True
-    tmp["n_early_stopping"] = 2
-    tmp["model"]["name"] = "alignn"
-    config["write_predictions"] = True
-    result = train_dgl(tmp)
+# def test_minor_configs():
+#    tmp = config
+#    # tmp["log_tensorboard"] = True
+#    tmp["n_early_stopping"] = 2
+#    tmp["model"]["name"] = "alignn"
+#    config["write_predictions"] = True
+#    result = train_dgl(tmp)
 
 
 def test_models():
 
     config["write_predictions"] = True
-    config["model"]["name"] = "alignn"
+    config["model"]["name"] = "alignn_atomwise"
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
     print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
+    # print("train=", result["train"])
+    # print("validation=", result["validation"])
     print()
     print()
     print()
 
-    config["model"]["name"] = "alignn"
+    config["model"]["name"] = "alignn_atomwise"
     config["classification_threshold"] = 0.0
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
     print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
+    # print("train=", result["train"])
+    # print("validation=", result["validation"])
     print()
     print()
     print()
@@ -241,5 +241,5 @@ def test_del_files():
 # test_pretrained()
 # test_runtime_training()
 # test_alignn_train()
-# test_models()
+test_models()
 # test_calculator()

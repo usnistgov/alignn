@@ -26,7 +26,6 @@ setuptools.setup(
         "matplotlib>=3.4.1",
         "tqdm>=4.60.0",
         "pandas>=1.2.3",
-        "pytorch-ignite>=0.5.0.dev20221024",
         "pydantic>=1.8.1",
         "pydantic-settings",
         "flake8>=3.9.1",
@@ -34,7 +33,8 @@ setuptools.setup(
         "pydocstyle>=6.0.0",
         "pyparsing>=2.2.1,<3",
         "ase",
-        "accelerate>=0.20.3",
+        # "pytorch-ignite>=0.5.0.dev20221024",
+        # "accelerate>=0.20.3",
         # "dgl-cu101>=0.6.0",
     ],
     # package_data={

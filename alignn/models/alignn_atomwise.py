@@ -334,8 +334,9 @@ class ALIGNNAtomWise(nn.Module):
             )
 
         if self.classification:
-            self.fc = nn.Linear(config.hidden_features, 2)
-            self.softmax = nn.LogSoftmax(dim=1)
+            self.fc = nn.Linear(config.hidden_features, 1)
+            self.softmax = nn.Sigmoid()
+            # self.softmax = nn.LogSoftmax(dim=1)
         else:
             self.fc = nn.Linear(config.hidden_features, config.output_features)
         self.link = None
@@ -544,6 +545,7 @@ class ALIGNNAtomWise(nn.Module):
             out = self.link(out)
 
         if self.classification:
+            # out = torch.max(out,dim=1)
             out = self.softmax(out)
         result["out"] = out
         result["grad"] = forces

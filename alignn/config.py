@@ -160,7 +160,7 @@ class TrainingConfig(BaseSettings):
         "tinnet_O",
         "tinnet_N",
     ] = "dft_3d"
-    target: TARGET_ENUM = "formation_energy_peratom"
+    target: TARGET_ENUM = "exfoliation_energy"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
     neighbor_strategy: Literal["k-nearest", "voronoi", "radius_graph"] = (
         "k-nearest"
@@ -226,7 +226,7 @@ class TrainingConfig(BaseSettings):
         # ALIGNN_LN_Config,
         # DenseALIGNNConfig,
         # ACGCNNConfig,
-    ] = ALIGNNConfig(name="alignn")
+    ] = ALIGNNAtomWiseConfig(name="alignn_atomwise")
 
     # @root_validator()
     # @model_validator(mode='before')

@@ -37,7 +37,7 @@
     "max_neighbors": 12,
     "keep_data_order": true,
     "model": {
-        "name": "alignn",
+        "name": "alignn_atomwise",
         "alignn_layers": 4,
         "gcn_layers": 4,
         "atom_input_features": 92,

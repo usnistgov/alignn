@@ -199,6 +199,7 @@ def train_for_folder(
 
     # mem = []
     # enp = []
+    n_outputs = []
     dataset = []
     for i in dat:
         info = {}
@@ -211,6 +212,7 @@ def train_for_folder(
                 tmp = tmp[0]
             else:
                 multioutput = True
+                n_outputs.append(tmp)
             info["target"] = tmp
             file_path = os.path.join(root_dir, file_name)
             atoms = Atoms.from_poscar(file_path)
@@ -233,31 +235,29 @@ def train_for_folder(
         dataset.append(info)
     print("len dataset", len(dataset))
     del dat
-    n_outputs = []
-    multioutput = False
+    # multioutput = False
     lists_length_equal = True
     line_graph = False
     alignn_models = {
-        "alignn",
+        # "alignn",
         # "alignn_layernorm",
         "alignn_atomwise",
     }
 
-    if config.model.name == "clgn":
-        line_graph = True
-    if config.model.name == "cgcnn":
-        line_graph = True
-    if config.model.name == "icgcnn":
-        line_graph = True
-    if config.model.name in alignn_models and config.model.alignn_layers > 0:
+    if config.model.alignn_layers > 0:
         line_graph = True
 
     if multioutput:
+        print("multioutput", multioutput)
         lists_length_equal = False not in [
             len(i) == len(n_outputs[0]) for i in n_outputs
         ]
-        print("lists_length_equal", lists_length_equal)
+        print("lists_length_equal", lists_length_equal, len(n_outputs[0]))
+        if lists_length_equal:
+            config.model.output_features = len(n_outputs[0])
 
+        else:
+            raise ValueError("Make sure the outputs are of same size.")
     model = None
     if restart_model_path is not None:
         # Should be best_model.pt file
