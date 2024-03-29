@@ -21,7 +21,7 @@ setuptools.setup(
         "torch>=2.0.0",
         "mpmath<=1.3.0",
         "dgl>=0.6.0",
-        "spglib<=2.0.2",
+        "spglib>=2.0.2",
         "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",
         "tqdm>=4.60.0",
