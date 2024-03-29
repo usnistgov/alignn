@@ -31,7 +31,7 @@ jobs:
       - name: Run pytest
         shell: bash -l {0}
         run: |
-            source ~/.bashrc
+            #source ~/.bashrc
             find . -type f > before_test_files.txt
             conda env create -f environment.yml
             conda activate my_jarvis
