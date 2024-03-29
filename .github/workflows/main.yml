@@ -33,8 +33,8 @@ jobs:
         run: |
             source ~/.bashrc
             find . -type f > before_test_files.txt
-            # conda env create -f environment.yml
-            # conda activate my_alignn
+            conda env create -f environment.yml
+            conda activate my_jarvis
             conda install pytest coverage codecov pandas numpy matplotlib phonopy scikit-learn jarvis-tools --quiet
             export DGLBACKEND=pytorch
             export CUDA_VISIBLE_DEVICES="-1"
