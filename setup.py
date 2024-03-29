@@ -18,7 +18,7 @@ setuptools.setup(
         "numpy>=1.19.5,<2.0.0",
         "scipy>=1.6.1",
         "jarvis-tools>=2021.07.19",
-        "torch<=2.0.0",
+        "torch>=2.0.0",
         "mpmath<=1.3.0",
         "dgl>=0.6.0",
         "spglib<=2.0.2",
