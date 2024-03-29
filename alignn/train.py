@@ -118,8 +118,8 @@ def train_dgl(
 
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
-    checkpoint_dir = os.path.join(config.output_dir)
-    deterministic = False
+    # checkpoint_dir = os.path.join(config.output_dir)
+    # deterministic = False
     classification = False
     print("config:")
     tmp = config.dict()
