@@ -252,11 +252,11 @@ def train_for_folder(
     # multioutput = False
     lists_length_equal = True
     line_graph = False
-    alignn_models = {
-        # "alignn",
-        # "alignn_layernorm",
-        "alignn_atomwise",
-    }
+    # alignn_models = {
+    #    # "alignn",
+    #    # "alignn_layernorm",
+    #    "alignn_atomwise",
+    # }
 
     if config.model.alignn_layers > 0:
         line_graph = True

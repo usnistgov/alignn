@@ -1,51 +1,280 @@
-name: alignn-action
-
+name: ALIGNN github action
 on: [push, pull_request]
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
+  miniconda:
+    name: Miniconda ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        python-version: ['3.10']
-
+        matrix:
+            os: ["ubuntu-latest"]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install numpy
-        python setup.py install
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: test
+          environment-file: environment.yml
+          python-version: "3.10"
+          auto-activate-base: false
+      - shell: bash -l {0}
+        run: |
+          conda info
+          conda list
+      - name: Lint
+        shell: bash -l {0}
+        run: |
+            conda install flake8 pycodestyle pydocstyle
+            flake8 --ignore E203,W503 --exclude=examples,tests,scripts --statistics --count --exit-zero alignn
+            pycodestyle --ignore E203,W503 --exclude=examples,tests,scripts alignn
+            pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count alignn
+      
+      - name: Run pytest
+        shell: bash -l {0}
+        run: |
+            #source ~/.bashrc
+            find . -type f > before_test_files.txt
+            conda env create -f environment.yml
+            conda activate my_alignn
+            conda install pytest coverage codecov pandas numpy matplotlib phonopy scikit-learn jarvis-tools --quiet
+            export DGLBACKEND=pytorch
+            export CUDA_VISIBLE_DEVICES="-1"
+            pip install phonopy flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage
+            python setup.py develop
+            echo 'environment.yml'
+            conda env export
+            coverage run -m pytest
+            coverage report -m -i
+            codecov
+            codecov --token="85bd9c5d-9e55-4f6d-bd69-350ee5e3bb41"
+            
+            echo 'Train alignn'
+            train_alignn.py -h 
+            echo 'Pre-trained models'
+            pretrained.py -h
+            find . -type f > after_test_files.txt
+            
 
-    - name: Lint
-      run: |
-        pip install flake8 pytest pycodestyle pydocstyle
-        pycodestyle --ignore E203,W503 --exclude=tests alignn
-        pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count alignn
-        flake8 --ignore E203,W503 --exclude=tests,scripts --statistics --count --exit-zero alignn
-    - name: Test with pytest
-      run: |
-        export DGLBACKEND=pytorch
-        export CUDA_VISIBLE_DEVICES="-1"
-        #pip install dgl-cu111
-        pip install phonopy flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage
-        #pip uninstall -y torch nvidia-cublas-cu11 nvidia-cuda-nvrtc-cu11 nvidia-cuda-runtime-cu11 nvidia-cudnn-cu11
-        #conda install -y  pytorch-cpu
-        pip install torch==2.0.0
-        #pip install attrs==22.1.0 certifi==2022.9.24 charset-normalizer==2.1.1 codecov==2.1.12 contourpy==1.0.5 coverage==6.5.0 cycler==0.11.0 dgl==0.9.1 flake8==5.0.4 fonttools==4.38.0 idna==3.4 iniconfig==1.1.1 jarvis-tools==2022.9.16 joblib==1.2.0 kiwisolver==1.4.4 matplotlib==3.6.1 mccabe==0.7.0 networkx==3.0b1 numpy==1.23.4 packaging==21.3 pandas==1.5.1 Pillow==9.2.0 pluggy==1.0.0 psutil==5.9.3 py==1.11.0 pycodestyle==2.9.1 pydantic==1.10.2 pydocstyle==6.1.1 pyflakes==2.5.0 pyparsing==2.4.7 pytest==7.1.3 pytest-cov==4.0.0 python-dateutil==2.8.2 pytorch-ignite==0.5.0.dev20221024 pytz==2022.5 requests==2.28.1 scikit-learn==1.1.2 scipy==1.9.3 six==1.16.0 snowballstemmer==2.2.0 spglib==2.0.1 threadpoolctl==3.1.0 tomli==2.0.1 toolz==0.12.0 torch==1.12.1 tqdm==4.64.1 typing_extensions==4.4.0 urllib3==1.26.12 xmltodict==0.13.0
-        echo 'PIP freeze'
-        pip freeze
-        coverage run -m pytest
-        coverage report -m -i
-        codecov
-        codecov --token="85bd9c5d-9e55-4f6d-bd69-350ee5e3bb41"
-        echo 'Train alignn'
-        train_alignn.py -h 
-        echo 'Pre-trained models'
-        pretrained.py -h
-        #train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp
+
+
+# name: JARVIS-Tools github action
+
+# on: [push, pull_request]
+
+# jobs:
+#   checks:
+#     name: Checks
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         shell: bash -l {0}
+#     strategy:
+#       matrix:
+#         python-version: ["3.10"]
+#     steps:
+#     - uses: actions/checkout@v2
+#     - name: Setup Python ${{ matrix.python-version }}
+#       uses: actions/setup-python@v2
+#       with:
+#         python-version: ${{ matrix.python-version }}
+
+#     - uses: actions/cache@v2
+#       with:
+#         path: ${{ env.pythonLocation }}
+#         key: ${{ env.pythonLocation }}-${{ hashFiles('setup.py') }}-${{ hashFiles('dev-requirements.txt') }}
+
+#     - name: Install requirements
+#       run: |
+#         source ~/.bashrc
+#         echo "begin: PATH=$PATH;"
+#         find . -type f > before_test_files.txt
+#         conda env create -f environment.yml
+#         conda activate my_jarvis
+#         conda install pandas numpy matplotlib phonopy scikit-learn --quiet
+#         pip install --upgrade pip
+#         pip install pycodestyle flake8 pydocstyle coverage pytest codecov qiskit==0.41.1
+#         flake8 --ignore E203,W503 --exclude=examples,tests --statistics --count --exit-zero jarvis
+#         pycodestyle --ignore E203,W503 --exclude=examples,testfiles jarvis
+#         pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count jarvis
+                
+#         #python setup.py develop
+#         #pip install --upgrade --upgrade-strategy eager -r dev-requirements.txt -e .
+#         #conda install -c ambermd pytraj
+#         #pip install numpy scipy matplotlib
+#         #pip install -r dev-requirements.txt
+        
+#         pip install -e .
+#         echo 'CONDA LIST'
+#         conda list
+
+#         echo 'PIP FREEZE'
+#         pip freeze
+
+#         #echo 'PYTEST-COV'
+#         #pytest --cov-config=.coveragerc --cov=jarvis -n 2
+
+#         coverage run -m pytest
+#         coverage report -m -i
+#         codecov
+#         codecov --token="b61081a0-39de-44a8-8a9c-97d4be82af6d"
+#         find . -type f > after_test_files.txt
+#         #comm -13 <(sort before_test_files.txt) <(sort after_test_files.txt) > new_files.txt
+#         #cat new_files.txt | xargs rm
+#         #rm before_test_files.txt after_test_files.txt new_files.txt
+
+#         # git clone https://github.com/QEF/q-e.git
+#         # cd q-e
+#         # ./configure
+#         # make pw
+
+# jobs:
+#   checks:
+#     name: Checks
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         python-version: ["3.9","3.10"]
+#     steps:
+#     - uses: actions/checkout@v2
+#     - name: Setup Python ${{ matrix.python-version }}
+#       uses: actions/setup-python@v2
+#       with:
+#         python-version: ${{ matrix.python-version }}
+
+#     - uses: actions/cache@v2
+#       with:
+#         path: ${{ env.pythonLocation }}
+#         key: ${{ env.pythonLocation }}-${{ hashFiles('setup.py') }}-${{ hashFiles('dev-requirements.txt') }}
+
+#     - name: Install requirements
+#       run: |
+#         python setup.py develop
+#         pip install --upgrade --upgrade-strategy eager -r dev-requirements.txt -e .
+#         #conda install -c ambermd pytraj
+#         echo 'CONDA LIST'
+#         conda list
+
+#         echo 'PIP FREEZE'
+#         pip freeze
+
+#         #echo 'PYTEST-COV'
+#         #pytest --cov-config=.coveragerc --cov=jarvis -n 2
+
+
+#         coverage run -m pytest
+#         coverage report -m -i
+#         codecov
+#         codecov --token="b61081a0-39de-44a8-8a9c-97d4be82af6d"
+#         # git clone https://github.com/QEF/q-e.git
+#         # cd q-e
+#         # ./configure
+#         # make pw
+
+
+
+#jobs:
+#   miniconda:
+#     name: Miniconda ${{ matrix.os }}
+#     runs-on: ${{ matrix.os }}
+#     strategy:
+#         matrix:
+#             os: ["ubuntu-latest"]
+#     steps:
+#       - uses: actions/checkout@v2
+#       - uses: conda-incubator/setup-miniconda@v2
+
+#         with:
+#           activate-environment: test
+
+#           python-version: 3.8
+#           auto-activate-base: false
+#       - shell: bash -l {0}
+#         run: |
+#           conda info
+#           conda list
+
+#       - uses: actions/cache@v2
+#         with:
+#           path: ~/.cache/pip
+#           key: ${{ hashFiles('setup.py') }}-${{ hashFiles('dev-requirements.txt') }}
+
+#       - name: Run pytest
+#         shell: bash -l {0}
+#         run: |
+#             python setup.py develop
+#             #pip uninstall qiskit
+#             # pip install qiskit ase  numpy==1.18.5 scipy==1.4.1 matplotlib>=3.0.0 phonopy==2.8.1 coverage lightgbm==2.1.0  flask joblib networkx scikit-learn pandas pennylane==0.14.1 dgl tqdm  codecov torch keras tensorflow==2.3.0  pytest pytest-cov bokeh pytest-xdist
+#             # pip install git+https://github.com/aspuru-guzik-group/tequila.git
+#             # pip install -r requirements-for-ci-only.txt
+#             # pip install -r dev-requirements.txt
+#             pip install --upgrade --upgrade-strategy eager -r dev-requirements.txt -e .
+#             echo 'CONDA LIST'
+#             conda list
+
+#             echo 'PIP FREEZE'
+#             pip freeze
+#             #echo 'PYTEST-COV'
+#             #pytest --cov-config=.coveragerc --cov=jarvis -n 2
+#             coverage run -m pytest
+#             coverage report -m
+#             codecov
+#             codecov --token="b61081a0-39de-44a8-8a9c-97d4be82af6d"
+#             # git clone https://github.com/QEF/q-e.git
+#             # cd q-e
+#             # ./configure
+#             # make pw
+
+# name: alignn-action
+
+# on: [push, pull_request]
+
+# jobs:
+#   build:
+
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         python-version: ['3.10']
+
+#     steps:
+#     - uses: actions/checkout@v2
+#     - name: Set up Python ${{ matrix.python-version }}
+#       uses: actions/setup-python@v2
+#       with:
+#         python-version: ${{ matrix.python-version }}
+#     - name: Install dependencies
+#       run: |
+#         python -m pip install --upgrade pip
+#         python -m pip install numpy
+#         python setup.py install
+
+#     - name: Lint
+#       run: |
+#         pip install flake8 pytest pycodestyle pydocstyle
+#         pycodestyle --ignore E203,W503 --exclude=tests alignn
+#         pydocstyle --match-dir=core --match-dir=io --match-dir=io --match-dir=ai --match-dir=analysis --match-dir=db --match-dir=tasks --count alignn
+#         flake8 --ignore E203,W503 --exclude=tests,scripts --statistics --count --exit-zero alignn
+#     - name: Test with pytest
+#       run: |
+#         export DGLBACKEND=pytorch
+#         export CUDA_VISIBLE_DEVICES="-1"
+#         #pip install dgl-cu111
+#         pip install phonopy flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage
+#         pip install -e .
+#         #pip uninstall -y torch nvidia-cublas-cu11 nvidia-cuda-nvrtc-cu11 nvidia-cuda-runtime-cu11 nvidia-cudnn-cu11
+#         #conda install -y  pytorch-cpu
+#         #pip install torch==2.0.0
+#         #pip install attrs==22.1.0 certifi==2022.9.24 charset-normalizer==2.1.1 codecov==2.1.12 contourpy==1.0.5 coverage==6.5.0 cycler==0.11.0 dgl==0.9.1 flake8==5.0.4 fonttools==4.38.0 idna==3.4 iniconfig==1.1.1 jarvis-tools==2022.9.16 joblib==1.2.0 kiwisolver==1.4.4 matplotlib==3.6.1 mccabe==0.7.0 networkx==3.0b1 numpy==1.23.4 packaging==21.3 pandas==1.5.1 Pillow==9.2.0 pluggy==1.0.0 psutil==5.9.3 py==1.11.0 pycodestyle==2.9.1 pydantic==1.10.2 pydocstyle==6.1.1 pyflakes==2.5.0 pyparsing==2.4.7 pytest==7.1.3 pytest-cov==4.0.0 python-dateutil==2.8.2 pytorch-ignite==0.5.0.dev20221024 pytz==2022.5 requests==2.28.1 scikit-learn==1.1.2 scipy==1.9.3 six==1.16.0 snowballstemmer==2.2.0 spglib==2.0.1 threadpoolctl==3.1.0 tomli==2.0.1 toolz==0.12.0 torch==1.12.1 tqdm==4.64.1 typing_extensions==4.4.0 urllib3==1.26.12 xmltodict==0.13.0
+#         echo 'PIP freeze'
+#         pip freeze
+#         echo 'environment.yml start'
+#         conda env export 
+#         echo 'environment.yml end'
+#         coverage run -m pytest
+#         coverage report -m -i
+#         codecov
+#         codecov --token="85bd9c5d-9e55-4f6d-bd69-350ee5e3bb41"
+#         echo 'Train alignn'
+#         train_alignn.py -h 
+#         echo 'Pre-trained models'
+#         pretrained.py -h
+#         #train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json" --output_dir=temp
