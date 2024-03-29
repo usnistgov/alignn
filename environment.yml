@@ -1,4 +1,4 @@
-name: my_jarvis
+name: my_alignn
 channels:
   - conda-forge
   - defaults
