@@ -57,13 +57,15 @@ bash Miniconda3-latest-Linux-x86_64.sh (for linux)
 bash Miniconda3-latest-MacOSX-x86_64.sh (for Mac)
 ```
 Download 32/64 bit python 3.10 miniconda exe and install (for windows)
-Now, let's make a conda environment, say "version", choose other name as you like::
+Now, let's make a conda environment, say "my_alignn", choose other name as you like::
 ```
-conda create --name version python=3.10
-source activate version
+conda create --name my_alignn python=3.10
+conda activate my_alignn
+conda install alignn
 ```
+Starting version 2024.3.24, we have developed a conda package for alignn: [https://anaconda.org/conda-forge/alignn](https://anaconda.org/conda-forge/alignn)
 
-#### optional GPU dependencies
+#### optional GPU dependencies notes
 
 If you need CUDA support, it's best to install PyTorch and DGL before installing alignn to ensure that you get a CUDA-enabled version of DGL.
 
@@ -88,7 +90,7 @@ conda install -c dglteam/label/cu118 dgl==1.0.2.cu118
 
 #### Method 1 (editable in-place install)
 
-You can install a development version of alignn by cloning the repository and installing in place with pip:
+You can laso install a development version of alignn by cloning the repository and installing in place with pip:
 
 ```
 git clone https://github.com/usnistgov/alignn
