@@ -364,7 +364,8 @@ class Graph(object):
         max_attempts=3,
         id: Optional[str] = None,
         compute_line_graph: bool = True,
-        use_canonize: bool = False,
+        use_canonize: bool = True,
+        # use_canonize: bool = False,
         use_lattice_prop: bool = False,
         cutoff_extra=3.5,
     ):
