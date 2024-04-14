@@ -259,6 +259,7 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
             cfg = i
         if "best_model.pt" in i:
             tmp = i
+            chks.append(i)
 
     print("Using chk file", tmp, "from ", chks)
     print("Path", os.path.abspath(path))
