@@ -65,6 +65,18 @@ all_models = {
         "https://figshare.com/ndownloader/files/31458712",
         1,
     ],
+    "intermat_cbm": [
+        "https://figshare.com/ndownloader/files/45392908",
+        1,
+    ],
+    "intermat_vbm": [
+        "https://figshare.com/ndownloader/files/45392914",
+        1,
+    ],
+    "intermat_phi": [
+        "https://figshare.com/ndownloader/files/45392911",
+        1,
+    ],
     "jv_magmom_oszicar_alignn": [
         "https://figshare.com/ndownloader/files/31458685",
         1,
