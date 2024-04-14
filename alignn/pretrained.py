@@ -12,13 +12,13 @@ import tempfile
 import torch
 import sys
 import json
-
-# from jarvis.db.jsonutils import loadjson
 import argparse
 from jarvis.core.atoms import Atoms
-from jarvis.core.graphs import Graph
+from alignn.graphs import Graph
 from jarvis.db.jsonutils import dumpjson
 import pandas as pd
+
+# from jarvis.core.graphs import Graph
 
 tqdm.pandas()
 
@@ -257,6 +257,8 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
             chks.append(i)
         if "config.json" in i:
             cfg = i
+        if "best_model.pt" in i:
+            tmp = i
 
     print("Using chk file", tmp, "from ", chks)
     print("Path", os.path.abspath(path))
