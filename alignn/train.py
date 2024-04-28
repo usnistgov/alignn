@@ -5,6 +5,8 @@ from the repository root, run
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 from functools import partial
 from typing import Any, Dict, Union
 import torch
@@ -27,6 +29,18 @@ from sklearn.metrics import roc_auc_score
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 torch.set_default_dtype(torch.float32)
+
+device = "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
+
+def setup(rank, world_size):
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
+    # Initialize the distributed environment.
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
 
 
 def activated_output_transform(output):
@@ -101,6 +115,8 @@ def train_dgl(
     model: nn.Module = None,
     # checkpoint_dir: Path = Path("./"),
     train_val_test_loaders=[],
+    rank="",
+    world_size="",
     # log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -108,6 +124,8 @@ def train_dgl(
     `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
+    print("rank", rank)
+    setup(rank, world_size)
     print(config)
     if type(config) is dict:
         try:
@@ -179,9 +197,8 @@ def train_dgl(
         val_loader = train_val_test_loaders[1]
         test_loader = train_val_test_loaders[2]
         prepare_batch = train_val_test_loaders[3]
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
+    # rank=0
+    device = torch.device(f"cuda:{rank}")
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True
@@ -208,12 +225,10 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
+
+    print("net", net)
     net.to(device)
-    if config.data_parallel and torch.cuda.device_count() > 1:
-        # For multi-GPU training make data_parallel:true in config.json file
-        device_ids = [cid for cid in range(torch.cuda.device_count())]
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        net = torch.nn.DataParallel(net, device_ids=device_ids).cuda()
+    net = DDP(net, device_ids=[rank])
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)

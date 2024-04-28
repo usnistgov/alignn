@@ -16,10 +16,12 @@ from alignn.graphs import Graph, StructureDataset
 
 # from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
-from torch.utils.data import DataLoader
+
+# from torch.utils.data import DataLoader
 from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
+from dgl.dataloading import GraphDataLoader
 
 # from sklearn.pipeline import Pipeline
 import pickle as pk
@@ -570,7 +572,8 @@ def get_train_val_loaders(
             collate_fn = train_data.collate_line_graph
 
         # use a regular pytorch dataloader
-        train_loader = DataLoader(
+        train_loader = GraphDataLoader(
+            # train_loader = DataLoader(
             train_data,
             batch_size=batch_size,
             shuffle=True,
@@ -580,7 +583,8 @@ def get_train_val_loaders(
             pin_memory=pin_memory,
         )
 
-        val_loader = DataLoader(
+        val_loader = GraphDataLoader(
+            # val_loader = DataLoader(
             val_data,
             batch_size=batch_size,
             shuffle=False,
@@ -591,7 +595,8 @@ def get_train_val_loaders(
         )
 
         test_loader = (
-            DataLoader(
+            GraphDataLoader(
+                # DataLoader(
                 test_data,
                 batch_size=1,
                 shuffle=False,
