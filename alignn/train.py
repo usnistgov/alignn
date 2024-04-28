@@ -195,7 +195,7 @@ def train_dgl(
             standard_scalar_and_pca=config.standard_scalar_and_pca,
             keep_data_order=config.keep_data_order,
             output_dir=config.output_dir,
-            use_ddp=use_ddp,
+            # use_ddp=use_ddp,
         )
     else:
         train_loader = train_val_test_loaders[0]
