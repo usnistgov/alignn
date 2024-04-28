@@ -36,6 +36,7 @@ if torch.cuda.is_available():
 
 
 def setup(rank, world_size):
+    """Set up multi GPU rank."""
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "12355"
     # Initialize the distributed environment.

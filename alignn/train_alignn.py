@@ -396,7 +396,7 @@ def train_for_folder(
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     world_size = int(torch.cuda.device_count())
-    rank = [0, 1]
+    print("world_size", world_size)
     torch.multiprocessing.spawn(
         train_for_folder,
         args=(
