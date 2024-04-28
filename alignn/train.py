@@ -35,13 +35,13 @@ if torch.cuda.is_available():
     device = torch.device("cuda")
 
 
-def setup(rank, world_size):
-    """Set up multi GPU rank."""
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
-    # Initialize the distributed environment.
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
+# def setup(rank, world_size):
+#    """Set up multi GPU rank."""
+#    os.environ["MASTER_ADDR"] = "localhost"
+#    os.environ["MASTER_PORT"] = "12355"
+#    # Initialize the distributed environment.
+#    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+#    torch.cuda.set_device(rank)
 
 
 def activated_output_transform(output):
@@ -125,8 +125,8 @@ def train_dgl(
     `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
-    print("rank", rank)
-    setup(rank, world_size)
+    # print("rank", rank)
+    # setup(rank, world_size)
     print(config)
     if type(config) is dict:
         try:
@@ -229,7 +229,7 @@ def train_dgl(
 
     print("net", net)
     net.to(device)
-    net = DDP(net, device_ids=[rank])
+    net = DDP(net, device_ids=[rank], find_unused_parameters=True)
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)

@@ -2,6 +2,7 @@
 
 """Module to train for a folder with formatted dataset."""
 import os
+import torch.distributed as dist
 import csv
 import sys
 import json
@@ -19,6 +20,15 @@ from jarvis.core.atoms import Atoms
 device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
+
+
+def setup(rank, world_size):
+    """Set up multi GPU rank."""
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
+    # Initialize the distributed environment.
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
 
 
 parser = argparse.ArgumentParser(
@@ -132,6 +142,7 @@ def train_for_folder(
     output_dir,
 ):
     """Train for a folder."""
+    setup(rank, world_size)
     print("root_dir", root_dir)
     id_prop_json = os.path.join(root_dir, "id_prop.json")
     id_prop_json_zip = os.path.join(root_dir, "id_prop.json.zip")

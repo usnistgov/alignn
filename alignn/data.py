@@ -581,6 +581,7 @@ def get_train_val_loaders(
             drop_last=True,
             num_workers=workers,
             pin_memory=pin_memory,
+            use_ddp=True,
         )
 
         val_loader = GraphDataLoader(
@@ -592,6 +593,7 @@ def get_train_val_loaders(
             drop_last=True,
             num_workers=workers,
             pin_memory=pin_memory,
+            use_ddp=True,
         )
 
         test_loader = (
@@ -604,6 +606,7 @@ def get_train_val_loaders(
                 drop_last=False,
                 num_workers=workers,
                 pin_memory=pin_memory,
+                use_ddp=True,
             )
             if len(dataset_test) > 0
             else None
