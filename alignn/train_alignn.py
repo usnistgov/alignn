@@ -132,21 +132,21 @@ parser.add_argument(
 
 
 def train_for_folder(
-    rank,
-    world_size,
-    root_dir,
-    config_name,
-    classification_threshold,
-    batch_size,
-    epochs,
-    id_key,
-    target_key,
-    atomwise_key,
-    gradwise_key,
-    stresswise_key,
-    file_format,
-    restart_model_path,
-    output_dir,
+    rank=0,
+    world_size=0,
+    root_dir="examples/sample_data",
+    config_name="config.json",
+    classification_threshold=None,
+    batch_size=None,
+    epochs=None,
+    id_key="jid",
+    target_key="total_energy",
+    atomwise_key="forces",
+    gradwise_key="forces",
+    stresswise_key="stresses",
+    file_format="poscar",
+    restart_model_path=None,
+    output_dir=None,
 ):
     """Train for a folder."""
     setup(rank, world_size)

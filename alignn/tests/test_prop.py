@@ -12,6 +12,7 @@ from jarvis.core.atoms import Atoms
 from alignn.train_alignn import train_for_folder
 from jarvis.db.figshare import get_jid_data
 from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, revised_path
+import torch
 
 plt.switch_backend("agg")
 
@@ -137,7 +138,10 @@ def test_alignn_train():
             "../examples/sample_data/config_example.json",
         )
     )
-    train_for_folder(root_dir=root_dir, config_name=config)
+    world_size = int(torch.cuda.device_count())
+    train_for_folder(
+        rank=0, world_size=world_size, root_dir=root_dir, config_name=config
+    )
 
     root_dir = os.path.abspath(
         os.path.join(
@@ -150,7 +154,9 @@ def test_alignn_train():
             "../examples/sample_data/config_example.json",
         )
     )
-    train_for_folder(root_dir=root_dir, config_name=config)
+    train_for_folder(
+        rank=0, world_size=world_size, root_dir=root_dir, config_name=config
+    )
 
     root_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../examples/sample_data/")
@@ -162,7 +168,11 @@ def test_alignn_train():
         )
     )
     train_for_folder(
-        root_dir=root_dir, config_name=config, classification_threshold=0.01
+        rank=0,
+        world_size=world_size,
+        root_dir=root_dir,
+        config_name=config,
+        classification_threshold=0.01,
     )
 
     root_dir = os.path.abspath(
@@ -174,7 +184,9 @@ def test_alignn_train():
             "../examples/sample_data_ff/config_example_atomwise.json",
         )
     )
-    train_for_folder(root_dir=root_dir, config_name=config)
+    train_for_folder(
+        rank=0, world_size=world_size, root_dir=root_dir, config_name=config
+    )
 
 
 def test_calculator():
