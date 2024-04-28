@@ -1,11 +1,9 @@
-"""Jarvis-dgl data loaders and DGLGraph utilities."""
+"""ALIGNN data loaders and DGLGraph utilities."""
 
 import random
 from pathlib import Path
 from typing import Optional
-
-# from typing import Dict, List, Optional, Set, Tuple
-
+from torch.utils.data.distributed import DistributedSampler
 import os
 import torch
 import dgl
@@ -13,11 +11,7 @@ import numpy as np
 import pandas as pd
 from jarvis.core.atoms import Atoms
 from alignn.graphs import Graph, StructureDataset
-
-# from jarvis.core.graphs import Graph, StructureDataset
 from jarvis.db.figshare import data as jdata
-
-# from torch.utils.data import DataLoader
 from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
@@ -123,7 +117,7 @@ def load_graphs(
         print("Converting to graphs!")
         graphs = []
         # columns=dataset.columns
-        for ii, i in tqdm(dataset.iterrows()):
+        for ii, i in tqdm(dataset.iterrows(), total=len(dataset)):
             # print('iooooo',i)
             atoms = i["atoms"]
             structure = (
@@ -239,6 +233,7 @@ def get_torch_dataset(
     classification=False,
     output_dir=".",
     tmp_name="dataset",
+    sampler=None,
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
@@ -274,6 +269,7 @@ def get_torch_dataset(
         line_graph=line_graph,
         id_tag=id_tag,
         classification=classification,
+        sampler=sampler,
     )
     return data
 
@@ -303,6 +299,7 @@ def get_train_val_loaders(
     filename: str = "sample",
     id_tag: str = "jid",
     use_canonize: bool = False,
+    # use_ddp: bool = False,
     cutoff: float = 8.0,
     cutoff_extra: float = 3.0,
     max_neighbors: int = 12,
@@ -312,8 +309,11 @@ def get_train_val_loaders(
     keep_data_order=False,
     output_features=1,
     output_dir=None,
+    world_size=0,
+    rank=0,
 ):
     """Help function to set up JARVIS train and val dataloaders."""
+
     train_sample = filename + "_train.data"
     val_sample = filename + "_val.data"
     test_sample = filename + "_test.data"
@@ -500,6 +500,18 @@ def get_train_val_loaders(
                 print("Data error", exp)
                 pass
 
+        if world_size > 1:
+            use_ddp = True
+            train_sampler = DistributedSampler(
+                dataset_train, num_replicas=world_size, rank=rank
+            )
+            val_sampler = DistributedSampler(
+                dataset_val, num_replicas=world_size, rank=rank
+            )
+        else:
+            use_ddp = False
+            train_sampler = None
+            val_sampler = None
         train_data = get_torch_dataset(
             dataset=dataset_train,
             id_tag=id_tag,
@@ -517,6 +529,7 @@ def get_train_val_loaders(
             max_neighbors=max_neighbors,
             classification=classification_threshold is not None,
             output_dir=output_dir,
+            sampler=train_sampler,
             tmp_name="train_data",
         )
         val_data = (
@@ -534,6 +547,7 @@ def get_train_val_loaders(
                 line_graph=line_graph,
                 cutoff=cutoff,
                 cutoff_extra=cutoff_extra,
+                sampler=val_sampler,
                 max_neighbors=max_neighbors,
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
@@ -581,7 +595,7 @@ def get_train_val_loaders(
             drop_last=True,
             num_workers=workers,
             pin_memory=pin_memory,
-            use_ddp=True,
+            use_ddp=use_ddp,
         )
 
         val_loader = GraphDataLoader(
@@ -593,7 +607,7 @@ def get_train_val_loaders(
             drop_last=True,
             num_workers=workers,
             pin_memory=pin_memory,
-            use_ddp=True,
+            use_ddp=use_ddp,
         )
 
         test_loader = (
@@ -606,7 +620,7 @@ def get_train_val_loaders(
                 drop_last=False,
                 num_workers=workers,
                 pin_memory=pin_memory,
-                use_ddp=True,
+                use_ddp=use_ddp,
             )
             if len(dataset_test) > 0
             else None

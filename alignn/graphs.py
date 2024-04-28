@@ -728,6 +728,7 @@ class StructureDataset(DGLDataset):
         line_graph=False,
         classification=False,
         id_tag="jid",
+        sampler=None,
     ):
         """Pytorch Dataset for atomistic graphs.
 

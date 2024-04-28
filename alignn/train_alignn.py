@@ -24,11 +24,18 @@ if torch.cuda.is_available():
 
 def setup(rank, world_size):
     """Set up multi GPU rank."""
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
-    # Initialize the distributed environment.
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
+    if world_size > 1:
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = "12355"
+        # Initialize the distributed environment.
+        dist.init_process_group("nccl", rank=rank, world_size=world_size)
+        torch.cuda.set_device(rank)
+
+
+def cleanup(world_size):
+    """Clean up distributed process."""
+    if world_size > 1:
+        dist.destroy_process_group()
 
 
 parser = argparse.ArgumentParser(
@@ -408,9 +415,30 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     world_size = int(torch.cuda.device_count())
     print("world_size", world_size)
-    torch.multiprocessing.spawn(
-        train_for_folder,
-        args=(
+    if world_size > 1:
+        torch.multiprocessing.spawn(
+            train_for_folder,
+            args=(
+                world_size,
+                args.root_dir,
+                args.config_name,
+                args.classification_threshold,
+                args.batch_size,
+                args.epochs,
+                args.id_key,
+                args.target_key,
+                args.atomwise_key,
+                args.force_key,
+                args.stresswise_key,
+                args.file_format,
+                args.restart_model_path,
+                args.output_dir,
+            ),
+            nprocs=world_size,
+        )
+    else:
+        train_for_folder(
+            0,
             world_size,
             args.root_dir,
             args.config_name,
@@ -425,6 +453,8 @@ if __name__ == "__main__":
             args.file_format,
             args.restart_model_path,
             args.output_dir,
-        ),
-        nprocs=world_size,
-    )
+        )
+    try:
+        cleanup(world_size)
+    except Exception:
+        pass

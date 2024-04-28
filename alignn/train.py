@@ -5,7 +5,6 @@ from the repository root, run
 then `tensorboard --logdir tb_logs/test` to monitor results...
 """
 
-import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from functools import partial
 from typing import Any, Dict, Union
@@ -29,10 +28,6 @@ from sklearn.metrics import roc_auc_score
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 torch.set_default_dtype(torch.float32)
-
-device = "cpu"
-if torch.cuda.is_available():
-    device = torch.device("cuda")
 
 
 # def setup(rank, world_size):
@@ -116,8 +111,8 @@ def train_dgl(
     model: nn.Module = None,
     # checkpoint_dir: Path = Path("./"),
     train_val_test_loaders=[],
-    rank="",
-    world_size="",
+    rank=0,
+    world_size=0,
     # log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
@@ -127,13 +122,14 @@ def train_dgl(
     """
     # print("rank", rank)
     # setup(rank, world_size)
-    print(config)
-    if type(config) is dict:
-        try:
-            print(config)
-            config = TrainingConfig(**config)
-        except Exception as exp:
-            print("Check", exp)
+    if rank == 0:
+        print(config)
+        if type(config) is dict:
+            try:
+                print(config)
+                config = TrainingConfig(**config)
+            except Exception as exp:
+                print("Check", exp)
 
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
@@ -154,6 +150,13 @@ def train_dgl(
     line_graph = False
     if config.model.alignn_layers > 0:
         line_graph = True
+    if world_size > 1:
+        use_ddp = True
+    else:
+        use_ddp = False
+        device = "cpu"
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
     if not train_val_test_loaders:
         # use input standardization for all real-valued feature sets
         # print("config.neighbor_strategy",config.neighbor_strategy)
@@ -192,6 +195,7 @@ def train_dgl(
             standard_scalar_and_pca=config.standard_scalar_and_pca,
             keep_data_order=config.keep_data_order,
             output_dir=config.output_dir,
+            use_ddp=use_ddp,
         )
     else:
         train_loader = train_val_test_loaders[0]
@@ -199,7 +203,8 @@ def train_dgl(
         test_loader = train_val_test_loaders[2]
         prepare_batch = train_val_test_loaders[3]
     # rank=0
-    device = torch.device(f"cuda:{rank}")
+    if use_ddp:
+        device = torch.device(f"cuda:{rank}")
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True
@@ -227,9 +232,11 @@ def train_dgl(
     else:
         net = model
 
-    print("net", net)
+    # print("net", net)
+    # print("device", device)
     net.to(device)
-    net = DDP(net, device_ids=[rank], find_unused_parameters=True)
+    if use_ddp:
+        net = DDP(net, device_ids=[rank], find_unused_parameters=True)
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
@@ -468,23 +475,7 @@ def train_dgl(
             scheduler.step()
             train_final_time = time.time()
             train_ep_time = train_final_time - train_init_time
-            print(
-                "TrainLoss",
-                "Epoch",
-                e,
-                "total",
-                running_loss,
-                "out",
-                mean_out,
-                "atom",
-                mean_atom,
-                "grad",
-                mean_grad,
-                "stress",
-                mean_stress,
-                "time",
-                train_ep_time,
-            )
+            # if rank == 0: # or world_size == 1:
             history_train.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_train.json"),
@@ -603,260 +594,288 @@ def train_dgl(
                     data=val_result,
                 )
                 best_model = net
-            print(
-                "ValLoss",
-                "Epoch",
-                e,
-                "total",
-                val_loss,
-                "out",
-                mean_out,
-                "atom",
-                mean_atom,
-                "grad",
-                mean_grad,
-                "stress",
-                mean_stress,
-                saving_msg,
-            )
             history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
                 filename=os.path.join(config.output_dir, "history_val.json"),
                 data=history_val,
             )
-
-        test_loss = 0
-        test_result = []
-        for dats, jid in zip(test_loader, test_loader.dataset.ids):
-            # for dats in test_loader:
-            info = {}
-            info["id"] = jid
-            optimizer.zero_grad()
-            # print('dats[0]',dats[0])
-            # print('test_loader',test_loader)
-            # print('test_loader.dataset.ids',test_loader.dataset.ids)
-            result = net([dats[0].to(device), dats[1].to(device)])
-            loss1 = 0  # Such as energy
-            loss2 = 0  # Such as bader charges
-            loss3 = 0  # Such as forces
-            loss4 = 0  # Such as stresses
-            if config.model.output_features is not None and not classification:
-                # print('result["out"]',result["out"])
-                # print('dats[2]',dats[2])
-                loss1 = config.model.graphwise_weight * criterion(
-                    result["out"], dats[2].to(device)
+            # print('rank',rank)
+            # print('world_size',world_size)
+            if rank == 0:
+                print(
+                    "TrainLoss",
+                    "Epoch",
+                    e,
+                    "total",
+                    running_loss,
+                    "out",
+                    mean_out,
+                    "atom",
+                    mean_atom,
+                    "grad",
+                    mean_grad,
+                    "stress",
+                    mean_stress,
+                    "time",
+                    train_ep_time,
                 )
-                info["target_out"] = dats[2].cpu().numpy().tolist()
-                info["pred_out"] = (
-                    result["out"].cpu().detach().numpy().tolist()
-                )
-
-            if config.model.atomwise_output_features > 0:
-                loss2 = config.model.atomwise_weight * criterion(
-                    result["atomwise_pred"].to(device),
-                    dats[0].ndata["atomwise_target"].to(device),
-                )
-                info["target_atomwise_pred"] = (
-                    dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
-                )
-                info["pred_atomwise_pred"] = (
-                    result["atomwise_pred"].cpu().detach().numpy().tolist()
+                print(
+                    "ValLoss",
+                    "Epoch",
+                    e,
+                    "total",
+                    val_loss,
+                    "out",
+                    mean_out,
+                    "atom",
+                    mean_atom,
+                    "grad",
+                    mean_grad,
+                    "stress",
+                    mean_stress,
+                    saving_msg,
                 )
 
-            if config.model.calculate_gradient:
-                loss3 = config.model.gradwise_weight * criterion(
-                    result["grad"].to(device),
-                    dats[0].ndata["atomwise_grad"].to(device),
-                )
-                info["target_grad"] = (
-                    dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
-                )
-                info["pred_grad"] = (
-                    result["grad"].cpu().detach().numpy().tolist()
-                )
-            if config.model.stresswise_weight != 0:
-                loss4 = config.model.stresswise_weight * criterion(
-                    # torch.flatten(result["stress"].to(device)),
-                    # (dats[0].ndata["stresses"]).to(device),
-                    # torch.flatten(dats[0].ndata["stresses"]).to(device),
-                    result["stresses"].to(device),
-                    torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
-                    # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
-                    # dats[0].ndata["stresses"][0].to(device),
-                )
-                # loss4 = config.model.stresswise_weight * criterion(
-                #    result["stress"][0].to(device),
-                #    dats[0].ndata["stresses"].to(device),
-                # )
-                info["target_stress"] = (
-                    torch.cat(tuple(dats[0].ndata["stresses"]))
-                    .cpu()
-                    .numpy()
-                    .tolist()
-                )
-                info["pred_stress"] = (
-                    result["stresses"].cpu().detach().numpy().tolist()
-                )
-            test_result.append(info)
-            loss = loss1 + loss2 + loss3 + loss4
-            if not classification:
-                test_loss += loss.item()
-        print("TestLoss", e, test_loss)
-        dumpjson(
-            filename=os.path.join(config.output_dir, "Test_results.json"),
-            data=test_result,
-        )
-        last_model_name = "last_model.pt"
-        torch.save(
-            net.state_dict(),
-            os.path.join(config.output_dir, last_model_name),
-        )
-        # return test_result
-
-    if config.write_predictions and classification:
-        best_model.eval()
-        # net.eval()
-        f = open(
-            os.path.join(config.output_dir, "prediction_results_test_set.csv"),
-            "w",
-        )
-        f.write("id,target,prediction\n")
-        targets = []
-        predictions = []
-        with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = best_model([g.to(device), lg.to(device)])["out"]
-                # out_data = net([g.to(device), lg.to(device)])["out"]
-                # out_data = torch.exp(out_data.cpu())
-                # print('target',target)
-                # print('out_data',out_data)
-                top_p, top_class = torch.topk(torch.exp(out_data), k=1)
-                target = int(target.cpu().numpy().flatten().tolist()[0])
-
-                f.write("%s, %d, %d\n" % (id, (target), (top_class)))
-                targets.append(target)
-                predictions.append(
-                    top_class.cpu().numpy().flatten().tolist()[0]
-                )
-        f.close()
-
-        print("predictions", predictions)
-        print("targets", targets)
-        print(
-            "Test ROCAUC:",
-            roc_auc_score(np.array(targets), np.array(predictions)),
-        )
-
-    if (
-        config.write_predictions
-        and not classification
-        and config.model.output_features > 1
-    ):
-        best_model.eval()
-        # net.eval()
-        mem = []
-        with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = best_model([g.to(device), lg.to(device)])["out"]
-                # out_data = net([g.to(device), lg.to(device)])["out"]
-                out_data = out_data.cpu().numpy().tolist()
-                if config.standard_scalar_and_pca:
-                    sc = pk.load(open("sc.pkl", "rb"))
-                    out_data = list(
-                        sc.transform(np.array(out_data).reshape(1, -1))[0]
-                    )  # [0][0]
-                target = target.cpu().numpy().flatten().tolist()
+        if rank == 0 or world_size == 1:
+            test_loss = 0
+            test_result = []
+            for dats, jid in zip(test_loader, test_loader.dataset.ids):
+                # for dats in test_loader:
                 info = {}
-                info["id"] = id
-                info["target"] = target
-                info["predictions"] = out_data
-                mem.append(info)
-        dumpjson(
-            filename=os.path.join(
-                config.output_dir, "multi_out_predictions.json"
-            ),
-            data=mem,
-        )
-    if (
-        config.write_predictions
-        and not classification
-        and config.model.output_features == 1
-        and config.model.gradwise_weight == 0
-    ):
-        best_model.eval()
-        # net.eval()
-        f = open(
-            os.path.join(config.output_dir, "prediction_results_test_set.csv"),
-            "w",
-        )
-        f.write("id,target,prediction\n")
-        targets = []
-        predictions = []
-        with torch.no_grad():
-            ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(test_loader, ids):
-                g, lg, target = dat
-                out_data = best_model([g.to(device), lg.to(device)])["out"]
-                # out_data = net([g.to(device), lg.to(device)])["out"]
-                out_data = out_data.cpu().numpy().tolist()
-                if config.standard_scalar_and_pca:
-                    sc = pk.load(
-                        open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                info["id"] = jid
+                optimizer.zero_grad()
+                # print('dats[0]',dats[0])
+                # print('test_loader',test_loader)
+                # print('test_loader.dataset.ids',test_loader.dataset.ids)
+                result = net([dats[0].to(device), dats[1].to(device)])
+                loss1 = 0  # Such as energy
+                loss2 = 0  # Such as bader charges
+                loss3 = 0  # Such as forces
+                loss4 = 0  # Such as stresses
+                if (
+                    config.model.output_features is not None
+                    and not classification
+                ):
+                    # print('result["out"]',result["out"])
+                    # print('dats[2]',dats[2])
+                    loss1 = config.model.graphwise_weight * criterion(
+                        result["out"], dats[2].to(device)
                     )
-                    out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
-                        0
-                    ][0]
-                target = target.cpu().numpy().flatten().tolist()
-                if len(target) == 1:
-                    target = target[0]
-                f.write("%s, %6f, %6f\n" % (id, target, out_data))
-                targets.append(target)
-                predictions.append(out_data)
-        f.close()
+                    info["target_out"] = dats[2].cpu().numpy().tolist()
+                    info["pred_out"] = (
+                        result["out"].cpu().detach().numpy().tolist()
+                    )
 
-        print(
-            "Test MAE:",
-            mean_absolute_error(np.array(targets), np.array(predictions)),
-        )
-        best_model.eval()
-        # net.eval()
-        f = open(
-            os.path.join(
-                config.output_dir, "prediction_results_train_set.csv"
-            ),
-            "w",
-        )
-        f.write("target,prediction\n")
-        targets = []
-        predictions = []
-        with torch.no_grad():
-            ids = train_loader.dataset.ids  # [test_loader.dataset.indices]
-            for dat, id in zip(train_loader, ids):
-                g, lg, target = dat
-                out_data = best_model([g.to(device), lg.to(device)])["out"]
-                # out_data = net([g.to(device), lg.to(device)])["out"]
-                out_data = out_data.cpu().numpy().tolist()
-                if config.standard_scalar_and_pca:
-                    sc = pk.load(
-                        open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                if config.model.atomwise_output_features > 0:
+                    loss2 = config.model.atomwise_weight * criterion(
+                        result["atomwise_pred"].to(device),
+                        dats[0].ndata["atomwise_target"].to(device),
                     )
-                    out_data = sc.transform(np.array(out_data).reshape(-1, 1))[
-                        0
-                    ][0]
-                target = target.cpu().numpy().flatten().tolist()
-                # if len(target) == 1:
-                #    target = target[0]
-                # if len(out_data) == 1:
-                #    out_data = out_data[0]
-                for ii, jj in zip(target, out_data):
-                    f.write("%6f, %6f\n" % (ii, jj))
-                    targets.append(ii)
-                    predictions.append(jj)
-        f.close()
+                    info["target_atomwise_pred"] = (
+                        dats[0].ndata["atomwise_target"].cpu().numpy().tolist()
+                    )
+                    info["pred_atomwise_pred"] = (
+                        result["atomwise_pred"].cpu().detach().numpy().tolist()
+                    )
+
+                if config.model.calculate_gradient:
+                    loss3 = config.model.gradwise_weight * criterion(
+                        result["grad"].to(device),
+                        dats[0].ndata["atomwise_grad"].to(device),
+                    )
+                    info["target_grad"] = (
+                        dats[0].ndata["atomwise_grad"].cpu().numpy().tolist()
+                    )
+                    info["pred_grad"] = (
+                        result["grad"].cpu().detach().numpy().tolist()
+                    )
+                if config.model.stresswise_weight != 0:
+                    loss4 = config.model.stresswise_weight * criterion(
+                        # torch.flatten(result["stress"].to(device)),
+                        # (dats[0].ndata["stresses"]).to(device),
+                        # torch.flatten(dats[0].ndata["stresses"]).to(device),
+                        result["stresses"].to(device),
+                        torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
+                        # torch.flatten(torch.cat(dats[0].ndata["stresses"])).to(device),
+                        # dats[0].ndata["stresses"][0].to(device),
+                    )
+                    # loss4 = config.model.stresswise_weight * criterion(
+                    #    result["stress"][0].to(device),
+                    #    dats[0].ndata["stresses"].to(device),
+                    # )
+                    info["target_stress"] = (
+                        torch.cat(tuple(dats[0].ndata["stresses"]))
+                        .cpu()
+                        .numpy()
+                        .tolist()
+                    )
+                    info["pred_stress"] = (
+                        result["stresses"].cpu().detach().numpy().tolist()
+                    )
+                test_result.append(info)
+                loss = loss1 + loss2 + loss3 + loss4
+                if not classification:
+                    test_loss += loss.item()
+            print("TestLoss", e, test_loss)
+            dumpjson(
+                filename=os.path.join(config.output_dir, "Test_results.json"),
+                data=test_result,
+            )
+            last_model_name = "last_model.pt"
+            torch.save(
+                net.state_dict(),
+                os.path.join(config.output_dir, last_model_name),
+            )
+            # return test_result
+    if rank == 0 or world_size == 1:
+        if config.write_predictions and classification:
+            best_model.eval()
+            # net.eval()
+            f = open(
+                os.path.join(
+                    config.output_dir, "prediction_results_test_set.csv"
+                ),
+                "w",
+            )
+            f.write("id,target,prediction\n")
+            targets = []
+            predictions = []
+            with torch.no_grad():
+                ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+                for dat, id in zip(test_loader, ids):
+                    g, lg, target = dat
+                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    # out_data = net([g.to(device), lg.to(device)])["out"]
+                    # out_data = torch.exp(out_data.cpu())
+                    # print('target',target)
+                    # print('out_data',out_data)
+                    top_p, top_class = torch.topk(torch.exp(out_data), k=1)
+                    target = int(target.cpu().numpy().flatten().tolist()[0])
+
+                    f.write("%s, %d, %d\n" % (id, (target), (top_class)))
+                    targets.append(target)
+                    predictions.append(
+                        top_class.cpu().numpy().flatten().tolist()[0]
+                    )
+            f.close()
+
+            print("predictions", predictions)
+            print("targets", targets)
+            print(
+                "Test ROCAUC:",
+                roc_auc_score(np.array(targets), np.array(predictions)),
+            )
+
+        if (
+            config.write_predictions
+            and not classification
+            and config.model.output_features > 1
+        ):
+            best_model.eval()
+            # net.eval()
+            mem = []
+            with torch.no_grad():
+                ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+                for dat, id in zip(test_loader, ids):
+                    g, lg, target = dat
+                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    # out_data = net([g.to(device), lg.to(device)])["out"]
+                    out_data = out_data.cpu().numpy().tolist()
+                    if config.standard_scalar_and_pca:
+                        sc = pk.load(open("sc.pkl", "rb"))
+                        out_data = list(
+                            sc.transform(np.array(out_data).reshape(1, -1))[0]
+                        )  # [0][0]
+                    target = target.cpu().numpy().flatten().tolist()
+                    info = {}
+                    info["id"] = id
+                    info["target"] = target
+                    info["predictions"] = out_data
+                    mem.append(info)
+            dumpjson(
+                filename=os.path.join(
+                    config.output_dir, "multi_out_predictions.json"
+                ),
+                data=mem,
+            )
+        if (
+            config.write_predictions
+            and not classification
+            and config.model.output_features == 1
+            and config.model.gradwise_weight == 0
+        ):
+            best_model.eval()
+            # net.eval()
+            f = open(
+                os.path.join(
+                    config.output_dir, "prediction_results_test_set.csv"
+                ),
+                "w",
+            )
+            f.write("id,target,prediction\n")
+            targets = []
+            predictions = []
+            with torch.no_grad():
+                ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+                for dat, id in zip(test_loader, ids):
+                    g, lg, target = dat
+                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    # out_data = net([g.to(device), lg.to(device)])["out"]
+                    out_data = out_data.cpu().numpy().tolist()
+                    if config.standard_scalar_and_pca:
+                        sc = pk.load(
+                            open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                        )
+                        out_data = sc.transform(
+                            np.array(out_data).reshape(-1, 1)
+                        )[0][0]
+                    target = target.cpu().numpy().flatten().tolist()
+                    if len(target) == 1:
+                        target = target[0]
+                    f.write("%s, %6f, %6f\n" % (id, target, out_data))
+                    targets.append(target)
+                    predictions.append(out_data)
+            f.close()
+
+            print(
+                "Test MAE:",
+                mean_absolute_error(np.array(targets), np.array(predictions)),
+            )
+            best_model.eval()
+            # net.eval()
+            f = open(
+                os.path.join(
+                    config.output_dir, "prediction_results_train_set.csv"
+                ),
+                "w",
+            )
+            f.write("target,prediction\n")
+            targets = []
+            predictions = []
+            with torch.no_grad():
+                ids = train_loader.dataset.ids  # [test_loader.dataset.indices]
+                for dat, id in zip(train_loader, ids):
+                    g, lg, target = dat
+                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    # out_data = net([g.to(device), lg.to(device)])["out"]
+                    out_data = out_data.cpu().numpy().tolist()
+                    if config.standard_scalar_and_pca:
+                        sc = pk.load(
+                            open(os.path.join(tmp_output_dir, "sc.pkl"), "rb")
+                        )
+                        out_data = sc.transform(
+                            np.array(out_data).reshape(-1, 1)
+                        )[0][0]
+                    target = target.cpu().numpy().flatten().tolist()
+                    # if len(target) == 1:
+                    #    target = target[0]
+                    # if len(out_data) == 1:
+                    #    out_data = out_data[0]
+                    for ii, jj in zip(target, out_data):
+                        f.write("%6f, %6f\n" % (ii, jj))
+                        targets.append(ii)
+                        predictions.append(jj)
+            f.close()
 
 
 if __name__ == "__main__":
