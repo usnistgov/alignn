@@ -6,7 +6,7 @@ import os
 import zipfile
 from tqdm import tqdm
 from alignn.models.alignn import ALIGNN, ALIGNNConfig
-from alignn.data import get_torch_dataset
+from alignn.dataset import get_torch_dataset
 from torch.utils.data import DataLoader
 import tempfile
 import torch
