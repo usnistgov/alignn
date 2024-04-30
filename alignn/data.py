@@ -164,6 +164,10 @@ def get_train_val_loaders(
     train_sample = filename + "_train.data"
     val_sample = filename + "_val.data"
     test_sample = filename + "_test.data"
+    if os.path.exists(train_sample):
+        print("If you are training from scratch, run")
+        cmd = "rm -r " + train_sample + " " + val_sample + " " + test_sample
+        print(cmd)
     # print ('output_dir data',output_dir)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)

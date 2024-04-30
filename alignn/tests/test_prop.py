@@ -128,7 +128,13 @@ def test_pretrained():
     get_multiple_predictions(atoms_array=[Si, Si])
 
 
-def test_alignn_train():
+world_size = int(torch.cuda.device_count())
+
+
+def test_alignn_train_regression():
+    # Regression
+    cmd = "rm -rf train_data test_data val_data"
+    os.system(cmd)
     root_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../examples/sample_data/")
     )
@@ -138,11 +144,15 @@ def test_alignn_train():
             "../examples/sample_data/config_example.json",
         )
     )
-    world_size = int(torch.cuda.device_count())
     train_for_folder(
         rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
 
+
+def test_alignn_train_regression_multi_out():
+    cmd = "rm -rf train_data test_data val_data"
+    os.system(cmd)
+    # Regression multi-out
     root_dir = os.path.abspath(
         os.path.join(
             os.path.dirname(__file__), "../examples/sample_data_multi_prop/"
@@ -158,6 +168,11 @@ def test_alignn_train():
         rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
 
+
+def test_alignn_train_classification():
+    cmd = "rm -rf train_data test_data val_data"
+    os.system(cmd)
+    # Classification
     root_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../examples/sample_data/")
     )
@@ -175,6 +190,11 @@ def test_alignn_train():
         classification_threshold=0.01,
     )
 
+
+def test_alignn_train_ff():
+    cmd = "rm -rf train_data test_data val_data"
+    os.system(cmd)
+    # FF
     root_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../examples/sample_data_ff/")
     )
@@ -248,6 +268,9 @@ def test_del_files():
         os.system(cmd)
 
 
+# test_alignn_train_ff()
+# test_alignn_train_classification()
+# test_alignn_train()
 # test_minor_configs()
 # test_pretrained()
 # test_runtime_training()
