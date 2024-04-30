@@ -123,7 +123,8 @@ def train_dgl(
     # print("rank", rank)
     # setup(rank, world_size)
     if rank == 0:
-        print(config)
+        print("config:")
+        # print(config)
         if type(config) is dict:
             try:
                 print(config)
@@ -136,7 +137,6 @@ def train_dgl(
     # checkpoint_dir = os.path.join(config.output_dir)
     # deterministic = False
     classification = False
-    print("config:")
     tmp = config.dict()
     f = open(os.path.join(config.output_dir, "config.json"), "w")
     f.write(json.dumps(tmp, indent=4))
@@ -195,7 +195,7 @@ def train_dgl(
             standard_scalar_and_pca=config.standard_scalar_and_pca,
             keep_data_order=config.keep_data_order,
             output_dir=config.output_dir,
-            # use_ddp=use_ddp,
+            use_lmdb=config.use_lmdb,
         )
     else:
         train_loader = train_val_test_loaders[0]
@@ -876,6 +876,10 @@ def train_dgl(
                         targets.append(ii)
                         predictions.append(jj)
             f.close()
+        if config.use_lmdb:
+            train_loader.dataset.close()
+            val_loader.dataset.close()
+            test_loader.dataset.close()
 
 
 if __name__ == "__main__":

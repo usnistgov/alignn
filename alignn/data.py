@@ -139,7 +139,7 @@ def get_train_val_loaders(
     save_dataloader: bool = False,
     filename: str = "sample",
     id_tag: str = "jid",
-    use_canonize: bool = False,
+    use_canonize: bool = True,
     # use_ddp: bool = False,
     cutoff: float = 8.0,
     cutoff_extra: float = 3.0,
@@ -152,7 +152,7 @@ def get_train_val_loaders(
     output_dir=None,
     world_size=0,
     rank=0,
-    use_lmdb: bool = False,
+    use_lmdb: bool = True,
 ):
     """Help function to set up JARVIS train and val dataloaders."""
     if use_lmdb:

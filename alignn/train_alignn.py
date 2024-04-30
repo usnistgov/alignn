@@ -387,12 +387,13 @@ def train_for_folder(
         standard_scalar_and_pca=config.standard_scalar_and_pca,
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
+        use_lmdb=config.use_lmdb,
     )
     # print("dataset", dataset[0])
     t1 = time.time()
     # world_size = torch.cuda.device_count()
-    print("rank ht1", rank)
-    print("world_size ht1", world_size)
+    print("rank", rank)
+    print("world_size", world_size)
     train_dgl(
         config,
         model=model,
