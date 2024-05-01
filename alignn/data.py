@@ -363,53 +363,9 @@ def get_train_val_loaders(
             use_ddp = False
             train_sampler = None
             val_sampler = None
-        train_data = get_torch_dataset(
-            dataset=dataset_train,
-            id_tag=id_tag,
-            atom_features=atom_features,
-            target=target,
-            target_atomwise=target_atomwise,
-            target_grad=target_grad,
-            target_stress=target_stress,
-            neighbor_strategy=neighbor_strategy,
-            use_canonize=use_canonize,
-            name=dataset,
-            line_graph=line_graph,
-            cutoff=cutoff,
-            cutoff_extra=cutoff_extra,
-            max_neighbors=max_neighbors,
-            classification=classification_threshold is not None,
-            output_dir=output_dir,
-            sampler=train_sampler,
-            tmp_name="train_data",
-        )
-        val_data = (
-            get_torch_dataset(
-                dataset=dataset_val,
-                id_tag=id_tag,
-                atom_features=atom_features,
-                target=target,
-                target_atomwise=target_atomwise,
-                target_grad=target_grad,
-                target_stress=target_stress,
-                neighbor_strategy=neighbor_strategy,
-                use_canonize=use_canonize,
-                name=dataset,
-                line_graph=line_graph,
-                cutoff=cutoff,
-                cutoff_extra=cutoff_extra,
-                sampler=val_sampler,
-                max_neighbors=max_neighbors,
-                classification=classification_threshold is not None,
-                output_dir=output_dir,
-                tmp_name="val_data",
-            )
-            if len(dataset_val) > 0
-            else None
-        )
-        test_data = (
-            get_torch_dataset(
-                dataset=dataset_test,
+        if rank == 0:
+            train_data = get_torch_dataset(
+                dataset=dataset_train,
                 id_tag=id_tag,
                 atom_features=atom_features,
                 target=target,
@@ -425,64 +381,109 @@ def get_train_val_loaders(
                 max_neighbors=max_neighbors,
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
-                tmp_name="test_data",
+                sampler=train_sampler,
+                tmp_name="train_data",
             )
-            if len(dataset_test) > 0
-            else None
-        )
+            val_data = (
+                get_torch_dataset(
+                    dataset=dataset_val,
+                    id_tag=id_tag,
+                    atom_features=atom_features,
+                    target=target,
+                    target_atomwise=target_atomwise,
+                    target_grad=target_grad,
+                    target_stress=target_stress,
+                    neighbor_strategy=neighbor_strategy,
+                    use_canonize=use_canonize,
+                    name=dataset,
+                    line_graph=line_graph,
+                    cutoff=cutoff,
+                    cutoff_extra=cutoff_extra,
+                    sampler=val_sampler,
+                    max_neighbors=max_neighbors,
+                    classification=classification_threshold is not None,
+                    output_dir=output_dir,
+                    tmp_name="val_data",
+                )
+                if len(dataset_val) > 0
+                else None
+            )
+            test_data = (
+                get_torch_dataset(
+                    dataset=dataset_test,
+                    id_tag=id_tag,
+                    atom_features=atom_features,
+                    target=target,
+                    target_atomwise=target_atomwise,
+                    target_grad=target_grad,
+                    target_stress=target_stress,
+                    neighbor_strategy=neighbor_strategy,
+                    use_canonize=use_canonize,
+                    name=dataset,
+                    line_graph=line_graph,
+                    cutoff=cutoff,
+                    cutoff_extra=cutoff_extra,
+                    max_neighbors=max_neighbors,
+                    classification=classification_threshold is not None,
+                    output_dir=output_dir,
+                    tmp_name="test_data",
+                )
+                if len(dataset_test) > 0
+                else None
+            )
 
-        collate_fn = train_data.collate
-        # print("line_graph,line_dih_graph", line_graph, line_dih_graph)
-        if line_graph:
-            collate_fn = train_data.collate_line_graph
+            collate_fn = train_data.collate
+            # print("line_graph,line_dih_graph", line_graph, line_dih_graph)
+            if line_graph:
+                collate_fn = train_data.collate_line_graph
 
-        # use a regular pytorch dataloader
-        train_loader = GraphDataLoader(
-            # train_loader = DataLoader(
-            train_data,
-            batch_size=batch_size,
-            shuffle=True,
-            collate_fn=collate_fn,
-            drop_last=True,
-            num_workers=workers,
-            pin_memory=pin_memory,
-            use_ddp=use_ddp,
-        )
-
-        val_loader = GraphDataLoader(
-            # val_loader = DataLoader(
-            val_data,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=collate_fn,
-            drop_last=True,
-            num_workers=workers,
-            pin_memory=pin_memory,
-            use_ddp=use_ddp,
-        )
-
-        test_loader = (
-            GraphDataLoader(
-                # DataLoader(
-                test_data,
-                batch_size=1,
-                shuffle=False,
+            # use a regular pytorch dataloader
+            train_loader = GraphDataLoader(
+                # train_loader = DataLoader(
+                train_data,
+                batch_size=batch_size,
+                shuffle=True,
                 collate_fn=collate_fn,
-                drop_last=False,
+                drop_last=True,
                 num_workers=workers,
                 pin_memory=pin_memory,
                 use_ddp=use_ddp,
             )
-            if len(dataset_test) > 0
-            else None
-        )
 
-        if save_dataloader:
-            torch.save(train_loader, train_sample)
-            if val_loader is not None:
-                torch.save(val_loader, val_sample)
-            if test_loader is not None:
-                torch.save(test_loader, test_sample)
+            val_loader = GraphDataLoader(
+                # val_loader = DataLoader(
+                val_data,
+                batch_size=batch_size,
+                shuffle=False,
+                collate_fn=collate_fn,
+                drop_last=True,
+                num_workers=workers,
+                pin_memory=pin_memory,
+                use_ddp=use_ddp,
+            )
+
+            test_loader = (
+                GraphDataLoader(
+                    # DataLoader(
+                    test_data,
+                    batch_size=1,
+                    shuffle=False,
+                    collate_fn=collate_fn,
+                    drop_last=False,
+                    num_workers=workers,
+                    pin_memory=pin_memory,
+                    use_ddp=use_ddp,
+                )
+                if len(dataset_test) > 0
+                else None
+            )
+
+            if save_dataloader:
+                torch.save(train_loader, train_sample)
+                if val_loader is not None:
+                    torch.save(val_loader, val_sample)
+                if test_loader is not None:
+                    torch.save(test_loader, test_sample)
 
     print("n_train:", len(train_loader.dataset))
     print("n_val  :", len(val_loader.dataset) if val_loader is not None else 0)
