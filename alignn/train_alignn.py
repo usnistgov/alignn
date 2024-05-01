@@ -22,11 +22,12 @@ if torch.cuda.is_available():
     device = torch.device("cuda")
 
 
-def setup(rank, world_size):
+def setup(rank=0, world_size=0, port="12356"):
     """Set up multi GPU rank."""
     if world_size > 1:
         os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = "12355"
+        os.environ["MASTER_PORT"] = port
+        # os.environ["MASTER_PORT"] = "12355"
         # Initialize the distributed environment.
         dist.init_process_group("nccl", rank=rank, world_size=world_size)
         torch.cuda.set_device(rank)
@@ -149,7 +150,7 @@ def train_for_folder(
     output_dir=None,
 ):
     """Train for a folder."""
-    setup(rank, world_size)
+    setup(rank=rank, world_size=world_size)
     print("root_dir", root_dir)
     id_prop_json = os.path.join(root_dir, "id_prop.json")
     id_prop_json_zip = os.path.join(root_dir, "id_prop.json.zip")
