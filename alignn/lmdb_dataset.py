@@ -108,6 +108,7 @@ def get_torch_dataset(
     output_dir=".",
     tmp_name="dataset",
     map_size=1e12,
+    read_existing=True,
 ):
     """Get Torch Dataset with LMDB."""
     vals = np.array([ii[target] for ii in dataset])  # df[target].values
@@ -118,6 +119,13 @@ def get_torch_dataset(
     line = "Min=" + str(np.min(vals)) + "\n"
     f.write(line)
     f.close()
+    ids = []
+    if os.path.exists(tmp_name) and read_existing:
+        for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
+            ids.append(d[id_tag])
+        dat = TorchLMDBDataset(lmdb_path=tmp_name, ids=ids)
+        print("Reading dataset", tmp_name)
+        return dat
     ids = []
     env = lmdb.open(tmp_name, map_size=int(map_size))
     with env.begin(write=True) as txn:
