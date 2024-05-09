@@ -16,6 +16,7 @@ from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
 import torch
 import time
 from jarvis.core.atoms import Atoms
+import random
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -24,6 +25,9 @@ if torch.cuda.is_available():
 
 def setup(rank=0, world_size=0, port="12356"):
     """Set up multi GPU rank."""
+    # "12356"
+    if port == "":
+        port = str(random.randint(10000, 99999))
     if world_size > 1:
         os.environ["MASTER_ADDR"] = "localhost"
         os.environ["MASTER_PORT"] = port
