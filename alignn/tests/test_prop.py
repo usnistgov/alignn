@@ -13,6 +13,7 @@ from alignn.train_alignn import train_for_folder
 from jarvis.db.figshare import get_jid_data
 from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, revised_path
 import torch
+from jarvis.db.jsonutils import loadjson, dumpjson
 
 plt.switch_backend("agg")
 
@@ -63,6 +64,7 @@ def test_models():
 
     config["write_predictions"] = True
     config["model"]["name"] = "alignn_atomwise"
+    config["filename"] = "X"
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
@@ -74,6 +76,7 @@ def test_models():
     print()
 
     config["model"]["name"] = "alignn_atomwise"
+    config["filename"] = "Y"
     config["classification_threshold"] = 0.0
     t1 = time.time()
     result = train_dgl(config)
@@ -133,7 +136,7 @@ world_size = int(torch.cuda.device_count())
 
 def test_alignn_train_regression():
     # Regression
-    cmd = "rm -rf train_data test_data val_data"
+    cmd = "rm -rf *train_data *test_data *val_data"
     os.system(cmd)
     root_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../examples/sample_data/")
@@ -144,13 +147,16 @@ def test_alignn_train_regression():
             "../examples/sample_data/config_example.json",
         )
     )
+    tmp = loadjson(config)
+    tmp["filename"] = "AA"
+    dumpjson(data=tmp, filename=config)
     train_for_folder(
         rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
 
 
 def test_alignn_train_regression_multi_out():
-    cmd = "rm -rf train_data test_data val_data"
+    cmd = "rm -rf *train_data *test_data *val_data"
     os.system(cmd)
     # Regression multi-out
     root_dir = os.path.abspath(
@@ -164,13 +170,16 @@ def test_alignn_train_regression_multi_out():
             "../examples/sample_data/config_example.json",
         )
     )
+    tmp = loadjson(config)
+    tmp["filename"] = "BB"
+    dumpjson(data=tmp, filename=config)
     train_for_folder(
         rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
 
 
 def test_alignn_train_classification():
-    cmd = "rm -rf train_data test_data val_data"
+    cmd = "rm -rf *train_data *test_data *val_data"
     os.system(cmd)
     # Classification
     root_dir = os.path.abspath(
@@ -182,6 +191,9 @@ def test_alignn_train_classification():
             "../examples/sample_data/config_example.json",
         )
     )
+    tmp = loadjson(config)
+    tmp["filename"] = "A"
+    dumpjson(data=tmp, filename=config)
     train_for_folder(
         rank=0,
         world_size=world_size,
@@ -192,7 +204,7 @@ def test_alignn_train_classification():
 
 
 def test_alignn_train_ff():
-    cmd = "rm -rf train_data test_data val_data"
+    cmd = "rm -rf *train_data *test_data *val_data"
     os.system(cmd)
     # FF
     root_dir = os.path.abspath(
@@ -204,6 +216,9 @@ def test_alignn_train_ff():
             "../examples/sample_data_ff/config_example_atomwise.json",
         )
     )
+    tmp = loadjson(config)
+    tmp["filename"] = "B"
+    dumpjson(data=tmp, filename=config)
     train_for_folder(
         rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
@@ -266,7 +281,8 @@ def test_del_files():
     for i in fnames:
         cmd = "rm -r " + i
         os.system(cmd)
-
+    cmd="rm -r *train_data *val_data *test_data"
+    os.system(cmd)
 
 # test_alignn_train_ff()
 # test_alignn_train_classification()

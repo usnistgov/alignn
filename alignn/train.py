@@ -877,6 +877,7 @@ def train_dgl(
                         predictions.append(jj)
             f.close()
         if config.use_lmdb:
+            print("Closing LMDB.")
             train_loader.dataset.close()
             val_loader.dataset.close()
             test_loader.dataset.close()

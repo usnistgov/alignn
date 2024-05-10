@@ -137,7 +137,7 @@ def get_train_val_loaders(
     workers: int = 0,
     pin_memory: bool = True,
     save_dataloader: bool = False,
-    filename: str = "sample",
+    filename: str = "./",
     id_tag: str = "jid",
     use_canonize: bool = True,
     # use_ddp: bool = False,
@@ -363,6 +363,7 @@ def get_train_val_loaders(
             use_ddp = False
             train_sampler = None
             val_sampler = None
+        tmp_name = filename + "train_data"
         train_data = get_torch_dataset(
             dataset=dataset_train,
             id_tag=id_tag,
@@ -381,8 +382,10 @@ def get_train_val_loaders(
             classification=classification_threshold is not None,
             output_dir=output_dir,
             sampler=train_sampler,
-            tmp_name="train_data",
+            tmp_name=tmp_name,
+            # tmp_name="train_data",
         )
+        tmp_name = filename + "val_data"
         val_data = (
             get_torch_dataset(
                 dataset=dataset_val,
@@ -402,11 +405,13 @@ def get_train_val_loaders(
                 max_neighbors=max_neighbors,
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
-                tmp_name="val_data",
+                tmp_name=tmp_name,
+                # tmp_name="val_data",
             )
             if len(dataset_val) > 0
             else None
         )
+        tmp_name = filename + "test_data"
         test_data = (
             get_torch_dataset(
                 dataset=dataset_test,
@@ -425,7 +430,8 @@ def get_train_val_loaders(
                 max_neighbors=max_neighbors,
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
-                tmp_name="test_data",
+                tmp_name=tmp_name,
+                # tmp_name="test_data",
             )
             if len(dataset_test) > 0
             else None
