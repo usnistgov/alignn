@@ -79,6 +79,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     add_reverse_forces: bool = False  # will make True as default soon
     lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
+    sph_embedding: bool = False
     extra_features: int = 0
 
     class Config:
@@ -317,11 +318,24 @@ class ALIGNNAtomWise(nn.Module):
             MLPLayer(config.edge_input_features, config.embedding_features),
             MLPLayer(config.embedding_features, config.hidden_features),
         )
-        self.angle_embedding = nn.Sequential(
-            # nn.Linear((config.l_max + 1) ** 2, config.embedding_features),
-            # MLPLayer(config.embedding_features, config.hidden_features),
-            MLPLayer((config.l_max + 1) ** 2, config.hidden_features),
-        )
+        if config.sph_embedding:
+            self.angle_embedding = nn.Sequential(
+                # nn.Linear((config.l_max + 1) ** 2, config.embedding_features),
+                # MLPLayer(config.embedding_features, config.hidden_features),
+                MLPLayer((config.l_max + 1) ** 2, config.hidden_features),
+            )
+        else:
+            self.angle_embedding = nn.Sequential(
+                RBFExpansion(
+                    vmin=-1,
+                    vmax=1.0,
+                    bins=config.triplet_input_features,
+                ),
+                MLPLayer(
+                    config.triplet_input_features, config.embedding_features
+                ),
+                MLPLayer(config.embedding_features, config.hidden_features),
+            )
         self.alignn_layers = nn.ModuleList(
             [
                 ALIGNNConv(config.hidden_features, config.hidden_features)
@@ -390,17 +404,19 @@ class ALIGNNAtomWise(nn.Module):
         if len(self.alignn_layers) > 0:
             g, lg = g
             lg = lg.local_var()
-            angles = lg.edata.pop("h")
-            # print('angles',angles.shape)
-            theta = angles  # [:, 0]
-            phi = torch.zeros_like(angles)  # angles[:, 1]
-            spherical_harmonics = SphericalHarmonicsExpansion(
-                vmin=0, vmax=math.pi, bins=40, l_max=self.config.l_max
-            )
-
-            z = spherical_harmonics(theta, phi)
-            # print('z1',z,z.shape)
-            z = self.angle_embedding(z)
+            if self.config.sph_embedding:
+                angles = lg.edata.pop("h")
+                # print('angles',angles.shape)
+                theta = angles  # [:, 0]
+                phi = torch.zeros_like(angles)  # angles[:, 1]
+                spherical_harmonics = SphericalHarmonicsExpansion(
+                    vmin=0, vmax=math.pi, bins=40, l_max=self.config.l_max
+                )
+                z = spherical_harmonics(theta, phi)
+                # print('z1',z,z.shape)
+                z = self.angle_embedding(z)
+            else:
+                z = self.angle_embedding(lg.edata.pop("h"))
             # z = torch.clamp(self.angle_embedding(z), -0.5, 0.5)
             # print('z2',z,z.shape)
 
@@ -419,15 +435,20 @@ class ALIGNNAtomWise(nn.Module):
         if self.config.lg_on_fly and len(self.alignn_layers) > 0:
             lg.ndata["r"] = r  # overwrites precomputed r values
             lg.apply_edges(compute_bond_cosines)  # overwrites precomputed h
-            angles = lg.edata.pop("h")
-            theta = angles  # [:, 0]
-            phi = torch.zeros_like(angles)  # angles[:, 1]
-            spherical_harmonics = SphericalHarmonicsExpansion(
-                vmin=0, vmax=math.pi, bins=20, l_max=self.config.l_max
-            )
-            z = spherical_harmonics(theta, phi)
-            # z = self.angle_embedding(z)
-            z = self.angle_embedding(z)
+            if self.config.sph_embedding:
+                # currently sph embedding giving nan
+                angles = lg.edata.pop("h")
+                theta = angles  # [:, 0]
+                phi = torch.zeros_like(angles)  # angles[:, 1]
+                spherical_harmonics = SphericalHarmonicsExpansion(
+                    vmin=0, vmax=math.pi, bins=20, l_max=self.config.l_max
+                )
+                z = spherical_harmonics(theta, phi)
+                # z = self.angle_embedding(z)
+                z = self.angle_embedding(z)
+
+            else:
+                z = self.angle_embedding(lg.edata.pop("h"))
             # z = torch.clamp(self.angle_embedding(z), -0.5, 0.5)
 
         bondlength = torch.norm(r, dim=1)
