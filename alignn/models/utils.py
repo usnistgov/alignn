@@ -1,4 +1,5 @@
 """Shared model-building components."""
+
 from typing import Optional
 
 import numpy as np
@@ -33,7 +34,7 @@ class RBFExpansion(nn.Module):
 
         else:
             self.lengthscale = lengthscale
-            self.gamma = 1 / (lengthscale ** 2)
+            self.gamma = 1 / (lengthscale**2)
 
     def forward(self, distance: torch.Tensor) -> torch.Tensor:
         """Apply RBF expansion to interatomic distance tensor."""
