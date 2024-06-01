@@ -19,7 +19,6 @@
 * [Installation](#install)
 * [Examples](#example)
 * [Pre-trained models](#pretrained)
-* [Quick start using colab](#colab)
 * [JARVIS-ALIGNN webapp](#webapp)
 * [ALIGNN-FF & ASE Calculator](#alignnff)
 * [Peformances on a few datasets](#performances)
@@ -111,6 +110,18 @@ pip install dgl==1.0.1+cu117 -f https://data.dgl.ai/wheels/cu117/repo.html
 Examples
 ---------
 
+
+
+
+| Notebooks                                                                                                                                      | Google&nbsp;Colab                                                                                                                                        | Descriptions                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Regression model](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb)                                                       | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb)                                 | Examples for developing single output regression model for exfoliation energies of 2D materials.                                                                                                                                                                                                                                                                       |
+| [MLFF](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb)                                                  | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb)                            | Examples of training a machine learning force field for Silicon.                                                                                                                                                                                                                                                                                                                                 |
+| [Miscellaneous tasks](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)                   | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)  | Examples for developing single output (such as formation energy, bandgaps) or multi-output (such as phonon DOS, electron DOS) Regression or Classification (such as metal vs non-metal), sing several pretrained models. |
+
+
+[Open in Google Colab]: https://colab.research.google.com/assets/colab-badge.svg
+
 Here, we provide examples for property prediction tasks, development of machine-learning force-fields (MLFF), usage of pre-trained property predictor, MLFFs, webapps etc.
 
 #### Dataset preparation for property prediction tasks
@@ -174,18 +185,7 @@ An example of prediction formation energy per atom using JARVIS-DFT dataset trai
 ```
 pretrained.py --model_name jv_formation_energy_peratom_alignn --file_format poscar --file_path alignn/examples/sample_data/POSCAR-JVASP-10.vasp
 ```
-<a name="colab"></a>
-Quick start using GoogleColab notebook example
------------------------------------------------
 
-The following [notebook](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb) provides an example of 1) installing ALIGNN model, 2) training the example data and 3) using the pretrained models. For this example, you don't need to install alignn package on your local computer/cluster, it requires a gmail account to login. Learn more about Google colab [here](https://colab.research.google.com/notebooks/intro.ipynb).
-
-[![name](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)
-
-
-The following [notebook](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb) provides an example of ALIGNN-FF model.
-
-For additional notebooks, checkout [JARVIS-Tools-Notebooks](https://github.com/JARVIS-Materials-Design/jarvis-tools-notebooks?tab=readme-ov-file#artificial-intelligencemachine-learning)
 
 <a name="webapp"></a>
 Web-app
