@@ -1,4 +1,3 @@
-[![name](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)
 ![alt text](https://github.com/usnistgov/alignn/actions/workflows/main.yml/badge.svg)
 [![codecov](https://codecov.io/gh/usnistgov/alignn/branch/main/graph/badge.svg?token=S5X4OYC80V)](https://codecov.io/gh/usnistgov/alignn)
 [![PyPI version](https://badge.fury.io/py/alignn.svg)](https://badge.fury.io/py/alignn)
