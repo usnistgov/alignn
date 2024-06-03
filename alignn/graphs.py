@@ -13,6 +13,7 @@ import math
 # from jarvis.core.atoms import Atoms
 from collections import defaultdict
 from typing import List, Tuple, Sequence, Optional
+from dgl.data import DGLDataset
 
 import torch
 import dgl
@@ -711,7 +712,7 @@ def compute_bond_cosines(edges):
     return {"h": bond_cosine}
 
 
-class StructureDataset(torch.utils.data.Dataset):
+class StructureDataset(DGLDataset):
     """Dataset of crystal DGLGraphs."""
 
     def __init__(
@@ -727,6 +728,7 @@ class StructureDataset(torch.utils.data.Dataset):
         line_graph=False,
         classification=False,
         id_tag="jid",
+        sampler=None,
     ):
         """Pytorch Dataset for atomistic graphs.
 
