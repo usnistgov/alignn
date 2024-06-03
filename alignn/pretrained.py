@@ -6,7 +6,6 @@ import os
 import zipfile
 from tqdm import tqdm
 from alignn.models.alignn import ALIGNN, ALIGNNConfig
-from alignn.data import get_torch_dataset
 from torch.utils.data import DataLoader
 import tempfile
 import torch
@@ -17,6 +16,7 @@ from jarvis.core.atoms import Atoms
 from alignn.graphs import Graph
 from jarvis.db.jsonutils import dumpjson
 import pandas as pd
+from alignn.dataset import get_torch_dataset
 
 # from jarvis.core.graphs import Graph
 
@@ -340,8 +340,16 @@ def get_multiple_predictions(
     model=None,
     model_name="jv_formation_energy_peratom_alignn",
     print_freq=100,
+    # use_lmdb=True,
 ):
     """Use pretrained model on a number of structures."""
+    # if use_lmdb:
+    #    print("Using LMDB dataset.")
+    #    from alignn.lmdb_dataset import get_torch_dataset
+    # else:
+    #    print("Not using LMDB dataset, memory footprint maybe high.")
+    #    from alignn.dataset import get_torch_dataset
+
     # import glob
     # atoms_array=[]
     # for i in glob.glob("alignn/examples/sample_data/*.vasp"):

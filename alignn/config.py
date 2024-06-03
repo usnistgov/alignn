@@ -207,7 +207,8 @@ class TrainingConfig(BaseSettings):
     distributed: bool = False
     data_parallel: bool = False
     n_early_stopping: Optional[int] = None  # typically 50
-    output_dir: str = os.path.abspath(".")  # typically 50
+    output_dir: str = os.path.abspath(".")
+    use_lmdb: bool = True
     # alignn_layers: int = 4
     # gcn_layers: int =4
     # edge_input_features: int= 80

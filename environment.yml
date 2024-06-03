@@ -168,6 +168,7 @@ dependencies:
   - pysocks=1.7.1=pyha2e5f31_6
   - pytest=8.1.1=pyhd8ed1ab_0
   - python=3.10.13=hd12c33a_0_cpython
+  - python-lmdb=1.4.1=py310hdf73078_1
   - python-tzdata=2024.1=pyhd8ed1ab_0
   - python_abi=3.10=4_cp310
   - pytz=2024.1=pyhd8ed1ab_0

@@ -2,6 +2,7 @@
 
 """Module to train for a folder with formatted dataset."""
 import os
+import torch.distributed as dist
 import csv
 import sys
 import json
@@ -15,10 +16,31 @@ from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
 import torch
 import time
 from jarvis.core.atoms import Atoms
+import random
 
 device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
+
+
+def setup(rank=0, world_size=0, port="12356"):
+    """Set up multi GPU rank."""
+    # "12356"
+    if port == "":
+        port = str(random.randint(10000, 99999))
+    if world_size > 1:
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = port
+        # os.environ["MASTER_PORT"] = "12355"
+        # Initialize the distributed environment.
+        dist.init_process_group("nccl", rank=rank, world_size=world_size)
+        torch.cuda.set_device(rank)
+
+
+def cleanup(world_size):
+    """Clean up distributed process."""
+    if world_size > 1:
+        dist.destroy_process_group()
 
 
 parser = argparse.ArgumentParser(
@@ -115,9 +137,10 @@ parser.add_argument(
 
 
 def train_for_folder(
+    rank=0,
+    world_size=0,
     root_dir="examples/sample_data",
     config_name="config.json",
-    # keep_data_order=False,
     classification_threshold=None,
     batch_size=None,
     epochs=None,
@@ -128,11 +151,11 @@ def train_for_folder(
     stresswise_key="stresses",
     file_format="poscar",
     restart_model_path=None,
-    # subtract_mean=False,
-    # normalize_with_natoms=False,
     output_dir=None,
 ):
     """Train for a folder."""
+    setup(rank=rank, world_size=world_size)
+    print("root_dir", root_dir)
     id_prop_json = os.path.join(root_dir, "id_prop.json")
     id_prop_json_zip = os.path.join(root_dir, "id_prop.json.zip")
     id_prop_csv = os.path.join(root_dir, "id_prop.csv")
@@ -369,9 +392,13 @@ def train_for_folder(
         standard_scalar_and_pca=config.standard_scalar_and_pca,
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
+        use_lmdb=config.use_lmdb,
     )
     # print("dataset", dataset[0])
     t1 = time.time()
+    # world_size = torch.cuda.device_count()
+    print("rank", rank)
+    print("world_size", world_size)
     train_dgl(
         config,
         model=model,
@@ -381,6 +408,8 @@ def train_for_folder(
             test_loader,
             prepare_batch,
         ],
+        rank=rank,
+        world_size=world_size,
     )
     t2 = time.time()
     print("Time taken (s)", t2 - t1)
@@ -390,21 +419,48 @@ def train_for_folder(
 
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
-    train_for_folder(
-        root_dir=args.root_dir,
-        config_name=args.config_name,
-        # keep_data_order=args.keep_data_order,
-        classification_threshold=args.classification_threshold,
-        output_dir=args.output_dir,
-        batch_size=(args.batch_size),
-        epochs=(args.epochs),
-        target_key=(args.target_key),
-        id_key=(args.id_key),
-        atomwise_key=(args.atomwise_key),
-        gradwise_key=(args.force_key),
-        stresswise_key=(args.stresswise_key),
-        restart_model_path=(args.restart_model_path),
-        # subtract_mean=(args.subtract_mean),
-        # normalize_with_natoms=(args.normalize_with_natoms),
-        file_format=(args.file_format),
-    )
+    world_size = int(torch.cuda.device_count())
+    print("world_size", world_size)
+    if world_size > 1:
+        torch.multiprocessing.spawn(
+            train_for_folder,
+            args=(
+                world_size,
+                args.root_dir,
+                args.config_name,
+                args.classification_threshold,
+                args.batch_size,
+                args.epochs,
+                args.id_key,
+                args.target_key,
+                args.atomwise_key,
+                args.force_key,
+                args.stresswise_key,
+                args.file_format,
+                args.restart_model_path,
+                args.output_dir,
+            ),
+            nprocs=world_size,
+        )
+    else:
+        train_for_folder(
+            0,
+            world_size,
+            args.root_dir,
+            args.config_name,
+            args.classification_threshold,
+            args.batch_size,
+            args.epochs,
+            args.id_key,
+            args.target_key,
+            args.atomwise_key,
+            args.force_key,
+            args.stresswise_key,
+            args.file_format,
+            args.restart_model_path,
+            args.output_dir,
+        )
+    try:
+        cleanup(world_size)
+    except Exception:
+        pass
