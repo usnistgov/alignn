@@ -48,6 +48,9 @@ bash Miniconda3-latest-Linux-x86_64.sh (for linux)
 bash Miniconda3-latest-MacOSX-x86_64.sh (for Mac)
 ```
 Download 32/64 bit python 3.10 miniconda exe and install (for windows)
+
+#### Method 1 (conda based installation)
+
 Now, let's make a conda environment, say "my_alignn", choose other name as you like::
 ```
 conda create --name my_alignn python=3.10
@@ -64,7 +67,7 @@ conda install dgl=2.1.0 pytorch torchvision torchaudio pytorch-cuda -c pytorch -
 ```
 
 
-#### Method 1 (editable in-place install)
+#### Method 2 (edit/debug in-place install)
 
 You can laso install a development version of alignn by cloning the repository and installing in place with pip:
 
@@ -75,12 +78,12 @@ python -m pip install -e .
 ```
 
 
-#### Method 2 (using pypi):
+#### Method 3 (using pypi):
 
 As an alternate method, ALIGNN can also be installed using `pip` command as follows:
 ```
 pip install alignn
-pip install dgl==1.0.1+cu117 -f https://data.dgl.ai/wheels/cu117/repo.html
+pip install  dgl -f https://data.dgl.ai/wheels/torch-2.1/cu121/repo.html
 ```
 
 <a name="example"></a>
