@@ -1,9 +1,8 @@
 """Module for running ALIGNN-FF."""
+
 from ase.md import MDLogger
 from jarvis.core.atoms import Atoms as JarvisAtoms
 import os
-
-# import json
 import requests
 from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
@@ -42,8 +41,6 @@ from jarvis.analysis.interface.zur import make_interface
 from jarvis.analysis.defects.surface import Surface
 from jarvis.core.kpoints import Kpoints3D as Kpoints
 import zipfile
-
-# from jarvis.core.atoms import get_supercell_dims
 from ase import Atoms as AseAtoms
 from ase.phonons import Phonons
 import matplotlib.pyplot as plt  # noqa
@@ -58,19 +55,10 @@ try:
 except Exception:
     pass
 plt.switch_backend("agg")
-# from ase.optimize.optimize import Optimizer
-# from ase.io import Trajectory
-# from ase.neighborlist import NeighborList
 
-__author__ = "Kamal Choudhary, Brian DeCost, Keith Butler, Lily Major"
-
-scf_fd_top_10_en_42_fmax_600_wt01 = (
-    "https://figshare.com/ndownloader/files/41967375"
-)
-scf_fd_top_10_en_42_fmax_600_wt10 = (
-    "https://figshare.com/ndownloader/files/41967372"
-)
+# Cite: https://doi.org/10.1039/D2DD00096B
 all_models_ff = {
+    "v5.27.2024": "https://figshare.com/ndownloader/files/47286127",
     "alignnff_fmult": "https://figshare.com/ndownloader/files/41583585",
     "alignnff_wt10": "https://figshare.com/ndownloader/files/41583594",
     "alignnff_fd": "https://figshare.com/ndownloader/files/41583582",
@@ -79,15 +67,21 @@ all_models_ff = {
     "fmult_mlearn_only": "https://figshare.com/ndownloader/files/41583597",
     "aff_Oct23": "https://figshare.com/ndownloader/files/42880573",
     "revised": "https://figshare.com/ndownloader/files/41583600",
-    "scf_fd_top_10_en_42_fmax_600_wt01": scf_fd_top_10_en_42_fmax_600_wt01,
-    "scf_fd_top_10_en_42_fmax_600_wt10": scf_fd_top_10_en_42_fmax_600_wt10,
+    "scf_fd_top_10_en_42_fmax_600_wt01": "https://figshare.com/ndownloader/files/41967375",
+    "scf_fd_top_10_en_42_fmax_600_wt10": "https://figshare.com/ndownloader/files/41967372",
 }
 
 
+def get_all_models():
+    json_path = os.path.join(os.path.dirname(__file__), "all_models_ff.json")
+    return loadjson(json_path)
+
+
 def get_figshare_model_ff(
-    model_name="alignnff_fmult", dir_path=None, filename="best_model.pt"
+    model_name="v5.27.2024", dir_path=None, filename="best_model.pt"
 ):
     """Get ALIGNN-FF torch models from figshare."""
+    all_models_ff = get_all_models()
     # https://doi.org/10.6084/m9.figshare.23695695
     if dir_path is None:
         dir_path = str(os.path.join(os.path.dirname(__file__), model_name))
@@ -145,9 +139,10 @@ def get_figshare_model_ff(
 
 def default_path():
     """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="alignnff_wt10")
+    dpath = get_figshare_model_ff(model_name="v5.27.2024")
+    # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
     # dpath = get_figshare_model_ff(model_name="alignnff_fmult")
-    print("model_path", dpath)
+    # print("model_path", dpath)
     return dpath
 
 
