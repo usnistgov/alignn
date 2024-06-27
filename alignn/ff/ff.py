@@ -57,19 +57,6 @@ except Exception:
 plt.switch_backend("agg")
 
 # Cite: https://doi.org/10.1039/D2DD00096B
-all_models_ff = {
-    "v5.27.2024": "https://figshare.com/ndownloader/files/47286127",
-    "alignnff_fmult": "https://figshare.com/ndownloader/files/41583585",
-    "alignnff_wt10": "https://figshare.com/ndownloader/files/41583594",
-    "alignnff_fd": "https://figshare.com/ndownloader/files/41583582",
-    "alignnff_wt01": "https://figshare.com/ndownloader/files/41583588",
-    "alignnff_wt1": "https://figshare.com/ndownloader/files/41583591",
-    "fmult_mlearn_only": "https://figshare.com/ndownloader/files/41583597",
-    "aff_Oct23": "https://figshare.com/ndownloader/files/42880573",
-    "revised": "https://figshare.com/ndownloader/files/41583600",
-    "scf_fd_top_10_en_42_fmax_600_wt01": "https://figshare.com/ndownloader/files/41967375",
-    "scf_fd_top_10_en_42_fmax_600_wt10": "https://figshare.com/ndownloader/files/41967372",
-}
 
 
 def get_all_models():
