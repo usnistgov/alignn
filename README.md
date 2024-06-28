@@ -29,17 +29,10 @@
 
 <a name="intro"></a>
 # ALIGNN (Introduction)
-The Atomistic Line Graph Neural Network (https://www.nature.com/articles/s41524-021-00650-1)  introduces a new graph convolution layer that explicitly models both two and three body interactions in atomistic systems.
+The Atomistic Line Graph Neural Network (https://www.nature.com/articles/s41524-021-00650-1)  introduces a new graph convolution layer that explicitly models both two and three body interactions in atomistic systems. This is achieved by composing two edge-gated graph convolution layers, the first applied to the atomistic line graph *L(g)* (representing triplet interactions) and the second applied to the atomistic bond graph *g* (representing pair interactions).
 
-This is achieved by composing two edge-gated graph convolution layers, the first applied to the atomistic line graph *L(g)* (representing triplet interactions) and the second applied to the atomistic bond graph *g* (representing pair interactions).
 
-The atomistic graph *g* consists of a node for each atom *i* (with atom/node representations *h<sub>i</sub>*), and one edge for each atom pair within a cutoff radius (with bond/pair representations *e<sub>ij</sub>*).
-
-The atomistic line graph *L(g)* represents relationships between atom triplets: it has nodes corresponding to bonds (sharing representations *e<sub>ij</sub>* with those in *g*) and edges corresponding to bond angles (with angle/triplet representations *t<sub>ijk</sub>*).
-
-The line graph convolution updates the triplet representations and the pair representations; the direct graph convolution further updates the pair representations and the atom representations.
-
-![ALIGNN layer schematic](https://github.com/usnistgov/alignn/blob/main/alignn/tex/alignn2.png)
+![ALIGNN layer schematic](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/schematic_lg.jpg)
 
 <a name="install"></a>
 Installation
@@ -55,38 +48,26 @@ bash Miniconda3-latest-Linux-x86_64.sh (for linux)
 bash Miniconda3-latest-MacOSX-x86_64.sh (for Mac)
 ```
 Download 32/64 bit python 3.10 miniconda exe and install (for windows)
+
+#### Method 1 (conda based installation)
+
 Now, let's make a conda environment, say "my_alignn", choose other name as you like::
 ```
 conda create --name my_alignn python=3.10
 conda activate my_alignn
-conda install alignn
+conda install alignn -y
 ```
-Starting version 2024.3.24, we have developed a conda package for alignn: [https://anaconda.org/conda-forge/alignn](https://anaconda.org/conda-forge/alignn)
 
 #### optional GPU dependencies notes
 
 If you need CUDA support, it's best to install PyTorch and DGL before installing alignn to ensure that you get a CUDA-enabled version of DGL.
 
-To [install the stable release of PyTorch] on linux with cudatoolkit 11.8 run
-
 ```
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
-```
-
-Then [install the matching DGL version](https://www.dgl.ai/pages/start.html)
-
-```
-conda install -c dglteam/label/cu118 dgl
-```
-
-Some of our models may not be stable with the latest DGL release (v1.1.0) so you may wish to install v1.0.2 instead:
-
-```
-conda install -c dglteam/label/cu118 dgl==1.0.2.cu118
+conda install dgl=2.1.0 pytorch torchvision torchaudio pytorch-cuda -c pytorch -c nvidia
 ```
 
 
-#### Method 1 (editable in-place install)
+#### Method 2 (edit/debug in-place install)
 
 You can laso install a development version of alignn by cloning the repository and installing in place with pip:
 
@@ -97,19 +78,17 @@ python -m pip install -e .
 ```
 
 
-#### Method 2 (using pypi):
+#### Method 3 (using pypi):
 
 As an alternate method, ALIGNN can also be installed using `pip` command as follows:
 ```
 pip install alignn
-pip install dgl==1.0.1+cu117 -f https://data.dgl.ai/wheels/cu117/repo.html
+pip install  dgl -f https://data.dgl.ai/wheels/torch-2.1/cu121/repo.html
 ```
 
 <a name="example"></a>
 Examples
 ---------
-
-
 
 
 | Notebooks                                                                                                                                      | Google&nbsp;Colab                                                                                                                                        | Descriptions                                                                                                                                                                                                                                                                                                                                                                                              |
