@@ -12,7 +12,7 @@ import torch
 import typer
 
 from alignn.config import TrainingConfig
-from alignn.profile import profile_dgl
+from alignn.profiler import profile_dgl
 from alignn.train import train_dgl
 
 

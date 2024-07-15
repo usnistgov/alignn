@@ -1,7 +1,7 @@
 """pytorch profiling script.
 
 from the repository root, run
-`PYTHONPATH=$PYTHONPATH:. python jarvisdgl/profile.py`
+`PYTHONPATH=$PYTHONPATH:. python alignn/profiler.py`
 """
 
 from functools import partial
