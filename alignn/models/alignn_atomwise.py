@@ -56,6 +56,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
     extra_features: int = 0
+    exponent: int = 3
 
     class Config:
         """Configure model settings behavior."""
@@ -99,6 +100,13 @@ def cutoff_function_based_edges(r, inner_cutoff=4, exponent=3):
         + c2 * ratio ** (exponent + 1)
         + c3 * ratio ** (exponent + 2)
     )
+    # r_cut = inner_cutoff
+    # r_on = inner_cutoff+1
+
+    # r_sq = r * r
+    # r_on_sq = r_on * r_on
+    # r_cut_sq = r_cut * r_cut
+    # envelope = (r_cut_sq - r_sq) ** 2 * (r_cut_sq + 2 * r_sq - 3 * r_on_sq)/ (r_cut_sq - r_on_sq) ** 3
     return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
 
 
@@ -392,7 +400,9 @@ class ALIGNNAtomWise(nn.Module):
         bondlength = torch.norm(r, dim=1)
         if self.config.use_cutoff_function:
             bondlength = cutoff_function_based_edges(
-                bondlength, inner_cutoff=self.config.inner_cutoff
+                bondlength,
+                inner_cutoff=self.config.inner_cutoff,
+                exponent=self.config.exponent,
             )
         y = self.edge_embedding(bondlength)
 

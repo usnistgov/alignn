@@ -38,11 +38,12 @@ def prepare_line_graph_batch(
 class TorchLMDBDataset(Dataset):
     """Dataset of crystal DGLGraphs using LMDB."""
 
-    def __init__(self, lmdb_path="", ids=[]):
+    def __init__(self, lmdb_path="", line_graph=True, ids=[]):
         """Intitialize with path and ids array."""
         super(TorchLMDBDataset, self).__init__()
         self.lmdb_path = lmdb_path
         self.ids = ids
+        self.line_graph = line_graph
         self.env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
         with self.env.begin() as txn:
             self.length = txn.stat()["entries"]
@@ -56,8 +57,12 @@ class TorchLMDBDataset(Dataset):
         """Get sample."""
         with self.env.begin() as txn:
             serialized_data = txn.get(f"{idx}".encode())
-        graph, line_graph, label = pk.loads(serialized_data)
-        return graph, line_graph, label
+        if self.line_graph:
+            graph, line_graph, label = pk.loads(serialized_data)
+            return graph, line_graph, label
+        else:
+            graph, label = pk.loads(serialized_data)
+            return graph, label
 
     def close(self):
         """Close connection."""
@@ -71,7 +76,8 @@ class TorchLMDBDataset(Dataset):
     def collate(samples: List[Tuple[dgl.DGLGraph, torch.Tensor]]):
         """Dataloader helper to batch graphs cross `samples`."""
         # print('samples',samples)
-        graphs, lgs, labels = map(list, zip(*samples))
+        graphs, labels = map(list, zip(*samples))
+        # graphs, lgs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         return batched_graph, torch.tensor(labels)
 
@@ -114,6 +120,7 @@ def get_torch_dataset(
     """Get Torch Dataset with LMDB."""
     vals = np.array([ii[target] for ii in dataset])  # df[target].values
     print("data range", np.max(vals), np.min(vals))
+    print("line_graph", line_graph)
     f = open(os.path.join(output_dir, tmp_name + "_data_range"), "w")
     line = "Max=" + str(np.max(vals)) + "\n"
     f.write(line)
@@ -124,7 +131,9 @@ def get_torch_dataset(
     if os.path.exists(tmp_name) and read_existing:
         for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
             ids.append(d[id_tag])
-        dat = TorchLMDBDataset(lmdb_path=tmp_name, ids=ids)
+        dat = TorchLMDBDataset(
+            lmdb_path=tmp_name, line_graph=line_graph, ids=ids
+        )
         print("Reading dataset", tmp_name)
         return dat
     ids = []
@@ -132,7 +141,8 @@ def get_torch_dataset(
     with env.begin(write=True) as txn:
         for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
             ids.append(d[id_tag])
-            g, lg = Graph.atom_dgl_multigraph(
+            # g, lg = Graph.atom_dgl_multigraph(
+            g = Graph.atom_dgl_multigraph(
                 Atoms.from_dict(d["atoms"]),
                 cutoff=float(cutoff),
                 max_neighbors=max_neighbors,
@@ -141,6 +151,8 @@ def get_torch_dataset(
                 use_canonize=use_canonize,
                 cutoff_extra=cutoff_extra,
             )
+            if line_graph:
+                g, lg = g
             label = torch.tensor(d[target]).type(torch.get_default_dtype())
             # print('label',label,label.view(-1).long())
             if classification:
@@ -166,11 +178,16 @@ def get_torch_dataset(
                 ).type(torch.get_default_dtype())
 
             # labels.append(label)
-            serialized_data = pk.dumps((g, lg, label))
+            if line_graph:
+                serialized_data = pk.dumps((g, lg, label))
+            else:
+                serialized_data = pk.dumps((g, label))
             txn.put(f"{idx}".encode(), serialized_data)
 
     env.close()
-    lmdb_dataset = TorchLMDBDataset(lmdb_path=tmp_name, ids=ids)
+    lmdb_dataset = TorchLMDBDataset(
+        lmdb_path=tmp_name, line_graph=line_graph, ids=ids
+    )
     return lmdb_dataset
 
 

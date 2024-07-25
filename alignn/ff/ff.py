@@ -287,6 +287,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         """Calculate properties."""
         j_atoms = ase_to_atoms(atoms)
         num_atoms = j_atoms.num_atoms
+        # g, lg = Graph.atom_dgl_multigraph(
         g, lg = Graph.atom_dgl_multigraph(
             j_atoms,
             neighbor_strategy=self.config["neighbor_strategy"],
@@ -295,7 +296,11 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             atom_features=self.config["atom_features"],
             use_canonize=self.config["use_canonize"],
         )
-        result = self.net((g.to(self.device), lg.to(self.device)))
+        if self.config["model"]["alignn_layers"] > 0:
+            # g,lg = g
+            result = self.net((g.to(self.device), lg.to(self.device)))
+        else:
+            result = self.net((g.to(self.device)))
         # print ('stress',result["stress"].detach().numpy())
         if self.force_mult_natoms:
             mult = num_atoms
