@@ -70,7 +70,8 @@ class TorchLMDBDataset(Dataset):
     @staticmethod
     def collate(samples: List[Tuple[dgl.DGLGraph, torch.Tensor]]):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, labels = map(list, zip(*samples))
+        # print('samples',samples)
+        graphs, lgs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         return batched_graph, torch.tensor(labels)
 

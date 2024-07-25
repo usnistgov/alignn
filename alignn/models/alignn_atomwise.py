@@ -371,7 +371,6 @@ class ALIGNNAtomWise(nn.Module):
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)
             features = self.extra_feature_embedding(features)
-
         g = g.local_var()
         result = {}
 
