@@ -232,7 +232,7 @@ def train_dgl(
     else:
         net = model
 
-    # print("net", net)
+    print("net parameters", sum(p.numel() for p in net.parameters()))
     # print("device", device)
     net.to(device)
     if use_ddp:
