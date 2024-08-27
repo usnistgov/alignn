@@ -28,6 +28,7 @@ if torch.cuda.is_available():
     device = torch.device("cuda")
 
 
+# def setup(rank=0, world_size=0, port=""):
 def setup(rank=0, world_size=0, port="12356"):
     """Set up multi GPU rank."""
     if port == "":
@@ -46,6 +47,7 @@ def cleanup(world_size):
 
 
 def group_decay(model):
+    """Group decay parameters."""
     decay, no_decay = [], []
     for name, p in model.named_parameters():
         if "bias" in name or "bn" in name or "norm" in name:
@@ -59,6 +61,7 @@ def group_decay(model):
 
 
 def setup_optimizer(params, config: TrainingConfig):
+    """Set up optimizers."""
     if config.optimizer == "adamw":
         return torch.optim.AdamW(
             params, lr=config.learning_rate, weight_decay=config.weight_decay
@@ -73,6 +76,8 @@ def setup_optimizer(params, config: TrainingConfig):
 
 
 class Trainer:
+    """Module for training."""
+
     def __init__(
         self,
         config: TrainingConfig,
@@ -84,6 +89,7 @@ class Trainer:
         world_size: int,
         device: torch.device,
     ) -> None:
+        """Initialize class."""
         self.config = config
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -101,6 +107,7 @@ class Trainer:
             )
 
     def _setup_scheduler(self, optimizer):
+        """Set up scheduler."""
         if self.config.scheduler == "none":
             return torch.optim.lr_scheduler.LambdaLR(
                 optimizer, lambda epoch: 1.0
@@ -118,6 +125,7 @@ class Trainer:
             return torch.optim.lr_scheduler.StepLR(optimizer)
 
     def _run_batch(self, batch):
+        """Run batch."""
         self.optimizer.zero_grad()
         loss = self._compute_loss(batch)
         loss.backward()
@@ -125,6 +133,7 @@ class Trainer:
         return loss.item()
 
     def _compute_loss(self, batch):
+        """Compute loss."""
         # print(batch,len(batch))
         dats = batch
         # dats, jid = batch
@@ -171,6 +180,8 @@ class Trainer:
         return loss1 + loss2 + loss3 + loss4
 
     def _run_epoch(self, epoch):
+        """Run epoch."""
+        t1 = time.time()
         self.model.train()
         train_loss = 0
         for batch in self.train_loader:
@@ -190,9 +201,12 @@ class Trainer:
 
         self.scheduler.step()
 
+        t2 = time.time()
         print(
-            f"[GPU{self.rank}] Epoch {epoch} | Training Loss: {train_loss} | Validation Loss: {val_loss}"
+            f"[GPU{self.rank}] Epoch {epoch} | Train Loss: {train_loss} | "
+            f"Val. Loss: {val_loss} | Time: {t2-t1}"
         )
+
         save_every = 1
         if self.rank == 0:
             dumpjson(
@@ -217,8 +231,8 @@ class Trainer:
                 self._save_checkpoint(epoch)
 
     def _save_checkpoint(self, epoch, best=False):
-        checkpoint_name = f"best_model.pt" if best else f"current_model.pt"
-        # checkpoint_name = f"best_model_epoch_{epoch}.pt" if best else f"checkpoint_epoch_{epoch}.pt"
+        """Save checkpoints."""
+        checkpoint_name = "best_model.pt" if best else "current_model.pt"
         torch.save(
             self.model.state_dict(),
             os.path.join(self.config.output_dir, checkpoint_name),
@@ -226,6 +240,7 @@ class Trainer:
         print(f"Epoch {epoch} | Model checkpoint saved as {checkpoint_name}")
 
     def train(self):
+        """Train model."""
         for epoch in range(self.config.epochs):
             self._run_epoch(epoch)
 
@@ -307,6 +322,7 @@ def train_for_folder(
                 tmp = tmp[0]
             else:
                 multioutput = True
+                multi_output_len = len(tmp)
             info["target"] = tmp
             file_path = os.path.join(root_dir, file_name)
             if file_format == "poscar":
@@ -351,9 +367,9 @@ def train_for_folder(
     line_graph = config.model.alignn_layers > 0
 
     if multioutput:
-        if not all(len(i) == len(n_outputs[0]) for i in n_outputs):
+        if not all(len(i["target"]) == multi_output_len for i in dataset):
             raise ValueError("Make sure the outputs are of same size.")
-        config.model.output_features = len(n_outputs[0])
+        config.model.output_features = multi_output_len
     if config.random_seed is not None:
         random.seed(config.random_seed)
         torch.manual_seed(config.random_seed)

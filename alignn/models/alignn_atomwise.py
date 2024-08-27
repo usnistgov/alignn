@@ -107,7 +107,8 @@ def cutoff_function_based_edges(r, inner_cutoff=4, exponent=3):
     # r_sq = r * r
     # r_on_sq = r_on * r_on
     # r_cut_sq = r_cut * r_cut
-    # envelope = (r_cut_sq - r_sq) ** 2 * (r_cut_sq + 2 * r_sq - 3 * r_on_sq)/ (r_cut_sq - r_on_sq) ** 3
+    # envelope = (r_cut_sq - r_sq) ** 2
+    # * (r_cut_sq + 2 * r_sq - 3 * r_on_sq)/ (r_cut_sq - r_on_sq) ** 3
     return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
 
 
