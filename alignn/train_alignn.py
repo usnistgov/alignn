@@ -2,22 +2,26 @@
 
 """Module to train for a folder with formatted dataset."""
 import os
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import torch.distributed as dist
-import csv
+import numpy as np
+import argparse
 import sys
 import json
-import zipfile
-from alignn.data import get_train_val_loaders
-from alignn.train import train_dgl
-from alignn.config import TrainingConfig
-from jarvis.db.jsonutils import loadjson
-import argparse
-from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-import torch
-import time
-from jarvis.core.atoms import Atoms
 import random
+import time
+import zipfile
+import csv
+from alignn.data import get_train_val_loaders
+from alignn.config import TrainingConfig
+from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+from jarvis.db.jsonutils import loadjson, dumpjson
+from jarvis.core.atoms import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
+from torch.utils.data import DataLoader
+import pprint
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -26,14 +30,11 @@ if torch.cuda.is_available():
 
 def setup(rank=0, world_size=0, port="12356"):
     """Set up multi GPU rank."""
-    # "12356"
     if port == "":
         port = str(random.randint(10000, 99999))
     if world_size > 1:
         os.environ["MASTER_ADDR"] = "localhost"
         os.environ["MASTER_PORT"] = port
-        # os.environ["MASTER_PORT"] = "12355"
-        # Initialize the distributed environment.
         dist.init_process_group("nccl", rank=rank, world_size=world_size)
         torch.cuda.set_device(rank)
 
@@ -44,97 +45,189 @@ def cleanup(world_size):
         dist.destroy_process_group()
 
 
-parser = argparse.ArgumentParser(
-    description="Atomistic Line Graph Neural Network"
-)
-parser.add_argument(
-    "--root_dir",
-    default="./",
-    help="Folder with id_props.csv, structure files",
-)
-parser.add_argument(
-    "--config_name",
-    default="alignn/examples/sample_data/config_example.json",
-    help="Name of the config file",
-)
-
-parser.add_argument(
-    "--file_format", default="poscar", help="poscar/cif/xyz/pdb file format."
-)
-
-# parser.add_argument(
-#    "--keep_data_order",
-#    default=True,
-#    help="Whether to randomly shuffle samples",
-# )
-
-parser.add_argument(
-    "--classification_threshold",
-    default=None,
-    help="Floating point threshold for converting into 0/1 class"
-    + ", use only for classification tasks",
-)
-
-parser.add_argument(
-    "--batch_size", default=None, help="Batch size, generally 64"
-)
-
-parser.add_argument(
-    "--epochs", default=None, help="Number of epochs, generally 300"
-)
+def group_decay(model):
+    decay, no_decay = [], []
+    for name, p in model.named_parameters():
+        if "bias" in name or "bn" in name or "norm" in name:
+            no_decay.append(p)
+        else:
+            decay.append(p)
+    return [
+        {"params": decay},
+        {"params": no_decay, "weight_decay": 0},
+    ]
 
 
-parser.add_argument(
-    "--target_key",
-    default="total_energy",
-    help="Name of the key for graph level data such as total_energy",
-)
-
-parser.add_argument(
-    "--id_key",
-    default="jid",
-    help="Name of the key for graph level id such as id",
-)
-
-parser.add_argument(
-    "--force_key",
-    default="forces",
-    help="Name of key for gradient level data such as forces, (Natoms x p)",
-)
-
-parser.add_argument(
-    "--atomwise_key",
-    default="forces",
-    help="Name of key for atomwise level data: forces, charges (Natoms x p)",
-)
+def setup_optimizer(params, config: TrainingConfig):
+    if config.optimizer == "adamw":
+        return torch.optim.AdamW(
+            params, lr=config.learning_rate, weight_decay=config.weight_decay
+        )
+    elif config.optimizer == "sgd":
+        return torch.optim.SGD(
+            params,
+            lr=config.learning_rate,
+            momentum=0.9,
+            weight_decay=config.weight_decay,
+        )
 
 
-parser.add_argument(
-    "--stresswise_key",
-    default="stresses",
-    help="Name of the key for stress (3x3) level data such as forces",
-)
+class Trainer:
+    def __init__(
+        self,
+        config: TrainingConfig,
+        model: nn.Module,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        optimizer: torch.optim.Optimizer,
+        rank: int,
+        world_size: int,
+        device: torch.device,
+    ) -> None:
+        self.config = config
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.optimizer = optimizer
+        self.rank = rank
+        self.device = device
+        self.model = model.to(self.device)
+        self.scheduler = self._setup_scheduler(optimizer)
+        self.history_train = []
+        self.history_val = []
+        self.best_val_loss = float("inf")
+        if world_size > 1:
+            self.model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[rank], find_unused_parameters=True
+            )
 
+    def _setup_scheduler(self, optimizer):
+        if self.config.scheduler == "none":
+            return torch.optim.lr_scheduler.LambdaLR(
+                optimizer, lambda epoch: 1.0
+            )
+        elif self.config.scheduler == "onecycle":
+            steps_per_epoch = len(self.train_loader)
+            return torch.optim.lr_scheduler.OneCycleLR(
+                optimizer,
+                max_lr=self.config.learning_rate,
+                epochs=self.config.epochs,
+                steps_per_epoch=steps_per_epoch,
+                pct_start=0.3,
+            )
+        elif self.config.scheduler == "step":
+            return torch.optim.lr_scheduler.StepLR(optimizer)
 
-parser.add_argument(
-    "--output_dir",
-    default="./",
-    help="Folder to save outputs",
-)
+    def _run_batch(self, batch):
+        self.optimizer.zero_grad()
+        loss = self._compute_loss(batch)
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
 
+    def _compute_loss(self, batch):
+        # print(batch,len(batch))
+        dats = batch
+        # dats, jid = batch
+        if self.config.model.alignn_layers > 0:
 
-parser.add_argument(
-    "--restart_model_path",
-    default=None,
-    help="Checkpoint file path for model",
-)
+            result = self.model(
+                [dats[0].to(self.device), dats[1].to(self.device)]
+            )
+        else:
+            result = self.model(dats[0].to(self.device))
 
+        loss1 = self.config.model.graphwise_weight * F.l1_loss(
+            result["out"], dats[-1].to(self.device)
+        )
+        loss2 = 0
+        if (
+            self.config.model.atomwise_output_features > 0
+            and self.config.model.atomwise_weight != 0
+        ):
 
-parser.add_argument(
-    "--device",
-    default=None,
-    help="set device for training the model [e.g. cpu, cuda, cuda:2]",
-)
+            loss2 = self.config.model.atomwise_weight * F.l1_loss(
+                result["atomwise_pred"].to(self.device),
+                dats[0].ndata["atomwise_target"].to(self.device),
+            )
+        loss3 = (
+            self.config.model.gradwise_weight
+            * F.l1_loss(
+                result["grad"].to(self.device),
+                dats[0].ndata["atomwise_grad"].to(self.device),
+            )
+            if self.config.model.calculate_gradient
+            else 0
+        )
+        loss4 = (
+            self.config.model.stresswise_weight
+            * F.l1_loss(
+                result["stresses"].to(self.device),
+                torch.cat(tuple(dats[0].ndata["stresses"])).to(self.device),
+            )
+            if self.config.model.stresswise_weight != 0
+            else 0
+        )
+        # print('loss1 , loss2 , loss3 , loss4',loss1 , loss2 , loss3 , loss4)
+        return loss1 + loss2 + loss3 + loss4
+
+    def _run_epoch(self, epoch):
+        self.model.train()
+        train_loss = 0
+        for batch in self.train_loader:
+            train_loss += self._run_batch(batch)
+        train_loss /= len(self.train_loader)
+        self.history_train.append(train_loss)
+
+        self.model.eval()
+        val_loss = 0
+        # """
+        # with torch.no_grad():
+        for batch in self.val_loader:
+            val_loss += self._compute_loss(batch).item()
+        val_loss /= len(self.val_loader)
+        # """
+        self.history_val.append(val_loss)
+
+        self.scheduler.step()
+
+        print(
+            f"[GPU{self.rank}] Epoch {epoch} | Training Loss: {train_loss} | Validation Loss: {val_loss}"
+        )
+        save_every = 1
+        if self.rank == 0:
+            dumpjson(
+                filename=os.path.join(
+                    self.config.output_dir, "history_train.json"
+                ),
+                data=self.history_train,
+            )
+            dumpjson(
+                filename=os.path.join(
+                    self.config.output_dir, "history_val.json"
+                ),
+                data=self.history_val,
+            )
+
+            if val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
+                self._save_checkpoint(epoch, best=True)
+
+            if epoch % save_every == 0:
+                # if epoch % self.config.save_every == 0:
+                self._save_checkpoint(epoch)
+
+    def _save_checkpoint(self, epoch, best=False):
+        checkpoint_name = f"best_model.pt" if best else f"current_model.pt"
+        # checkpoint_name = f"best_model_epoch_{epoch}.pt" if best else f"checkpoint_epoch_{epoch}.pt"
+        torch.save(
+            self.model.state_dict(),
+            os.path.join(self.config.output_dir, checkpoint_name),
+        )
+        print(f"Epoch {epoch} | Model checkpoint saved as {checkpoint_name}")
+
+    def train(self):
+        for epoch in range(self.config.epochs):
+            self._run_epoch(epoch)
 
 
 def train_for_folder(
@@ -152,6 +245,7 @@ def train_for_folder(
     stresswise_key="stresses",
     file_format="poscar",
     restart_model_path=None,
+    restart_model_name="current_model.pt",
     output_dir=None,
 ):
     """Train for a folder."""
@@ -162,7 +256,7 @@ def train_for_folder(
     id_prop_csv = os.path.join(root_dir, "id_prop.csv")
     id_prop_csv_file = False
     multioutput = False
-    # lists_length_equal = True
+
     if os.path.exists(id_prop_json_zip):
         dat = json.loads(
             zipfile.ZipFile(id_prop_json_zip).read("id_prop.json")
@@ -177,15 +271,10 @@ def train_for_folder(
         print("id_prop_csv_file exists", id_prop_csv_file)
     else:
         print("Check dataset file.")
+
     config_dict = loadjson(config_name)
     config = TrainingConfig(**config_dict)
-    if type(config) is dict:
-        try:
-            config = TrainingConfig(**config)
-        except Exception as exp:
-            print("Check", exp)
-
-    # config.keep_data_order = keep_data_order
+    pprint.pprint(config_dict)
     if classification_threshold is not None:
         config.classification_threshold = float(classification_threshold)
     if output_dir is not None:
@@ -195,48 +284,29 @@ def train_for_folder(
     if epochs is not None:
         config.epochs = int(epochs)
 
-    train_grad = False
-    train_stress = False
-    train_atom = False
-    if config.model.calculate_gradient and config.model.gradwise_weight != 0:
-        train_grad = True
-    else:
-        train_grad = False
-    if config.model.calculate_gradient and config.model.stresswise_weight != 0:
-        train_stress = True
-    else:
-        train_stress = False
-    if config.model.atomwise_weight != 0:
-        train_atom = True
-    else:
-        train_atom = False
+    train_grad = (
+        config.model.calculate_gradient and config.model.gradwise_weight != 0
+    )
+    train_stress = (
+        config.model.calculate_gradient and config.model.stresswise_weight != 0
+    )
+    train_atom = config.model.atomwise_weight != 0
 
-    # if config.model.atomwise_weight == 0:
-    #    train_atom = False
-    # if config.model.gradwise_weight == 0:
-    #    train_grad = False
-    # if config.model.stresswise_weight == 0:
-    #    train_stress = False
-    target_atomwise = None  # "atomwise_target"
-    target_grad = None  # "atomwise_grad"
-    target_stress = None  # "stresses"
+    target_atomwise = None
+    target_grad = None
+    target_stress = None
 
-    # mem = []
-    # enp = []
-    n_outputs = []
     dataset = []
     for i in dat:
         info = {}
         if id_prop_csv_file:
             file_name = i[0]
-            tmp = [float(j) for j in i[1:]]  # float(i[1])
+            tmp = [float(j) for j in i[1:]]
             info["jid"] = file_name
-
             if len(tmp) == 1:
                 tmp = tmp[0]
             else:
                 multioutput = True
-                n_outputs.append(tmp)
             info["target"] = tmp
             file_path = os.path.join(root_dir, file_name)
             if file_format == "poscar":
@@ -246,9 +316,6 @@ def train_for_folder(
             elif file_format == "xyz":
                 atoms = Atoms.from_xyz(file_path, box_size=500)
             elif file_format == "pdb":
-                # Note using 500 angstrom as box size
-                # Recommended install pytraj
-                # conda install -c ambermd pytraj
                 atoms = Atoms.from_pdb(file_path, max_lat=500)
             else:
                 raise NotImplementedError(
@@ -259,110 +326,67 @@ def train_for_folder(
             info["target"] = i[target_key]
             info["atoms"] = i["atoms"]
             info["jid"] = i[id_key]
+
         if train_atom:
             target_atomwise = "atomwise_target"
-            info["atomwise_target"] = i[atomwise_key]  # such as charges
+            info["atomwise_target"] = i[atomwise_key]
         if train_grad:
             target_grad = "atomwise_grad"
-            info["atomwise_grad"] = i[gradwise_key]  # - mean_force
+            info["atomwise_grad"] = i[gradwise_key]
         if train_stress:
-            if len(i[stresswise_key]) == 6:
-
-                stress = voigt_6_to_full_3x3_stress(i[stresswise_key])
-            else:
-                stress = i[stresswise_key]
-            info["stresses"] = stress  # - mean_force
+            stress = (
+                voigt_6_to_full_3x3_stress(i[stresswise_key])
+                if len(i[stresswise_key]) == 6
+                else i[stresswise_key]
+            )
+            info["stresses"] = stress
             target_stress = "stresses"
 
-            # print("stresses",info["stresses"] )
         if "extra_features" in i:
             info["extra_features"] = i["extra_features"]
         dataset.append(info)
-    print("len dataset", len(dataset))
-    del dat
-    # multioutput = False
-    lists_length_equal = True
-    line_graph = False
-    # alignn_models = {
-    #    # "alignn",
-    #    # "alignn_layernorm",
-    #    "alignn_atomwise",
-    # }
 
-    if config.model.alignn_layers > 0:
-        line_graph = True
+    print("len dataset", len(dataset))
+
+    line_graph = config.model.alignn_layers > 0
 
     if multioutput:
-        print("multioutput", multioutput)
-        lists_length_equal = False not in [
-            len(i) == len(n_outputs[0]) for i in n_outputs
-        ]
-        print("lists_length_equal", lists_length_equal, len(n_outputs[0]))
-        if lists_length_equal:
-            config.model.output_features = len(n_outputs[0])
-
-        else:
+        if not all(len(i) == len(n_outputs[0]) for i in n_outputs):
             raise ValueError("Make sure the outputs are of same size.")
+        config.model.output_features = len(n_outputs[0])
+    if config.random_seed is not None:
+        random.seed(config.random_seed)
+        torch.manual_seed(config.random_seed)
+        np.random.seed(config.random_seed)
+        torch.cuda.manual_seed_all(config.random_seed)
+        try:
+            import torch_xla.core.xla_model as xm
+
+            xm.set_rng_state(config.random_seed)
+        except ImportError:
+            pass
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        os.environ["PYTHONHASHSEED"] = str(config.random_seed)
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = str(":4096:8")
+        torch.use_deterministic_algorithms(True)
+
     model = None
+    # print('config.model',config.model)
+    model = ALIGNNAtomWise(config.model)
     if restart_model_path is not None:
-        # Should be best_model.pt file
         print("Restarting the model training:", restart_model_path)
-        if config.model.name == "alignn_atomwise":
-            rest_config = loadjson(
-                restart_model_path.replace("best_model.pt", "config.json")
-            )
 
-            tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
-            # tmp = ALIGNNAtomWiseConfig(
-            #    name="alignn_atomwise",
-            #    output_features=config.model.output_features,
-            #    alignn_layers=config.model.alignn_layers,
-            #    atomwise_weight=config.model.atomwise_weight,
-            #    stresswise_weight=config.model.stresswise_weight,
-            #    graphwise_weight=config.model.graphwise_weight,
-            #    gradwise_weight=config.model.gradwise_weight,
-            #    gcn_layers=config.model.gcn_layers,
-            #    atom_input_features=config.model.atom_input_features,
-            #    edge_input_features=config.model.edge_input_features,
-            #    triplet_input_features=config.model.triplet_input_features,
-            #    embedding_features=config.model.embedding_features,
-            # )
-            print("Rest config", tmp)
-            # for i,j in config_dict['model'].items():
-            #    print ('i',i)
-            #    tmp.i=j
-            # print ('tmp1',tmp)
-            model = ALIGNNAtomWise(tmp)  # config.model)
-            # model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(
-            #    name="alignn_atomwise",
-            #    output_features=1,
-            #    graphwise_weight=1,
-            #    alignn_layers=4,
-            #    gradwise_weight=10,
-            #    stresswise_weight=0.01,
-            #    atomwise_weight=0,
-            #      )
-            #    )
-            print("model", model)
-            model.load_state_dict(
-                torch.load(restart_model_path, map_location=device)
-            )
-            model = model.to(device)
+        rest_config = loadjson(
+            restart_model_path.replace("current_model.pt", "config.json")
+        )
+        model_config = ALIGNNAtomWiseConfig(**rest_config["model"])
+        model = ALIGNNAtomWise(model_config)
+        model.load_state_dict(
+            torch.load(restart_model_path, map_location=device)
+        )
+        model = model.to(device)
 
-    # print ('n_outputs',n_outputs[0])
-    # if multioutput and classification_threshold is not None:
-    #    raise ValueError("Classification for multi-output not implemented.")
-    # if multioutput and lists_length_equal:
-    #    config.model.output_features = len(n_outputs[0])
-    # else:
-    #    # TODO: Pad with NaN
-    #    if not lists_length_equal:
-    #        raise ValueError("Make sure the outputs are of same size.")
-    #    else:
-    #        config.model.output_features = 1
-    # print('config.neighbor_strategy',config.neighbor_strategy)
-    # import sys
-    # sys.exit()
     (
         train_loader,
         val_loader,
@@ -402,33 +426,98 @@ def train_for_folder(
         output_dir=config.output_dir,
         use_lmdb=config.use_lmdb,
     )
-    # print("dataset", dataset[0])
+    print("net parameters", sum(p.numel() for p in model.parameters()))
+    optimizer = setup_optimizer(group_decay(model), config)
+
     t1 = time.time()
-    # world_size = torch.cuda.device_count()
     print("rank", rank)
     print("world_size", world_size)
-    train_dgl(
+    trainer = Trainer(
         config,
-        model=model,
-        train_val_test_loaders=[
-            train_loader,
-            val_loader,
-            test_loader,
-            prepare_batch,
-        ],
-        rank=rank,
-        world_size=world_size,
+        model,
+        train_loader,
+        val_loader,
+        optimizer,
+        rank,
+        world_size,
+        device,
     )
+    trainer.train()
     t2 = time.time()
     print("Time taken (s)", t2 - t1)
 
-    # train_data = get_torch_dataset(
-
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Atomistic Line Graph Neural Network"
+    )
+    parser.add_argument(
+        "--root_dir",
+        default="./",
+        help="Folder with id_props.csv, structure files",
+    )
+    parser.add_argument(
+        "--config_name",
+        default="alignn/examples/sample_data/config_example.json",
+        help="Name of the config file",
+    )
+    parser.add_argument(
+        "--file_format",
+        default="poscar",
+        help="poscar/cif/xyz/pdb file format.",
+    )
+    parser.add_argument(
+        "--classification_threshold",
+        default=None,
+        help="Threshold for converting into 0/1 class",
+    )
+    parser.add_argument(
+        "--batch_size", default=None, help="Batch size, generally 64"
+    )
+    parser.add_argument(
+        "--epochs", default=None, help="Number of epochs, generally 300"
+    )
+    parser.add_argument(
+        "--target_key",
+        default="total_energy",
+        help="Name of the key for graph level data",
+    )
+    parser.add_argument(
+        "--id_key", default="jid", help="Name of the key for graph level id"
+    )
+    parser.add_argument(
+        "--force_key",
+        default="forces",
+        help="Name of key for gradient level data",
+    )
+    parser.add_argument(
+        "--atomwise_key",
+        default="forces",
+        help="Name of key for atomwise level data",
+    )
+    parser.add_argument(
+        "--stresswise_key",
+        default="stresses",
+        help="Name of the key for stress data",
+    )
+    parser.add_argument(
+        "--output_dir", default="./", help="Folder to save outputs"
+    )
+    parser.add_argument(
+        "--restart_model_path",
+        default=None,
+        help="Checkpoint file path for model",
+    )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="set device for training the model [e.g. cpu, cuda, cuda:2]",
+    )
+
     args = parser.parse_args(sys.argv[1:])
     world_size = int(torch.cuda.device_count())
-    print("world_size", world_size)
+    # print("world_size", world_size)
+
     if world_size > 1:
         torch.multiprocessing.spawn(
             train_for_folder,
