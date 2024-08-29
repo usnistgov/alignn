@@ -142,8 +142,15 @@ def revised_path():
 
 
 def alignnff_fmult():
-    """Get defaukt model path."""
+    """Get default model path."""
     dpath = get_figshare_model_ff(model_name="alignnff_fmult")
+    print("model_path", dpath)
+    return dpath
+
+
+def mptraj_path():
+    """Get MPtraj model path."""
+    dpath = get_figshare_model_ff(model_name="v8.29.2024_mpf")
     print("model_path", dpath)
     return dpath
 
