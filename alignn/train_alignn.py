@@ -17,6 +17,7 @@ import torch
 import time
 from jarvis.core.atoms import Atoms
 import random
+from ase.stress import voigt_6_to_full_3x3_stress
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -265,8 +266,15 @@ def train_for_folder(
             target_grad = "atomwise_grad"
             info["atomwise_grad"] = i[gradwise_key]  # - mean_force
         if train_stress:
-            info["stresses"] = i[stresswise_key]  # - mean_force
+            if len(i[stresswise_key]) == 6:
+
+                stress = voigt_6_to_full_3x3_stress(i[stresswise_key])
+            else:
+                stress = i[stresswise_key]
+            info["stresses"] = stress  # - mean_force
             target_stress = "stresses"
+
+            # print("stresses",info["stresses"] )
         if "extra_features" in i:
             info["extra_features"] = i["extra_features"]
         dataset.append(info)
@@ -301,7 +309,8 @@ def train_for_folder(
         print("Restarting the model training:", restart_model_path)
         if config.model.name == "alignn_atomwise":
             rest_config = loadjson(
-                restart_model_path.replace("best_model.pt", "config.json")
+                restart_model_path.replace("current_model.pt", "config.json")
+                # restart_model_path.replace("best_model.pt", "config.json")
             )
 
             tmp = ALIGNNAtomWiseConfig(**rest_config["model"])

@@ -55,7 +55,9 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     add_reverse_forces: bool = False  # will make True as default soon
     lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
+    multiply_cutoff: bool = False
     extra_features: int = 0
+    exponent: int = 3
 
     class Config:
         """Configure model settings behavior."""
@@ -99,6 +101,14 @@ def cutoff_function_based_edges(r, inner_cutoff=4, exponent=3):
         + c2 * ratio ** (exponent + 1)
         + c3 * ratio ** (exponent + 2)
     )
+    # r_cut = inner_cutoff
+    # r_on = inner_cutoff+1
+
+    # r_sq = r * r
+    # r_on_sq = r_on * r_on
+    # r_cut_sq = r_cut * r_cut
+    # envelope = (r_cut_sq - r_sq)
+    # ** 2 * (r_cut_sq + 2 * r_sq - 3 * r_on_sq)/ (r_cut_sq - r_on_sq) ** 3
     return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
 
 
@@ -371,7 +381,6 @@ class ALIGNNAtomWise(nn.Module):
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)
             features = self.extra_feature_embedding(features)
-
         g = g.local_var()
         result = {}
 
@@ -381,6 +390,9 @@ class ALIGNNAtomWise(nn.Module):
         r = g.edata["r"]
         if self.config.calculate_gradient:
             r.requires_grad_(True)
+        bondlength = torch.norm(r, dim=1)
+        # mask = bondlength >= self.config.inner_cutoff
+        # bondlength[mask]=float(1.1)
         if self.config.lg_on_fly and len(self.alignn_layers) > 0:
             # re-compute bond angle cosines here to ensure
             # the three-body interactions are fully included
@@ -390,13 +402,26 @@ class ALIGNNAtomWise(nn.Module):
             z = self.angle_embedding(lg.edata.pop("h"))
 
         # r = g.edata["r"].clone().detach().requires_grad_(True)
-        bondlength = torch.norm(r, dim=1)
         if self.config.use_cutoff_function:
-            bondlength = cutoff_function_based_edges(
-                bondlength, inner_cutoff=self.config.inner_cutoff
-            )
-        y = self.edge_embedding(bondlength)
+            # bondlength = cutoff_function_based_edges(
+            if self.config.multiply_cutoff:
+                c_off = cutoff_function_based_edges(
+                    bondlength,
+                    inner_cutoff=self.config.inner_cutoff,
+                    exponent=self.config.exponent,
+                ).unsqueeze(dim=1)
 
+                y = self.edge_embedding(bondlength) * c_off
+            else:
+                bondlength = cutoff_function_based_edges(
+                    bondlength,
+                    inner_cutoff=self.config.inner_cutoff,
+                    exponent=self.config.exponent,
+                )
+                y = self.edge_embedding(bondlength)
+        else:
+            y = self.edge_embedding(bondlength)
+        # y = self.edge_embedding(bondlength)
         # ALIGNN updates: update node, edge, triplet features
         for alignn_layer in self.alignn_layers:
             x, y, z = alignn_layer(g, lg, x, y, z)

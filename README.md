@@ -28,8 +28,10 @@
 * [Funding support](#fund)
 
 <a name="intro"></a>
-# ALIGNN (Introduction)
+# ALIGNN & ALIGNN-FF (Introduction)
 The Atomistic Line Graph Neural Network (https://www.nature.com/articles/s41524-021-00650-1)  introduces a new graph convolution layer that explicitly models both two and three body interactions in atomistic systems. This is achieved by composing two edge-gated graph convolution layers, the first applied to the atomistic line graph *L(g)* (representing triplet interactions) and the second applied to the atomistic bond graph *g* (representing pair interactions).
+
+A unified force-field model, ALIGNN-FF (https://pubs.rsc.org/en/content/articlehtml/2023/dd/d2dd00096b ) was developed that can model both structurally and chemically diverse solids with any combination of 89 elements from the periodic table.
 
 
 ![ALIGNN layer schematic](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/schematic_lg.jpg)
@@ -185,35 +187,41 @@ Atomisitic line graph neural network-based FF (ALIGNN-FF) can be used to model b
 [ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html) provides interface to various codes. An example for ALIGNN-FF is give below. Note that there are multiple pretrained ALIGNN-FF models available, here we use the deafult_path model. As more accurate models are developed, they will be made available as well:
 
 ```
-from alignn.ff.ff import AlignnAtomwiseCalculator,default_path
+from alignn.ff.ff import (
+    AlignnAtomwiseCalculator,
+    default_path,
+    mptraj_path,
+    wt01_path,
+)
+import matplotlib.pyplot as plt
+from ase import Atom, Atoms
+import time
+from ase.build import bulk
+import numpy as np
+import matplotlib.pyplot as plt
+from ase.build import make_supercell
+%matplotlib inline
+
 model_path = default_path()
 calc = AlignnAtomwiseCalculator(path=model_path)
 
-from ase import Atom, Atoms
-import numpy as np
-import matplotlib.pyplot as plt
-
-lattice_params = np.linspace(3.5, 3.8)
+t1 = time.time()
+# a = 5.43
+lattice_params = np.linspace(5.2, 5.6)
 fcc_energies = []
 ready = True
 for a in lattice_params:
-    atoms = Atoms([Atom('Cu', (0, 0, 0))],
-                  cell=0.5 * a * np.array([[1.0, 1.0, 0.0],
-                                           [0.0, 1.0, 1.0],
-                                           [1.0, 0.0, 1.0]]),
-                 pbc=True)
-
+    atoms = bulk("Si", "diamond", a=a)
     atoms.set_tags(np.ones(len(atoms)))
     atoms.calc = calc
     e = atoms.get_potential_energy()
     fcc_energies.append(e)
-
-import matplotlib.pyplot as plt
-%matplotlib inline
-plt.plot(lattice_params, fcc_energies)
-plt.title('1x1x1')
-plt.xlabel('Lattice constant ($\AA$)')
-plt.ylabel('Total energy (eV)')
+t2 = time.time()
+print("Time", t2 - t1)
+plt.plot(lattice_params, fcc_energies, "-o")
+plt.title("Si")
+plt.xlabel("Lattice constant ($\AA$)")
+plt.ylabel("Total energy (eV)")
 plt.show()
 ```
 
