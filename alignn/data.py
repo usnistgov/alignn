@@ -289,7 +289,12 @@ def get_train_val_loaders(
         dataset_train = [dat[x] for x in id_train]
         dataset_val = [dat[x] for x in id_val]
         dataset_test = [dat[x] for x in id_test]
-
+        print(
+            "dataset_train,dataset_val,dataset_test",
+            len(dataset_train),
+            len(dataset_val),
+            len(dataset_test),
+        )
         if standard_scalar_and_pca:
             y_data = [i[target] for i in dataset_train]
             # pipe = Pipeline([('scale', StandardScaler())])

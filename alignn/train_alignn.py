@@ -75,6 +75,21 @@ def setup_optimizer(params, config: TrainingConfig):
         )
 
 
+def remove_module_prefix(state_dict):
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        if "module." in k:
+            k = k.replace("module.", "")
+        # if k.startswith('module.'):
+        #    new_key = k[len('module.'):]
+        # elif k.startswith('module.module.'):
+        #    new_key = k[len('module.module.'):]
+        # else:
+        new_key = k
+        new_state_dict[new_key] = v
+    return new_state_dict
+
+
 class Trainer:
     """Module for training."""
 
@@ -105,6 +120,16 @@ class Trainer:
             self.model = torch.nn.parallel.DistributedDataParallel(
                 model, device_ids=[rank], find_unused_parameters=True
             )
+        with open(
+            os.path.join(self.config.output_dir, "config.json"), "w"
+        ) as cf:
+            cf.write(json.dumps(self.config.dict(), indent=4))
+        # dumpjson(
+        #    filename=os.path.join(
+        #        self.config.output_dir, "config.json"
+        #    ),
+        #    data=self.config.dict(),
+        # )
 
     def _setup_scheduler(self, optimizer):
         """Set up scheduler."""
@@ -128,8 +153,9 @@ class Trainer:
         """Run batch."""
         self.optimizer.zero_grad()
         loss = self._compute_loss(batch)
-        loss.backward()
-        self.optimizer.step()
+        loss.backward()  # calculate grad
+        self.optimizer.step()  # change params
+        self.scheduler.step()
         return loss.item()
 
     def _compute_loss(self, batch):
@@ -199,7 +225,7 @@ class Trainer:
         # """
         self.history_val.append(val_loss)
 
-        self.scheduler.step()
+        # self.scheduler.step()
 
         t2 = time.time()
         print(
@@ -246,22 +272,22 @@ class Trainer:
 
 
 def train_for_folder(
-    rank=0,
-    world_size=0,
-    root_dir="examples/sample_data",
-    config_name="config.json",
-    classification_threshold=None,
-    batch_size=None,
-    epochs=None,
-    id_key="jid",
-    target_key="total_energy",
-    atomwise_key="forces",
-    gradwise_key="forces",
-    stresswise_key="stresses",
-    file_format="poscar",
-    restart_model_path=None,
-    restart_model_name="current_model.pt",
-    output_dir=None,
+    rank,
+    world_size,
+    root_dir,
+    config_name,
+    classification_threshold,
+    batch_size,
+    epochs,
+    id_key,
+    target_key,
+    atomwise_key,
+    gradwise_key,
+    stresswise_key,
+    file_format,
+    restart_model_path,
+    restart_model_name,
+    output_dir,
 ):
     """Train for a folder."""
     setup(rank=rank, world_size=world_size)
@@ -289,15 +315,17 @@ def train_for_folder(
 
     config_dict = loadjson(config_name)
     config = TrainingConfig(**config_dict)
-    pprint.pprint(config_dict)
     if classification_threshold is not None:
         config.classification_threshold = float(classification_threshold)
+    print("output_dir", output_dir)
     if output_dir is not None:
         config.output_dir = output_dir
     if batch_size is not None:
         config.batch_size = int(batch_size)
     if epochs is not None:
         config.epochs = int(epochs)
+    print("Config:")
+    pprint.pprint(config_dict)
 
     train_grad = (
         config.model.calculate_gradient and config.model.gradwise_weight != 0
@@ -389,19 +417,29 @@ def train_for_folder(
 
     model = None
     # print('config.model',config.model)
-    model = ALIGNNAtomWise(config.model)
     if restart_model_path is not None:
         print("Restarting the model training:", restart_model_path)
 
         rest_config = loadjson(
             restart_model_path.replace("current_model.pt", "config.json")
         )
-        model_config = ALIGNNAtomWiseConfig(**rest_config["model"])
-        model = ALIGNNAtomWise(model_config)
-        model.load_state_dict(
-            torch.load(restart_model_path, map_location=device)
-        )
-        model = model.to(device)
+        config = TrainingConfig(**rest_config)
+        print("Latest config", config)
+        # model_config = ALIGNNAtomWiseConfig(**rest_config["model"])
+        if world_size > 1:
+            model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[rank], find_unused_parameters=True
+            )
+        else:
+            model = ALIGNNAtomWise(config.model)  # .to(device)
+        checkpoint = torch.load(restart_model_path, map_location=device)
+        checkpoint = remove_module_prefix(checkpoint)
+        model.load_state_dict(checkpoint)
+
+    # model.load_state_dict(torch.load(restart_model_path, map_location=device))
+    else:
+        model = ALIGNNAtomWise(config.model)
+    model = model.to(device)
 
     (
         train_loader,
@@ -444,7 +482,6 @@ def train_for_folder(
     )
     print("net parameters", sum(p.numel() for p in model.parameters()))
     optimizer = setup_optimizer(group_decay(model), config)
-
     t1 = time.time()
     print("rank", rank)
     print("world_size", world_size)
@@ -525,6 +562,11 @@ if __name__ == "__main__":
         help="Checkpoint file path for model",
     )
     parser.add_argument(
+        "--restart_model_name",
+        default="current_model.pt",
+        help="Checkpoint file name for model",
+    )
+    parser.add_argument(
         "--device",
         default=None,
         help="set device for training the model [e.g. cpu, cuda, cuda:2]",
@@ -551,8 +593,25 @@ if __name__ == "__main__":
                 args.stresswise_key,
                 args.file_format,
                 args.restart_model_path,
+                args.restart_model_name,
                 args.output_dir,
             ),
+            # args=(
+            #    world_size=world_size,
+            #    root_dir=args.root_dir,
+            #    config_name=args.config_name,
+            #    classification_threshold=args.classification_threshold,
+            #    batch_size=args.batch_size,
+            #    epochs=args.epochs,
+            #    id_key=args.id_key,
+            #    target_key=args.target_key,
+            #    atomwise_key=args.atomwise_key,
+            #    gradwise_key=args.force_key,
+            #    stresswise_key=args.stresswise_key,
+            #    file_format=args.file_format,
+            #    restart_model_path=args.restart_model_path,
+            #    output_dir=args.output_dir,
+            # ),
             nprocs=world_size,
         )
     else:
@@ -571,6 +630,7 @@ if __name__ == "__main__":
             args.stresswise_key,
             args.file_format,
             args.restart_model_path,
+            args.restart_model_name,
             args.output_dir,
         )
     try:
