@@ -309,7 +309,8 @@ def train_for_folder(
         print("Restarting the model training:", restart_model_path)
         if config.model.name == "alignn_atomwise":
             rest_config = loadjson(
-                restart_model_path.replace("best_model.pt", "config.json")
+                restart_model_path.replace("current_model.pt", "config.json")
+                # restart_model_path.replace("best_model.pt", "config.json")
             )
 
             tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
