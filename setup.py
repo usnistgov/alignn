@@ -34,6 +34,7 @@ setuptools.setup(
         "pyparsing>=2.2.1,<3",
         "ase",
         "lmdb",
+        "train_on_folder",
         # "pytorch-ignite>=0.5.0.dev20221024",
         # "accelerate>=0.20.3",
         # "dgl-cu101>=0.6.0",
@@ -53,5 +54,5 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.8",
 )
