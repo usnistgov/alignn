@@ -10,12 +10,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2024.8.27",
+    version="2024.8.30",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
     install_requires=[
-        "numpy>=1.19.5,<2.0.0",
+        "numpy>=1.19.5",
+        # "numpy>=1.19.5,<2.0.0",
         "scipy>=1.6.1",
         "jarvis-tools>=2021.07.19",
         "torch>=2.0.0",
@@ -34,9 +35,6 @@ setuptools.setup(
         "pyparsing>=2.2.1,<3",
         "ase",
         "lmdb",
-        # "pytorch-ignite>=0.5.0.dev20221024",
-        # "accelerate>=0.20.3",
-        # "dgl-cu101>=0.6.0",
     ],
     scripts=[
         "alignn/pretrained.py",
