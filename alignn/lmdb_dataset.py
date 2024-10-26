@@ -150,6 +150,7 @@ def get_torch_dataset(
                 compute_line_graph=line_graph,
                 use_canonize=use_canonize,
                 cutoff_extra=cutoff_extra,
+                neighbor_strategy=neighbor_strategy,
             )
             if line_graph:
                 g, lg = g

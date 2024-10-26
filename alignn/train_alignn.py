@@ -198,19 +198,27 @@ def train_for_folder(
     train_grad = False
     train_stress = False
     train_atom = False
-    if config.model.calculate_gradient and config.model.gradwise_weight != 0:
-        train_grad = True
-    else:
-        train_grad = False
-    if config.model.calculate_gradient and config.model.stresswise_weight != 0:
-        train_stress = True
-    else:
-        train_stress = False
-    if config.model.atomwise_weight != 0:
-        train_atom = True
-    else:
-        train_atom = False
-
+    try:
+        if (
+            config.model.calculate_gradient
+            and config.model.gradwise_weight != 0
+        ):
+            train_grad = True
+        else:
+            train_grad = False
+        if (
+            config.model.calculate_gradient
+            and config.model.stresswise_weight != 0
+        ):
+            train_stress = True
+        else:
+            train_stress = False
+        if config.model.atomwise_weight != 0:
+            train_atom = True
+        else:
+            train_atom = False
+    except Exception as exp:
+        pass
     # if config.model.atomwise_weight == 0:
     #    train_atom = False
     # if config.model.gradwise_weight == 0:

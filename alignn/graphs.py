@@ -320,6 +320,52 @@ def radius_graph_old(
 
 
 ###
+def radius_graph_jarvis(
+    atoms, cutoff=4, atom_features="cgcnn", line_graph=True
+):
+    """Construct edge list for radius graph."""
+    u, v, r, atom_feats = [], [], [], []
+    elements = atoms.elements
+
+    # Loop over each atom in the structure
+    for ii, i in enumerate(atoms.cart_coords):
+        # Get neighbors within the cutoff distance
+        neighs = atoms.lattice.get_points_in_sphere(
+            atoms.frac_coords, i, cutoff, distance_vector=True
+        )
+
+        # Filter out self-loops (where the neighbor is the same as the source atom)
+        valid_indices = neighs[2] != ii  # Exclude self-loops
+
+        # Store source (u), destination (v), and distances (r) only for valid neighbors
+        u.extend(
+            [ii] * np.sum(valid_indices)
+        )  # Add the source atom multiple times
+        v.extend(neighs[2][valid_indices])  # Add valid neighbors only
+        r.extend(neighs[-1][valid_indices])  # Add distances of valid neighbors
+
+        # Store atom features for the current atom
+        feat = list(
+            get_node_attributes(elements[ii], atom_features=atom_features)
+        )
+        atom_feats.append(feat)
+
+    # Create DGL graph
+    g = dgl.graph((np.array(u), np.array(v)))
+    g.ndata["atom_features"] = torch.tensor(atom_feats, dtype=torch.float32)
+    g.edata["r"] = torch.tensor(r, dtype=torch.float32)
+    g.ndata["coords"] = torch.tensor(atoms.cart_coords, dtype=torch.float32)
+    g.ndata["V"] = torch.tensor(
+        [atoms.volume] * atoms.num_atoms, dtype=torch.float32
+    )
+
+    # Optional: Create a line graph if requested
+    if line_graph:
+        lg = g.line_graph(shared=True)
+        lg.apply_edges(compute_bond_cosines)
+        return g, lg
+
+    return g
 
 
 class Graph(object):
@@ -372,6 +418,7 @@ class Graph(object):
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
+        # print('stratgery', neighbor_strategy)
         if neighbor_strategy == "k-nearest":
             edges = nearest_neighbor_edges(
                 atoms=atoms,
@@ -388,6 +435,14 @@ class Graph(object):
             u, v, r = radius_graph(
                 atoms, cutoff=cutoff, cutoff_extra=cutoff_extra
             )
+        elif neighbor_strategy == "radius_graph_jarvis":
+            g, lg = radius_graph_jarvis(
+                atoms,
+                cutoff=cutoff,
+                atom_features=atom_features,
+                line_graph=compute_line_graph,
+            )
+            return g, lg
         else:
             raise ValueError("Not implemented yet", neighbor_strategy)
         # elif neighbor_strategy == "voronoi":

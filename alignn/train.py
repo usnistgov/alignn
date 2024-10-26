@@ -18,6 +18,7 @@ from torch import nn
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
+from alignn.models.alignn import ALIGNN
 from jarvis.db.jsonutils import dumpjson
 import json
 import pprint
@@ -210,6 +211,7 @@ def train_dgl(
         config.model.classification = True
     _model = {
         "alignn_atomwise": ALIGNNAtomWise,
+        "alignn": ALIGNN,
     }
     if config.random_seed is not None:
         random.seed(config.random_seed)

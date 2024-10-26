@@ -386,7 +386,10 @@ class ALIGNNAtomWise(nn.Module):
 
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
+        # print('x1',x,x.shape)
+
         x = self.atom_embedding(x)
+        # print('x2',x,x.shape)
         r = g.edata["r"]
         if self.config.calculate_gradient:
             r.requires_grad_(True)

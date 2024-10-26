@@ -309,9 +309,9 @@ class ALIGNN(nn.Module):
         g = g.local_var()
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
-        # print('x1',x.shape)
+        # print("x1", x, x.shape)
         x = self.atom_embedding(x)
-        # print('x2',x.shape)
+        # print("x2", x, x.shape)
 
         # initial bond features
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
@@ -327,7 +327,7 @@ class ALIGNN(nn.Module):
 
         # norm-activation-pool-classify
         h = self.readout(g, x)
-        # print('h',h.shape)
+        # print("h", h, h.shape)
         # print('features',features.shape)
         if self.config.extra_features != 0:
             h_feat = self.readout_feat(g, features)

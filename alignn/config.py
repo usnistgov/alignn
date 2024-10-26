@@ -162,9 +162,9 @@ class TrainingConfig(BaseSettings):
     ] = "dft_3d"
     target: TARGET_ENUM = "exfoliation_energy"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
-    neighbor_strategy: Literal["k-nearest", "voronoi", "radius_graph"] = (
-        "k-nearest"
-    )
+    neighbor_strategy: Literal[
+        "k-nearest", "voronoi", "radius_graph", "radius_graph_jarvis"
+    ] = "k-nearest"
     id_tag: Literal["jid", "id", "_oqmd_entry_id"] = "jid"
 
     # logging configuration
