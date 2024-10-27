@@ -13,6 +13,7 @@ from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+from alignn.models.alignn_ff2 import ALIGNNFF2, ALIGNNFF2Config
 import torch
 import time
 from jarvis.core.atoms import Atoms
@@ -218,6 +219,7 @@ def train_for_folder(
         else:
             train_atom = False
     except Exception as exp:
+        print("exp", exp)
         pass
     # if config.model.atomwise_weight == 0:
     #    train_atom = False
@@ -322,36 +324,22 @@ def train_for_folder(
             )
 
             tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
-            # tmp = ALIGNNAtomWiseConfig(
-            #    name="alignn_atomwise",
-            #    output_features=config.model.output_features,
-            #    alignn_layers=config.model.alignn_layers,
-            #    atomwise_weight=config.model.atomwise_weight,
-            #    stresswise_weight=config.model.stresswise_weight,
-            #    graphwise_weight=config.model.graphwise_weight,
-            #    gradwise_weight=config.model.gradwise_weight,
-            #    gcn_layers=config.model.gcn_layers,
-            #    atom_input_features=config.model.atom_input_features,
-            #    edge_input_features=config.model.edge_input_features,
-            #    triplet_input_features=config.model.triplet_input_features,
-            #    embedding_features=config.model.embedding_features,
-            # )
             print("Rest config", tmp)
-            # for i,j in config_dict['model'].items():
-            #    print ('i',i)
-            #    tmp.i=j
-            # print ('tmp1',tmp)
             model = ALIGNNAtomWise(tmp)  # config.model)
-            # model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(
-            #    name="alignn_atomwise",
-            #    output_features=1,
-            #    graphwise_weight=1,
-            #    alignn_layers=4,
-            #    gradwise_weight=10,
-            #    stresswise_weight=0.01,
-            #    atomwise_weight=0,
-            #      )
-            #    )
+            print("model", model)
+            model.load_state_dict(
+                torch.load(restart_model_path, map_location=device)
+            )
+            model = model.to(device)
+        if config.model.name == "alignn_ff2":
+            rest_config = loadjson(
+                restart_model_path.replace("current_model.pt", "config.json")
+                # restart_model_path.replace("best_model.pt", "config.json")
+            )
+
+            tmp = ALIGNNFF2Config(**rest_config["model"])
+            print("Rest config", tmp)
+            model = ALIGNNFF2(tmp)  # config.model)
             print("model", model)
             model.load_state_dict(
                 torch.load(restart_model_path, map_location=device)
@@ -410,6 +398,7 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
         use_lmdb=config.use_lmdb,
+        dtype=config.dtype,
     )
     # print("dataset", dataset[0])
     t1 = time.time()

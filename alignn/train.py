@@ -18,6 +18,7 @@ from torch import nn
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
+from alignn.models.alignn_ff2 import ALIGNNFF2
 from alignn.models.alignn import ALIGNN
 from jarvis.db.jsonutils import dumpjson
 import json
@@ -28,7 +29,7 @@ import time
 from sklearn.metrics import roc_auc_score
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-torch.set_default_dtype(torch.float32)
+# torch.set_default_dtype(torch.float32)
 
 
 # def setup(rank, world_size):
@@ -147,7 +148,13 @@ def train_dgl(
     pprint.pprint(tmp)  # , sort_dicts=False)
     if config.classification_threshold is not None:
         classification = True
-
+    TORCH_DTYPES = {
+        "float16": torch.float16,
+        "float32": torch.float32,
+        "float64": torch.float64,
+        "bfloat": torch.bfloat16,
+    }
+    torch.set_default_dtype(TORCH_DTYPES[config.dtype])
     line_graph = False
     if config.model.alignn_layers > 0:
         line_graph = True
@@ -197,6 +204,7 @@ def train_dgl(
             keep_data_order=config.keep_data_order,
             output_dir=config.output_dir,
             use_lmdb=config.use_lmdb,
+            dtype=config.dtype,
         )
     else:
         train_loader = train_val_test_loaders[0]
@@ -212,6 +220,7 @@ def train_dgl(
     _model = {
         "alignn_atomwise": ALIGNNAtomWise,
         "alignn": ALIGNN,
+        "alignn_ff2": ALIGNNFF2,
     }
     if config.random_seed is not None:
         random.seed(config.random_seed)
@@ -265,7 +274,10 @@ def train_dgl(
             optimizer,
         )
 
-    if config.model.name == "alignn_atomwise":
+    if (
+        config.model.name == "alignn_atomwise"
+        or config.model.name == "alignn_ff2"
+    ):
 
         def get_batch_errors(dat=[]):
             """Get errors for samples."""

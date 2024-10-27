@@ -153,6 +153,7 @@ def get_train_val_loaders(
     world_size=0,
     rank=0,
     use_lmdb: bool = True,
+    dtype="float32",
 ):
     """Help function to set up JARVIS train and val dataloaders."""
     if use_lmdb:
@@ -383,6 +384,7 @@ def get_train_val_loaders(
             output_dir=output_dir,
             sampler=train_sampler,
             tmp_name=tmp_name,
+            dtype=dtype,
             # tmp_name="train_data",
         )
         tmp_name = filename + "val_data"
@@ -406,6 +408,7 @@ def get_train_val_loaders(
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
                 tmp_name=tmp_name,
+                dtype=dtype,
                 # tmp_name="val_data",
             )
             if len(dataset_val) > 0
@@ -431,6 +434,7 @@ def get_train_val_loaders(
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
                 tmp_name=tmp_name,
+                dtype=dtype,
                 # tmp_name="test_data",
             )
             if len(dataset_test) > 0

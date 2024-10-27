@@ -116,6 +116,7 @@ def get_torch_dataset(
     tmp_name="dataset",
     map_size=1e12,
     read_existing=True,
+    dtype="float32",
 ):
     """Get Torch Dataset with LMDB."""
     vals = np.array([ii[target] for ii in dataset])  # df[target].values
@@ -151,6 +152,7 @@ def get_torch_dataset(
                 use_canonize=use_canonize,
                 cutoff_extra=cutoff_extra,
                 neighbor_strategy=neighbor_strategy,
+                dtype=dtype,
             )
             if line_graph:
                 g, lg = g

@@ -9,20 +9,100 @@ from collections import OrderedDict
 from jarvis.analysis.structure.neighbors import NeighborsAnalysis
 from jarvis.core.specie import chem_data, get_node_attributes
 import math
-
-# from jarvis.core.atoms import Atoms
 from collections import defaultdict
 from typing import List, Tuple, Sequence, Optional
 from dgl.data import DGLDataset
-
 import torch
 import dgl
+from tqdm import tqdm
 
-try:
-    from tqdm import tqdm
-except Exception as exp:
-    print("tqdm is not installed.", exp)
-    pass
+
+def temp_graph(atoms=None, cutoff=4.0, atom_features="cgcnn", dtype="float32"):
+    """Helper function to construct a graph for a given cutoff."""
+    TORCH_DTYPES = {
+        "float16": torch.float16,
+        "float32": torch.float32,
+        "float64": torch.float64,
+        "bfloat": torch.bfloat16,
+    }
+    dtype = TORCH_DTYPES[dtype]
+    u, v, r, d, images, atom_feats = [], [], [], [], [], []
+    elements = atoms.elements
+
+    # Loop over each atom in the structure
+    for ii, i in enumerate(atoms.cart_coords):
+        # Get neighbors within the cutoff distance
+        neighs = atoms.lattice.get_points_in_sphere(
+            atoms.frac_coords, i, cutoff, distance_vector=True
+        )
+
+        # Filter out self-loops (exclude cases where atom is bonded to itself)
+        valid_indices = neighs[2] != ii
+
+        u.extend([ii] * np.sum(valid_indices))
+        d.extend(neighs[1][valid_indices])
+        v.extend(neighs[2][valid_indices])
+        images.extend(neighs[3][valid_indices])
+        r.extend(neighs[4][valid_indices])
+
+        feat = list(
+            get_node_attributes(elements[ii], atom_features=atom_features)
+        )
+        atom_feats.append(feat)
+
+    # Create DGL graph
+    g = dgl.graph((np.array(u), np.array(v)))
+
+    # Add data to the graph with the specified dtype
+    g.ndata["atom_features"] = torch.tensor(atom_feats, dtype=dtype)
+    g.edata["r"] = torch.tensor(r, dtype=dtype)
+    g.edata["d"] = torch.tensor(d, dtype=dtype)
+    g.edata["images"] = torch.tensor(images, dtype=dtype)
+    g.ndata["coords"] = torch.tensor(atoms.cart_coords, dtype=dtype)
+    g.ndata["V"] = torch.tensor([atoms.volume] * atoms.num_atoms, dtype=dtype)
+
+    return g, u, v, r
+
+
+def radius_graph_jarvis(
+    atoms,
+    cutoff_extra=0.5,
+    cutoff=4.0,
+    atom_features="cgcnn",
+    line_graph=True,
+    dtype="float32",
+):
+    """Construct radius graph with dynamic cutoff."""
+
+    while True:
+        # try:
+        # Attempt to create the graph
+        g, u, v, r = temp_graph(
+            atoms=atoms,
+            cutoff=cutoff,
+            atom_features=atom_features,
+            dtype=dtype,
+        )
+        # Check if all atoms are included as nodes
+        if g.num_nodes() == len(atoms.elements):
+            # print(f"Graph constructed with cutoff: {cutoff}")
+            break  # Exit the loop when successful
+        # Increment the cutoff if the graph is incomplete
+        cutoff += cutoff_extra
+        # print(f"Increasing cutoff to: {cutoff}")
+
+    # except Exception as exp:
+    #    # Handle exceptions and try again
+    #    print(f"Graph construction failed: {exp}")
+    #    cutoff += cutoff_extra  # Try with a larger cutoff
+
+    # Optional: Create a line graph if requested
+    if line_graph:
+        lg = g.line_graph(shared=True)
+        lg.apply_edges(compute_bond_cosines)
+        return g, lg
+
+    return g
 
 
 def canonize_edge(
@@ -320,52 +400,6 @@ def radius_graph_old(
 
 
 ###
-def radius_graph_jarvis(
-    atoms, cutoff=4, atom_features="cgcnn", line_graph=True
-):
-    """Construct edge list for radius graph."""
-    u, v, r, atom_feats = [], [], [], []
-    elements = atoms.elements
-
-    # Loop over each atom in the structure
-    for ii, i in enumerate(atoms.cart_coords):
-        # Get neighbors within the cutoff distance
-        neighs = atoms.lattice.get_points_in_sphere(
-            atoms.frac_coords, i, cutoff, distance_vector=True
-        )
-
-        # Filter out self-loops (where the neighbor is the same as the source atom)
-        valid_indices = neighs[2] != ii  # Exclude self-loops
-
-        # Store source (u), destination (v), and distances (r) only for valid neighbors
-        u.extend(
-            [ii] * np.sum(valid_indices)
-        )  # Add the source atom multiple times
-        v.extend(neighs[2][valid_indices])  # Add valid neighbors only
-        r.extend(neighs[-1][valid_indices])  # Add distances of valid neighbors
-
-        # Store atom features for the current atom
-        feat = list(
-            get_node_attributes(elements[ii], atom_features=atom_features)
-        )
-        atom_feats.append(feat)
-
-    # Create DGL graph
-    g = dgl.graph((np.array(u), np.array(v)))
-    g.ndata["atom_features"] = torch.tensor(atom_feats, dtype=torch.float32)
-    g.edata["r"] = torch.tensor(r, dtype=torch.float32)
-    g.ndata["coords"] = torch.tensor(atoms.cart_coords, dtype=torch.float32)
-    g.ndata["V"] = torch.tensor(
-        [atoms.volume] * atoms.num_atoms, dtype=torch.float32
-    )
-
-    # Optional: Create a line graph if requested
-    if line_graph:
-        lg = g.line_graph(shared=True)
-        lg.apply_edges(compute_bond_cosines)
-        return g, lg
-
-    return g
 
 
 class Graph(object):
@@ -415,6 +449,7 @@ class Graph(object):
         # use_canonize: bool = False,
         use_lattice_prop: bool = False,
         cutoff_extra=3.5,
+        dtype=torch.float32,
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
@@ -441,6 +476,7 @@ class Graph(object):
                 cutoff=cutoff,
                 atom_features=atom_features,
                 line_graph=compute_line_graph,
+                dtype=dtype,
             )
             return g, lg
         else:
@@ -784,6 +820,7 @@ class StructureDataset(DGLDataset):
         classification=False,
         id_tag="jid",
         sampler=None,
+        dtype="float32",
     ):
         """Pytorch Dataset for atomistic graphs.
 
