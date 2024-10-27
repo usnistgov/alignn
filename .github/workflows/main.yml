@@ -39,6 +39,8 @@ jobs:
             export DGLBACKEND=pytorch
             export CUDA_VISIBLE_DEVICES="-1"
             pip install phonopy flake8 pytest pycodestyle pydocstyle codecov pytest-cov coverage
+            pip uninstall jarvis-tools -y
+            pip install -q git+https://github.com/usnistgov/jarvis.git@develop
             python setup.py develop
             echo 'environment.yml'
             conda env export

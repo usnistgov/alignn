@@ -203,7 +203,7 @@ def nearest_neighbor_edges(
             else:
                 edges[(site_idx, dst)].add(tuple(image))
 
-    return edges
+    return edges, images
 
 
 def build_undirected_edgedata(
@@ -217,7 +217,7 @@ def build_undirected_edgedata(
     """
     # second pass: construct *undirected* graph
     # import pprint
-    u, v, r = [], [], []
+    u, v, r, all_images = [], [], [], []
     for (src_id, dst_id), images in edges.items():
         for dst_image in images:
             # fractional coordinate for periodic image of dst
@@ -233,12 +233,14 @@ def build_undirected_edgedata(
                 u.append(uu)
                 v.append(vv)
                 r.append(dd)
+                all_images.append(dst_image)
     u, v, r = (np.array(x) for x in (u, v, r))
     u = torch.tensor(u)
     v = torch.tensor(v)
     r = torch.tensor(r).type(torch.get_default_dtype())
+    all_images = torch.tensor(all_images).type(torch.get_default_dtype())
 
-    return u, v, r
+    return u, v, r, all_images
 
 
 def radius_graph(
@@ -284,6 +286,8 @@ def radius_graph(
         # tile periodic images into X_dst
         # index id_dst into X_dst maps to atom id as id_dest % num_atoms
         X_dst = (cell_images @ lattice_mat)[:, None, :] + X_src
+        # cell_images = cell_images[:,None,:]+cell_images
+        # print('cell_images',cell_images,cell_images.shape)
         X_dst = X_dst.reshape(-1, 3)
         # pairwise distances between atoms in (0,0,0) cell
         # and atoms in all periodic image
@@ -300,11 +304,15 @@ def radius_graph(
                 atol=atol,
             ),
         )
+
         # get node indices for edgelist from neighbor mask
         u, v = torch.where(neighbor_mask)
+        # cell_images=cell_images[neighbor_mask]
+        # u, v = torch.where(neighbor_mask)
         # print("u2v2", u, v, u.shape, v.shape)
         # print("v1", v, v.shape)
         # print("v2", v % num_atoms, (v % num_atoms).shape)
+        cell_images = cell_images[v // num_atoms]
 
         r = (X_dst[v] - X_src[u]).float()
         # gk = dgl.knn_graph(X_dst, 12)
@@ -312,22 +320,22 @@ def radius_graph(
         # print("gk", gk)
         v = v % num_atoms
         g = dgl.graph((u, v))
-        return g, u, v, r
+        return g, u, v, r, cell_images
 
-    g, u, v, r = temp_graph(cutoff)
+    g, u, v, r, cell_images = temp_graph(cutoff)
     while (g.num_nodes()) != len(atoms.elements):
         try:
             cutoff += cutoff_extra
-            g, u, v, r = temp_graph(cutoff)
+            g, u, v, r, cell_images = temp_graph(cutoff)
             print("cutoff", id, cutoff)
             print(atoms)
 
         except Exception as exp:
             print("Graph exp", exp)
             pass
-        return u, v, r
+        return u, v, r, cell_images
 
-    return u, v, r
+    return u, v, r, cell_images
 
 
 ###
@@ -454,19 +462,19 @@ class Graph(object):
         # print('id',id)
         # print('stratgery', neighbor_strategy)
         if neighbor_strategy == "k-nearest":
-            edges = nearest_neighbor_edges(
+            edges, images = nearest_neighbor_edges(
                 atoms=atoms,
                 cutoff=cutoff,
                 max_neighbors=max_neighbors,
                 id=id,
                 use_canonize=use_canonize,
             )
-            u, v, r = build_undirected_edgedata(atoms, edges)
+            u, v, r, images = build_undirected_edgedata(atoms, edges)
         elif neighbor_strategy == "radius_graph":
             # print('HERE')
             # import sys
             # sys.exit()
-            u, v, r = radius_graph(
+            u, v, r, images = radius_graph(
                 atoms, cutoff=cutoff, cutoff_extra=cutoff_extra
             )
         elif neighbor_strategy == "radius_graph_jarvis":
@@ -498,10 +506,18 @@ class Graph(object):
         )
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
-        g.edata["r"] = r
+        g.edata["r"] = torch.tensor(r).type(torch.get_default_dtype())
+        # images=torch.tensor(images).type(torch.get_default_dtype())
+        # print('images',images.shape,r.shape)
+        # print('type',torch.get_default_dtype())
+        g.edata["images"] = torch.tensor(images).type(
+            torch.get_default_dtype()
+        )
         vol = atoms.volume
         g.ndata["V"] = torch.tensor([vol for ii in range(atoms.num_atoms)])
-        g.ndata["coords"] = torch.tensor(atoms.cart_coords)
+        g.ndata["coords"] = torch.tensor(atoms.cart_coords).type(
+            torch.get_default_dtype()
+        )
         if use_lattice_prop:
             lattice_prop = np.array(
                 [atoms.lattice.lat_lengths(), atoms.lattice.lat_angles()]

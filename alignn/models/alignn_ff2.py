@@ -199,6 +199,7 @@ class MLPLayer(nn.Module):
 
     def forward(self, x):
         """Linear, Batchnorm, silu layer."""
+        # print('xtype',x.dtype)
         return self.layer(x)
 
 
@@ -277,7 +278,7 @@ class ALIGNNFF2(nn.Module):
         else:
             self.angle_embedding = nn.Sequential(
                 RBFExpansion(
-                    vmin=-1,
+                    vmin=-1.0,
                     vmax=1.0,
                     bins=config.triplet_input_features,
                 ),
@@ -368,6 +369,7 @@ class ALIGNNFF2(nn.Module):
         g.edata["d"] = bondlength
         g.edata["r"] = r
         # bond_expansion = self.bond_expansion(bondlength)
+        # z = self.angle_embedding(lg.edata.pop("h"))
         lg = check_line_graph(g, lg, self.config.inner_cutoff)
         lg.apply_edges(compute_bond_cosines)
 
