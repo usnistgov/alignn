@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 
 def temp_graph(atoms=None, cutoff=4.0, atom_features="cgcnn", dtype="float32"):
-    """Helper function to construct a graph for a given cutoff."""
+    """Construct a graph for a given cutoff."""
     TORCH_DTYPES = {
         "float16": torch.float16,
         "float32": torch.float32,
@@ -73,7 +73,6 @@ def radius_graph_jarvis(
     dtype="float32",
 ):
     """Construct radius graph with dynamic cutoff."""
-
     while True:
         # try:
         # Attempt to create the graph

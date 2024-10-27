@@ -89,7 +89,6 @@ class ALIGNNFF2Config(BaseSettings):
     inner_cutoff: float = 6  # Ansgtrom
     stress_multiplier: float = 1
     add_reverse_forces: bool = False  # will make True as default soon
-    lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
     multiply_cutoff: bool = False
     extra_features: int = 0
@@ -98,10 +97,9 @@ class ALIGNNFF2Config(BaseSettings):
     max_f: int = 4
     learn_basis: bool = True
 
-    class Config:
-        """Configure model settings behavior."""
-
-        env_prefix = "jv_model"
+    # class Config:
+    #    """Configure model settings behavior."""
+    #    env_prefix = "jv_model"
 
 
 def cutoff_function_based_edges_old(r, inner_cutoff=4):
