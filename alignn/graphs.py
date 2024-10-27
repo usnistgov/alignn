@@ -74,26 +74,26 @@ def radius_graph_jarvis(
 ):
     """Construct radius graph with dynamic cutoff."""
     while True:
-        # try:
-        # Attempt to create the graph
-        g, u, v, r = temp_graph(
-            atoms=atoms,
-            cutoff=cutoff,
-            atom_features=atom_features,
-            dtype=dtype,
-        )
-        # Check if all atoms are included as nodes
-        if g.num_nodes() == len(atoms.elements):
-            # print(f"Graph constructed with cutoff: {cutoff}")
-            break  # Exit the loop when successful
-        # Increment the cutoff if the graph is incomplete
-        cutoff += cutoff_extra
-        # print(f"Increasing cutoff to: {cutoff}")
+        try:
+            # Attempt to create the graph
+            g, u, v, r = temp_graph(
+                atoms=atoms,
+                cutoff=cutoff,
+                atom_features=atom_features,
+                dtype=dtype,
+            )
+            # Check if all atoms are included as nodes
+            if g.num_nodes() == len(atoms.elements):
+                # print(f"Graph constructed with cutoff: {cutoff}")
+                break  # Exit the loop when successful
+            # Increment the cutoff if the graph is incomplete
+            cutoff += cutoff_extra
+            # print(f"Increasing cutoff to: {cutoff}")
 
-    # except Exception as exp:
-    #    # Handle exceptions and try again
-    #    print(f"Graph construction failed: {exp}")
-    #    cutoff += cutoff_extra  # Try with a larger cutoff
+        except Exception as exp:
+            # Handle exceptions and try again
+            print(f"Graph construction failed: {exp,cutoff}")
+            cutoff += cutoff_extra  # Try with a larger cutoff
 
     # Optional: Create a line graph if requested
     if line_graph:

@@ -44,16 +44,15 @@
         "atom_input_features": 92,
         "calculate_gradient":true,
         "atomwise_output_features":0,
-        "alignn_layers":2,
-        "gcn_layers":2,
-        "hidden_features":128,
+        "alignn_layers":1,
+        "gcn_layers":1,
+        "hidden_features":64,
         "output_features": 1,
         "graphwise_weight":0.85,
         "gradwise_weight":0.05,
         "atomwise_weight":0.0,
         "stresswise_weight":0.05,
-        "add_reverse_forces":true,
-        "lg_on_fly":true
+        "add_reverse_forces":true
 
 
     }

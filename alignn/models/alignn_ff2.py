@@ -12,56 +12,19 @@ import torch
 from typing import Literal
 from torch import nn
 from torch.nn import functional as F
-from alignn.models.utils import RBFExpansion
+from alignn.models.utils import (
+    RBFExpansion,
+    BesselExpansion,
+    SphericalHarmonicsExpansion,
+    FourierExpansion,
+    compute_pair_vector_and_distance,
+    check_line_graph,
+    cutoff_function_based_edges,
+)
 from alignn.graphs import compute_bond_cosines
 from alignn.utils import BaseSettings
 
-# from math import pi, sqrt
-
-
-def compute_pair_vector_and_distance(g: dgl.DGLGraph):
-    """Calculate bond vectors and distances using dgl graphs.
-
-    Args:
-    g: DGL graph
-
-    Returns:
-    bond_vec (torch.tensor): bond distance between two atoms
-    bond_dist (torch.tensor): vector from src node to dst node
-    """
-    dst_pos = g.ndata["coords"][g.edges()[1]] + g.edata["images"]
-    src_pos = g.ndata["coords"][g.edges()[0]]
-    bond_vec = dst_pos - src_pos
-    bond_dist = torch.norm(bond_vec, dim=1)
-
-    return bond_vec, bond_dist
-
-
-def check_line_graph(
-    graph: dgl.DGLGraph, line_graph: dgl.DGLGraph, threebody_cutoff: float
-):
-    """Ensure that 3body line graph is compatible with a given graph.
-
-    Args:
-        graph: atomistic graph
-        line_graph: line graph of atomistic graph
-        threebody_cutoff: cutoff for three-body interactions
-    """
-    valid_three_body = graph.edata["d"] <= threebody_cutoff
-    if line_graph.num_nodes() == graph.edata["r"][valid_three_body].shape[0]:
-        line_graph.ndata["r"] = graph.edata["r"][valid_three_body]
-        line_graph.ndata["d"] = graph.edata["d"][valid_three_body]
-        line_graph.ndata["images"] = graph.edata["images"][valid_three_body]
-    else:
-        three_body_id = torch.concatenate(line_graph.edges())
-        max_three_body_id = (
-            torch.max(three_body_id) + 1 if three_body_id.numel() > 0 else 0
-        )
-        line_graph.ndata["r"] = graph.edata["r"][:max_three_body_id]
-        line_graph.ndata["d"] = graph.edata["d"][:max_three_body_id]
-        line_graph.ndata["images"] = graph.edata["images"][:max_three_body_id]
-
-    return line_graph
+torch.autograd.set_detect_anomaly(True)
 
 
 class ALIGNNFF2Config(BaseSettings):
@@ -80,73 +43,24 @@ class ALIGNNFF2Config(BaseSettings):
     calculate_gradient: bool = True
     atomwise_output_features: int = 0
     graphwise_weight: float = 1.0
-    gradwise_weight: float = 0.0
-    stresswise_weight: float = 0.0
+    gradwise_weight: float = 1.0
+    stresswise_weight: float = 0.00001
     atomwise_weight: float = 0.0
     classification: bool = False
-    force_mult_natoms: bool = False
-    use_cutoff_function: bool = False
-    inner_cutoff: float = 6  # Ansgtrom
+    force_mult_natoms: bool = True
+    use_cutoff_function: bool = True
+    inner_cutoff: float = 4  # Ansgtrom
     stress_multiplier: float = 1
     add_reverse_forces: bool = False  # will make True as default soon
     batch_stress: bool = True
     multiply_cutoff: bool = False
     extra_features: int = 0
     exponent: int = 3
+    bond_exp_basis: str = "gaussian"  # "bessel"  # or gaussian
+    angle_exp_basis: str = "gaussian"  # "bessel"  # or gaussian
     max_n: int = 9
     max_f: int = 4
     learn_basis: bool = True
-
-    # class Config:
-    #    """Configure model settings behavior."""
-    #    env_prefix = "jv_model"
-
-
-def cutoff_function_based_edges_old(r, inner_cutoff=4):
-    """Apply smooth cutoff to pairwise interactions
-
-    r: bond lengths
-    inner_cutoff: cutoff radius
-
-    inside cutoff radius, apply smooth cutoff envelope
-    outside cutoff radius: hard zeros
-    """
-    ratio = r / inner_cutoff
-    return torch.where(
-        ratio <= 1,
-        1 - 6 * ratio**5 + 15 * ratio**4 - 10 * ratio**3,
-        torch.zeros_like(r),
-    )
-
-
-def cutoff_function_based_edges(r, inner_cutoff=4, exponent=3):
-    """Apply smooth cutoff to pairwise interactions
-
-    r: bond lengths
-    inner_cutoff: cutoff radius
-
-    inside cutoff radius, apply smooth cutoff envelope
-    outside cutoff radius: hard zeros
-    """
-    ratio = r / inner_cutoff
-    c1 = -(exponent + 1) * (exponent + 2) / 2
-    c2 = exponent * (exponent + 2)
-    c3 = -exponent * (exponent + 1) / 2
-    envelope = (
-        1
-        + c1 * ratio**exponent
-        + c2 * ratio ** (exponent + 1)
-        + c3 * ratio ** (exponent + 2)
-    )
-    # r_cut = inner_cutoff
-    # r_on = inner_cutoff+1
-
-    # r_sq = r * r
-    # r_on_sq = r_on * r_on
-    # r_cut_sq = r_cut * r_cut
-    # envelope = (r_cut_sq - r_sq)
-    # ** 2 * (r_cut_sq + 2 * r_sq - 3 * r_on_sq)/ (r_cut_sq - r_on_sq) ** 3
-    return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
 
 
 class EdgeGatedGraphConv(nn.Module):
@@ -311,29 +225,67 @@ class ALIGNNFF2(nn.Module):
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
         )
-        # self.bond_expansion = RadialBesselFunction(
-        #    max_n=config.max_n,
-        #    cutoff=config.inner_cutoff,
-        #    learnable=config.learn_basis,
-        # )
-        self.edge_embedding = nn.Sequential(
-            RBFExpansion(
-                vmin=0,
-                vmax=5.0,
-                bins=config.edge_input_features,
-            ),
-            MLPLayer(config.edge_input_features, config.embedding_features),
-            MLPLayer(config.embedding_features, config.hidden_features),
-        )
-        self.angle_embedding = nn.Sequential(
-            RBFExpansion(
-                vmin=-1,
-                vmax=1.0,
-                bins=config.triplet_input_features,
-            ),
-            MLPLayer(config.triplet_input_features, config.embedding_features),
-            MLPLayer(config.embedding_features, config.hidden_features),
-        )
+        if self.config.bond_exp_basis == "bessel":
+            self.edge_embedding = nn.Sequential(
+                BesselExpansion(
+                    # RadialBesselFunction(
+                    vmin=0,
+                    vmax=8.0,
+                    bins=config.edge_input_features,
+                ),
+                MLPLayer(
+                    config.edge_input_features, config.embedding_features
+                ),
+                MLPLayer(config.embedding_features, config.hidden_features),
+            )
+        else:
+            self.edge_embedding = nn.Sequential(
+                RBFExpansion(
+                    vmin=0,
+                    vmax=8.0,
+                    bins=config.edge_input_features,
+                ),
+                MLPLayer(
+                    config.edge_input_features, config.embedding_features
+                ),
+                MLPLayer(config.embedding_features, config.hidden_features),
+            )
+        if self.config.angle_exp_basis == "spherical":
+            self.angle_embedding = nn.Sequential(
+                SphericalHarmonicsExpansion(),
+                MLPLayer(
+                    config.triplet_input_features, config.embedding_features
+                ),
+                MLPLayer(config.embedding_features, config.hidden_features),
+            )  # not tested
+        elif self.config.angle_exp_basis == "bessel":
+            self.angle_embedding = nn.Sequential(
+                BesselExpansion(),
+                MLPLayer(
+                    config.triplet_input_features, config.embedding_features
+                ),
+                MLPLayer(config.embedding_features, config.hidden_features),
+            )  # not tested
+        elif self.config.angle_exp_basis == "fourier":
+            self.angle_embedding = nn.Sequential(
+                FourierExpansion(),
+                MLPLayer(
+                    config.triplet_input_features, config.embedding_features
+                ),
+                MLPLayer(config.embedding_features, config.hidden_features),
+            )  # not tested
+        else:
+            self.angle_embedding = nn.Sequential(
+                RBFExpansion(
+                    vmin=-1,
+                    vmax=1.0,
+                    bins=config.triplet_input_features,
+                ),
+                MLPLayer(
+                    config.triplet_input_features, config.embedding_features
+                ),
+                MLPLayer(config.embedding_features, config.hidden_features),
+            )
 
         self.alignn_layers = nn.ModuleList(
             [
@@ -407,9 +359,11 @@ class ALIGNNFF2(nn.Module):
             features = self.extra_feature_embedding(features)
         x = g.ndata.pop("atom_features")
         x = self.atom_embedding(x)
+        # r=g.edata['r']
         r, bondlength = compute_pair_vector_and_distance(g)
         if self.config.calculate_gradient:
             r.requires_grad_(True)
+            # print('gradient')
         bondlength = torch.norm(r, dim=1)
         g.edata["d"] = bondlength
         g.edata["r"] = r
@@ -518,6 +472,7 @@ class ALIGNNFF2(nn.Module):
                 )
             else:
                 forces = torch.squeeze(g.ndata["forces_ji"])
+            # print('forces',forces)
 
             if self.config.stresswise_weight != 0:
                 # Under development, use with caution

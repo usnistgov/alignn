@@ -8,7 +8,7 @@ from alignn.ff.ff import (
     ForceField,
     get_interface_energy,
 )
-from alignn.graphs import Graph
+from alignn.graphs import Graph, radius_graph_jarvis
 from alignn.ff.ff import phonons
 from jarvis.core.atoms import ase_to_atoms
 from jarvis.db.figshare import get_jid_data
@@ -21,6 +21,31 @@ from alignn.ff.ff import (
     fd_path,
     ForceField,
 )
+from jarvis.io.vasp.inputs import Poscar
+
+# JVASP-25139
+pos = """Rb8
+1.0
+8.534892364405636 0.6983003603741366 -0.0
+-3.4905051320748712 7.819743736978101 -0.0
+0.0 -0.0 9.899741852856957
+Rb
+8
+Cartesian
+-0.48436620907024275 6.0395021169791425 0.0
+-0.48395379092975643 6.039257883020857 4.94987
+5.528746209070245 2.478537883020856 0.0
+5.528333790929757 2.478782116979143 4.94987
+1.264246578587533 2.1348318180359995 2.469410532600589
+1.2579434214124685 2.1241881819640005 7.419280532600588
+3.7864365785875354 6.393851818035999 2.4804594673994105
+3.7801334214124656 6.383208181964002 7.430329467399411
+"""
+
+
+def test_radius_graph_jarvis():
+    atoms = Poscar.from_string(pos).atoms
+    g, lg = radius_graph_jarvis(atoms=atoms)
 
 
 def test_alignnff():
