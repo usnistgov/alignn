@@ -7,11 +7,8 @@ from typing import Tuple, Union
 from torch.autograd import grad
 import dgl
 import dgl.function as fn
-import numpy as np
 from dgl.nn import AvgPooling
 import torch
-
-# from dgl.nn.functional import edge_softmax
 from typing import Literal
 from torch import nn
 from torch.nn import functional as F
@@ -19,8 +16,28 @@ from alignn.models.utils import RBFExpansion
 from alignn.graphs import compute_bond_cosines
 from alignn.utils import BaseSettings
 
+# from math import pi, sqrt
 
-def _ensure_3body_line_graph_compatibility(
+
+def compute_pair_vector_and_distance(g: dgl.DGLGraph):
+    """Calculate bond vectors and distances using dgl graphs.
+
+    Args:
+    g: DGL graph
+
+    Returns:
+    bond_vec (torch.tensor): bond distance between two atoms
+    bond_dist (torch.tensor): vector from src node to dst node
+    """
+    dst_pos = g.ndata["coords"][g.edges()[1]] + g.edata["images"]
+    src_pos = g.ndata["coords"][g.edges()[0]]
+    bond_vec = dst_pos - src_pos
+    bond_dist = torch.norm(bond_vec, dim=1)
+
+    return bond_vec, bond_dist
+
+
+def check_line_graph(
     graph: dgl.DGLGraph, line_graph: dgl.DGLGraph, threebody_cutoff: float
 ):
     """Ensure that 3body line graph is compatible with a given graph.
@@ -30,34 +47,19 @@ def _ensure_3body_line_graph_compatibility(
         line_graph: line graph of atomistic graph
         threebody_cutoff: cutoff for three-body interactions
     """
-    valid_three_body = graph.edata["bond_dist"] <= threebody_cutoff
-    if (
-        line_graph.num_nodes()
-        == graph.edata["bond_vec"][valid_three_body].shape[0]
-    ):
-        line_graph.ndata["bond_vec"] = graph.edata["bond_vec"][
-            valid_three_body
-        ]
-        line_graph.ndata["bond_dist"] = graph.edata["bond_dist"][
-            valid_three_body
-        ]
-        line_graph.ndata["pbc_offset"] = graph.edata["pbc_offset"][
-            valid_three_body
-        ]
+    valid_three_body = graph.edata["d"] <= threebody_cutoff
+    if line_graph.num_nodes() == graph.edata["r"][valid_three_body].shape[0]:
+        line_graph.ndata["r"] = graph.edata["r"][valid_three_body]
+        line_graph.ndata["d"] = graph.edata["d"][valid_three_body]
+        line_graph.ndata["images"] = graph.edata["images"][valid_three_body]
     else:
         three_body_id = torch.concatenate(line_graph.edges())
         max_three_body_id = (
             torch.max(three_body_id) + 1 if three_body_id.numel() > 0 else 0
         )
-        line_graph.ndata["bond_vec"] = graph.edata["bond_vec"][
-            :max_three_body_id
-        ]
-        line_graph.ndata["bond_dist"] = graph.edata["bond_dist"][
-            :max_three_body_id
-        ]
-        line_graph.ndata["pbc_offset"] = graph.edata["pbc_offset"][
-            :max_three_body_id
-        ]
+        line_graph.ndata["r"] = graph.edata["r"][:max_three_body_id]
+        line_graph.ndata["d"] = graph.edata["d"][:max_three_body_id]
+        line_graph.ndata["images"] = graph.edata["images"][:max_three_body_id]
 
     return line_graph
 
@@ -73,8 +75,6 @@ class ALIGNNFF2Config(BaseSettings):
     triplet_input_features: int = 40
     embedding_features: int = 64
     hidden_features: int = 256
-    # fc_layers: int = 1
-    # fc_features: int = 64
     output_features: int = 1
     grad_multiplier: int = -1
     calculate_gradient: bool = True
@@ -83,14 +83,8 @@ class ALIGNNFF2Config(BaseSettings):
     gradwise_weight: float = 0.0
     stresswise_weight: float = 0.0
     atomwise_weight: float = 0.0
-    # if link == log, apply `exp` to final outputs
-    # to constrain predictions to be positive
-    link: Literal["identity", "log", "logit"] = "identity"
-    zero_inflated: bool = False
     classification: bool = False
     force_mult_natoms: bool = False
-    energy_mult_natoms: bool = False
-    include_pos_deriv: bool = False
     use_cutoff_function: bool = False
     inner_cutoff: float = 6  # Ansgtrom
     stress_multiplier: float = 1
@@ -100,6 +94,9 @@ class ALIGNNFF2Config(BaseSettings):
     multiply_cutoff: bool = False
     extra_features: int = 0
     exponent: int = 3
+    max_n: int = 9
+    max_f: int = 4
+    learn_basis: bool = True
 
     class Config:
         """Configure model settings behavior."""
@@ -316,11 +313,15 @@ class ALIGNNFF2(nn.Module):
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
         )
-
+        # self.bond_expansion = RadialBesselFunction(
+        #    max_n=config.max_n,
+        #    cutoff=config.inner_cutoff,
+        #    learnable=config.learn_basis,
+        # )
         self.edge_embedding = nn.Sequential(
             RBFExpansion(
                 vmin=0,
-                vmax=8.0,
+                vmax=5.0,
                 bins=config.edge_input_features,
             ),
             MLPLayer(config.edge_input_features, config.embedding_features),
@@ -389,18 +390,6 @@ class ALIGNNFF2(nn.Module):
             # self.softmax = nn.LogSoftmax(dim=1)
         else:
             self.fc = nn.Linear(config.hidden_features, config.output_features)
-        self.link = None
-        self.link_name = config.link
-        if config.link == "identity":
-            self.link = lambda x: x
-        elif config.link == "log":
-            self.link = torch.exp
-            avg_gap = 0.7  # magic number -- average bandgap in dft_3d
-            self.fc.bias.data = torch.tensor(
-                np.log(avg_gap), dtype=torch.float
-            )
-        elif config.link == "logit":
-            self.link = torch.sigmoid
 
     def forward(
         self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
@@ -411,42 +400,37 @@ class ALIGNNFF2(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
+        result = {}
         if len(self.alignn_layers) > 0:
             g, lg = g
             lg = lg.local_var()
-
-            # angle features (fixed)
-            z = self.angle_embedding(lg.edata.pop("h"))
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
-            # print('features',features,features.shape)
             features = self.extra_feature_embedding(features)
-        g = g.local_var()
-        result = {}
-
-        # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
-        # print('x1',x,x.shape)
-
         x = self.atom_embedding(x)
-        # print('x2',x,x.shape)
-        r = g.edata["r"]
+        r, bondlength = compute_pair_vector_and_distance(g)
         if self.config.calculate_gradient:
             r.requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
-        # mask = bondlength >= self.config.inner_cutoff
-        # bondlength[mask]=float(1.1)
-        if self.config.lg_on_fly and len(self.alignn_layers) > 0:
-            # re-compute bond angle cosines here to ensure
-            # the three-body interactions are fully included
-            # in the autograd graph. don't rely on dataloader/caching.
-            lg.ndata["r"] = r  # overwrites precomputed r values
-            lg.apply_edges(compute_bond_cosines)  # overwrites precomputed h
-            z = self.angle_embedding(lg.edata.pop("h"))
+        g.edata["d"] = bondlength
+        g.edata["r"] = r
+        # bond_expansion = self.bond_expansion(bondlength)
+        lg = check_line_graph(g, lg, self.config.inner_cutoff)
+        lg.apply_edges(compute_bond_cosines)
 
-        # r = g.edata["r"].clone().detach().requires_grad_(True)
+        # smooth_cutoff = polynomial_cutoff(
+        #    bond_expansion, self.config.inner_cutoff, self.config.exponent
+        # )
+        # bond_expansion *= smooth_cutoff
+        # g.edata["bond_expansion"] = (
+        #    bond_expansion  # smooth_cutoff * bond_expansion
+        # )
+
+        # y = self.edge_embedding(bondlength)
+        z = self.angle_embedding(lg.edata.pop("h"))
+
         if self.config.use_cutoff_function:
-            # bondlength = cutoff_function_based_edges(
             if self.config.multiply_cutoff:
                 c_off = cutoff_function_based_edges(
                     bondlength,
@@ -464,7 +448,6 @@ class ALIGNNFF2(nn.Module):
                 y = self.edge_embedding(bondlength)
         else:
             y = self.edge_embedding(bondlength)
-        # y = self.edge_embedding(bondlength)
         # ALIGNN updates: update node, edge, triplet features
         for alignn_layer in self.alignn_layers:
             x, y, z = alignn_layer(g, lg, x, y, z)
@@ -479,12 +462,10 @@ class ALIGNNFF2(nn.Module):
             out = self.fc(h)
             if self.config.extra_features != 0:
                 h_feat = self.readout_feat(g, features)
-                # print('h_feat',h_feat)
                 h = torch.cat((h, h_feat), 1)
                 h = self.fc1(h)
                 h = self.fc2(h)
                 out = self.fc3(h)
-                # print('out',out)
             else:
                 out = torch.squeeze(out)
         atomwise_pred = torch.empty(1)
@@ -500,25 +481,14 @@ class ALIGNNFF2(nn.Module):
         stress = torch.empty(1)
 
         if self.config.calculate_gradient:
-            if self.config.include_pos_deriv:
-                # Not tested yet
-                g.ndata["coords"].requires_grad_(True)
-                dx = [g.ndata["coords"], r]
-            else:
-                dx = r
-
-            if self.config.energy_mult_natoms:
-                en_out = out * g.num_nodes()
-            else:
-                en_out = out
-
+            en_out = out
             # force calculation based on bond displacement vectors
             # autograd gives dE / d{r_{i->j}}
             pair_forces = (
                 self.config.grad_multiplier
                 * grad(
                     en_out,
-                    dx,
+                    r,
                     grad_outputs=torch.ones_like(en_out),
                     create_graph=True,
                     retain_graph=True,
@@ -609,8 +579,6 @@ class ALIGNNFF2(nn.Module):
                 #    * torch.einsum("ij, ik->jk", result["r"], result["dy_dr"])
                 #    / 2
                 # )  # / ( g.ndata["V"][0])
-        if self.link:
-            out = self.link(out)
 
         if self.classification:
             # out = torch.max(out,dim=1)
