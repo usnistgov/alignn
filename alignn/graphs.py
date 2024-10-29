@@ -57,8 +57,20 @@ def temp_graph(atoms=None, cutoff=4.0, atom_features="cgcnn", dtype="float32"):
     g.ndata["atom_features"] = torch.tensor(atom_feats, dtype=dtype)
     g.edata["r"] = torch.tensor(r, dtype=dtype)
     g.edata["d"] = torch.tensor(d, dtype=dtype)
+    g.edata["pbc_offset"] = torch.tensor(images, dtype=dtype)
     g.edata["images"] = torch.tensor(images, dtype=dtype)
-    g.ndata["coords"] = torch.tensor(atoms.cart_coords, dtype=dtype)
+    #g.edata["lattice"] = torch.tensor(torch.repeat_interleave(torch.tensor(atoms.lattice_mat.flatten()), atoms.num_atoms), dtype=dtype)
+    node_type=torch.tensor([0 for i in range(len(atoms.atomic_numbers))])
+    g.ndata['node_type']=node_type
+    lattice_mat = atoms.lattice_mat
+    g.ndata["lattice"] = torch.tensor(
+       [lattice_mat for ii in range(g.num_nodes())]
+    , dtype=dtype)
+    g.edata["lattice"] = torch.tensor(
+       [lattice_mat for ii in range(g.num_edges())]
+    , dtype=dtype)
+    #g.ndata["coords"] = torch.tensor(atoms.cart_coords, dtype=dtype)
+    g.ndata["frac_coords"] = torch.tensor(atoms.frac_coords, dtype=dtype)
     g.ndata["V"] = torch.tensor([atoms.volume] * atoms.num_atoms, dtype=dtype)
 
     return g, u, v, r
@@ -456,7 +468,7 @@ class Graph(object):
         # use_canonize: bool = False,
         use_lattice_prop: bool = False,
         cutoff_extra=3.5,
-        dtype=torch.float32,
+        dtype="float32",
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
@@ -835,6 +847,7 @@ class StructureDataset(DGLDataset):
         classification=False,
         id_tag="jid",
         sampler=None,
+        lattices=None,
         dtype="float32",
     ):
         """Pytorch Dataset for atomistic graphs.
@@ -853,6 +866,7 @@ class StructureDataset(DGLDataset):
         self.target_stress = target_stress
         self.line_graph = line_graph
         print("df", df)
+        self.lattices = lattices
         self.labels = self.df[target]
 
         if (
@@ -897,6 +911,11 @@ class StructureDataset(DGLDataset):
         self.labels = torch.tensor(self.df[target]).type(
             torch.get_default_dtype()
         )
+        self.lattices = []
+        for ii, i in df.iterrows():
+            self.lattices.append(Atoms.from_dict(i['atoms']).lattice_mat)
+        
+        self.lattices = torch.tensor(self.lattices).type(torch.get_default_dtype())
         self.transform = transform
 
         features = self._get_attribute_lookup(atom_features)
@@ -972,14 +991,15 @@ class StructureDataset(DGLDataset):
         """Get StructureDataset sample."""
         g = self.graphs[idx]
         label = self.labels[idx]
+        lattice = self.lattices[idx]
         # id = self.ids[idx]
         if self.transform:
             g = self.transform(g)
 
         if self.line_graph:
-            return g, self.line_graphs[idx], label
+            return g, self.line_graphs[idx], lattice, label
 
-        return g, label
+        return g, lattice, label
 
     def setup_standardizer(self, ids):
         """Atom-wise feature standardization transform."""
@@ -1000,22 +1020,22 @@ class StructureDataset(DGLDataset):
     @staticmethod
     def collate(samples: List[Tuple[dgl.DGLGraph, torch.Tensor]]):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, labels = map(list, zip(*samples))
+        graphs, lattice, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
-        return batched_graph, torch.tensor(labels)
+        return batched_graph, torch.tensor(lattices), torch.tensor(labels)
 
     @staticmethod
     def collate_line_graph(
         samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
     ):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, line_graphs, labels = map(list, zip(*samples))
+        graphs, line_graphs, lattices, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         batched_line_graph = dgl.batch(line_graphs)
         if len(labels[0].size()) > 0:
             return batched_graph, batched_line_graph, torch.stack(labels)
         else:
-            return batched_graph, batched_line_graph, torch.tensor(labels)
+            return batched_graph, batched_line_graph, torch.tensor(lattices), torch.tensor(labels)
 
 
 """

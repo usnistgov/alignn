@@ -51,6 +51,7 @@
         "graphwise_weight":0.85,
         "gradwise_weight":0.05,
         "atomwise_weight":0.0,
+        "use_cutoff_function":false,
         "stresswise_weight":0.05,
         "add_reverse_forces":true
 

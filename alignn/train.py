@@ -169,7 +169,11 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
-
+    from matgl.models import CHGNet, M3GNet
+    from matgl.utils.training import ModelLightningModule, PotentialLightningModule
+    #model = M3GNet(element_types=['Si'], is_intensive=False)
+    model = CHGNet(element_types=['Si'], is_intensive=False,threebody_cutoff=4)
+    net = PotentialLightningModule(model=model, stress_weight=0.0001, include_line_graph=True)
     print("net parameters", sum(p.numel() for p in net.parameters()))
     # print("device", device)
     net.to(device)
@@ -229,7 +233,8 @@ def train_dgl(
                 # info["id"] = jid
                 optimizer.zero_grad()
                 if (config.model.alignn_layers) > 0:
-                    result = net([dats[0].to(device), dats[1].to(device)])
+                    result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
+                    #result = net([dats[0].to(device), dats[1].to(device),lat=dats[2].to(device)])
                 else:
                     result = net(dats[0].to(device))
                 # info = {}
@@ -346,7 +351,8 @@ def train_dgl(
                 optimizer.zero_grad()
                 # result = net([dats[0].to(device), dats[1].to(device)])
                 if (config.model.alignn_layers) > 0:
-                    result = net([dats[0].to(device), dats[1].to(device)])
+                    #result = net([dats[0].to(device), dats[2].to(device),  dats[1].to(device)])
+                    result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
                 else:
                     result = net(dats[0].to(device))
                 # info = {}

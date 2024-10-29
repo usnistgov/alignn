@@ -267,8 +267,9 @@ class SphericalHarmonicsExpansion(nn.Module):
 
 def compute_pair_vector_and_distance(g: dgl.DGLGraph):
     """Calculate bond vectors and distances using dgl graphs."""
-    dst_pos = g.ndata["coords"][g.edges()[1]] + g.edata["images"]
-    src_pos = g.ndata["coords"][g.edges()[0]]
+    #print('g.edges()',g.ndata["cart_coords"][g.edges()[1]].shape,g.edata["pbc_offshift"].shape)
+    dst_pos = g.ndata["cart_coords"][g.edges()[1]] + g.edata["pbc_offshift"]
+    src_pos = g.ndata["cart_coords"][g.edges()[0]]
     bond_vec = dst_pos - src_pos
     bond_dist = torch.norm(bond_vec, dim=1)
 

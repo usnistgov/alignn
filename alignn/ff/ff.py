@@ -30,6 +30,8 @@ from ase.stress import full_3x3_to_voigt_6_stress
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+from alignn.models.alignn_ff2 import ALIGNNFF2, ALIGNNFF2Config
+
 from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
 from alignn.pretrained import get_prediction
@@ -278,7 +280,10 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             self.device = torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu"
             )
-        model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config["model"]))
+        if config['model']['name']=='alignn_ff2':
+          model = ALIGNNFF2(ALIGNNFF2Config(**config["model"]))
+        if config['model']['name']=='alignn_atomwise':
+         model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config["model"]))
         model.state_dict()
         model.load_state_dict(
             torch.load(

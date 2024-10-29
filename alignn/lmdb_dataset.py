@@ -58,11 +58,11 @@ class TorchLMDBDataset(Dataset):
         with self.env.begin() as txn:
             serialized_data = txn.get(f"{idx}".encode())
         if self.line_graph:
-            graph, line_graph, label = pk.loads(serialized_data)
-            return graph, line_graph, label
+            graph, line_graph, lattice,label = pk.loads(serialized_data)
+            return graph, line_graph, lattice,label
         else:
-            graph, label = pk.loads(serialized_data)
-            return graph, label
+            graph, lattice,label = pk.loads(serialized_data)
+            return graph, lattice,label
 
     def close(self):
         """Close connection."""
@@ -76,23 +76,23 @@ class TorchLMDBDataset(Dataset):
     def collate(samples: List[Tuple[dgl.DGLGraph, torch.Tensor]]):
         """Dataloader helper to batch graphs cross `samples`."""
         # print('samples',samples)
-        graphs, labels = map(list, zip(*samples))
+        graphs, lattices,labels = map(list, zip(*samples))
         # graphs, lgs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
-        return batched_graph, torch.tensor(labels)
+        return batched_graph, torch.tensor(lattices), torch.tensor(labels)
 
     @staticmethod
     def collate_line_graph(
         samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
     ):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, line_graphs, labels = map(list, zip(*samples))
+        graphs, line_graphs, lattices, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         batched_line_graph = dgl.batch(line_graphs)
         if len(labels[0].size()) > 0:
-            return batched_graph, batched_line_graph, torch.stack(labels)
+            return batched_graph, batched_line_graph, torch.tensor(lattices),torch.stack(labels)
         else:
-            return batched_graph, batched_line_graph, torch.tensor(labels)
+            return batched_graph, batched_line_graph, torch.stack(lattices),torch.tensor(labels)
 
 
 def get_torch_dataset(
@@ -143,8 +143,9 @@ def get_torch_dataset(
         for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
             ids.append(d[id_tag])
             # g, lg = Graph.atom_dgl_multigraph(
+            atoms=Atoms.from_dict(d["atoms"])
             g = Graph.atom_dgl_multigraph(
-                Atoms.from_dict(d["atoms"]),
+                atoms,
                 cutoff=float(cutoff),
                 max_neighbors=max_neighbors,
                 atom_features=atom_features,
@@ -156,6 +157,7 @@ def get_torch_dataset(
             )
             if line_graph:
                 g, lg = g
+            lattice=torch.tensor(atoms.lattice_mat).type(torch.get_default_dtype())
             label = torch.tensor(d[target]).type(torch.get_default_dtype())
             # print('label',label,label.view(-1).long())
             if classification:
@@ -182,9 +184,9 @@ def get_torch_dataset(
 
             # labels.append(label)
             if line_graph:
-                serialized_data = pk.dumps((g, lg, label))
+                serialized_data = pk.dumps((g, lg, lattice,label))
             else:
-                serialized_data = pk.dumps((g, label))
+                serialized_data = pk.dumps((g, lattice,label))
             txn.put(f"{idx}".encode(), serialized_data)
 
     env.close()
