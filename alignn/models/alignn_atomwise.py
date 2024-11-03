@@ -15,7 +15,11 @@ import torch
 from typing import Literal
 from torch import nn
 from torch.nn import functional as F
-from alignn.models.utils import RBFExpansion
+from alignn.models.utils import (
+    RBFExpansion,
+    compute_cartesian_coordinates,
+    compute_pair_vector_and_distance,
+)
 from alignn.graphs import compute_bond_cosines
 from alignn.utils import BaseSettings
 
@@ -56,6 +60,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     lg_on_fly: bool = False  # will make True as default soon
     batch_stress: bool = True
     multiply_cutoff: bool = False
+    use_penalty: bool = False
     extra_features: int = 0
     exponent: int = 3
 
@@ -372,11 +377,11 @@ class ALIGNNAtomWise(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
-            g, lg = g
+            g, lg, lat = g
             lg = lg.local_var()
-
+            # print('lg',lg)
             # angle features (fixed)
-            z = self.angle_embedding(lg.edata.pop("h"))
+            # z = self.angle_embedding(lg.edata.pop("h"))
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)
@@ -391,7 +396,21 @@ class ALIGNNAtomWise(nn.Module):
         x = self.atom_embedding(x)
         # print('x2',x,x.shape)
         r = g.edata["r"]
-        if self.config.calculate_gradient:
+        if self.config.include_pos_deriv:
+            # Not tested yet
+            g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
+            g.ndata["cart_coords"].requires_grad_(True)
+            r, bondlength = compute_pair_vector_and_distance(g)
+            lg = g.line_graph(shared=True)
+            lg.ndata["r"] = r
+            lg.apply_edges(compute_bond_cosines)
+
+            # bondlength = torch.norm(r, dim=1)
+            # y = self.edge_embedding(bondlength)
+        if (
+            self.config.calculate_gradient
+            and not self.config.include_pos_deriv
+        ):
             r.requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
         # mask = bondlength >= self.config.inner_cutoff
@@ -400,6 +419,7 @@ class ALIGNNAtomWise(nn.Module):
             # re-compute bond angle cosines here to ensure
             # the three-body interactions are fully included
             # in the autograd graph. don't rely on dataloader/caching.
+
             lg.ndata["r"] = r  # overwrites precomputed r values
             lg.apply_edges(compute_bond_cosines)  # overwrites precomputed h
             z = self.angle_embedding(lg.edata.pop("h"))
@@ -458,117 +478,136 @@ class ALIGNNAtomWise(nn.Module):
         forces = torch.empty(1)
         # gradient = torch.empty(1)
         stress = torch.empty(1)
+        if self.config.energy_mult_natoms:
+            en_out = out * g.num_nodes()
+        else:
+            en_out = out
+        if self.config.use_penalty:
+            penalty_factor = 500.0  # Penalty weight, tune as needed
+            penalty_factor = 0.01  # Penalty weight, tune as needed
+            penalty_threshold = 1.0  # 1 angstrom
+
+            penalties = torch.where(
+                bondlength < penalty_threshold,
+                penalty_factor * (penalty_threshold - bondlength),
+                torch.zeros_like(bondlength),
+            )
+            total_penalty = torch.sum(penalties)
+            en_out += total_penalty
 
         if self.config.calculate_gradient:
             if self.config.include_pos_deriv:
-                # Not tested yet
-                g.ndata["coords"].requires_grad_(True)
-                dx = [g.ndata["coords"], r]
+                dx = [g.ndata["cart_coords"]]
+                forces = (
+                    self.config.grad_multiplier
+                    * grad(
+                        en_out * g.num_nodes(),
+                        dx,
+                        grad_outputs=torch.ones_like(en_out),
+                        create_graph=True,
+                        retain_graph=True,
+                    )[0]
+                )
             else:
                 dx = r
 
-            if self.config.energy_mult_natoms:
-                en_out = out * g.num_nodes()
-            else:
-                en_out = out
-
-            # force calculation based on bond displacement vectors
-            # autograd gives dE / d{r_{i->j}}
-            pair_forces = (
-                self.config.grad_multiplier
-                * grad(
-                    en_out,
-                    dx,
-                    grad_outputs=torch.ones_like(en_out),
-                    create_graph=True,
-                    retain_graph=True,
-                )[0]
-            )
-            if self.config.force_mult_natoms:
-                pair_forces *= g.num_nodes()
-
-            # construct force_i = dE / d{r_i}
-            # reduce over bonds to get forces on each atom
-
-            # force_i contributions from r_{j->i} (in edges)
-            g.edata["pair_forces"] = pair_forces
-            g.update_all(
-                fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ji")
-            )
-            if self.config.add_reverse_forces:
-                # reduce over reverse edges too!
-                # force_i contributions from r_{i->j} (out edges)
-                # aggregate pairwise_force_contributions over reversed edges
-                rg = dgl.reverse(g, copy_edata=True)
-                rg.update_all(
-                    fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ij")
+                # force calculation based on bond displacement vectors
+                # autograd gives dE / d{r_{i->j}}
+                pair_forces = (
+                    self.config.grad_multiplier
+                    * grad(
+                        en_out,
+                        dx,
+                        grad_outputs=torch.ones_like(en_out),
+                        create_graph=True,
+                        retain_graph=True,
+                    )[0]
                 )
+                if self.config.force_mult_natoms:
+                    pair_forces *= g.num_nodes()
 
-                # combine dE / d(r_{j->i}) and dE / d(r_{i->j})
-                forces = torch.squeeze(
-                    g.ndata["forces_ji"] - rg.ndata["forces_ij"]
+                # construct force_i = dE / d{r_i}
+                # reduce over bonds to get forces on each atom
+
+                # force_i contributions from r_{j->i} (in edges)
+                g.edata["pair_forces"] = pair_forces
+                g.update_all(
+                    fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ji")
                 )
-            else:
-                forces = torch.squeeze(g.ndata["forces_ji"])
-
-            if self.config.stresswise_weight != 0:
-                # Under development, use with caution
-                # 1 eV/Angstrom3 = 160.21766208 GPa
-                # 1 GPa = 10 kbar
-                # Following Virial stress formula, assuming inital velocity = 0
-                # Save volume as g.gdta['V']?
-                # print('pair_forces',pair_forces.shape)
-                # print('r',r.shape)
-                # print('g.ndata["V"]',g.ndata["V"].shape)
-                if not self.config.batch_stress:
-                    # print('Not batch_stress')
-                    stress = (
-                        -1
-                        * 160.21766208
-                        * (
-                            torch.matmul(r.T, pair_forces)
-                            # / (2 * g.edata["V"])
-                            / (2 * g.ndata["V"][0])
-                        )
+                if self.config.add_reverse_forces:
+                    # reduce over reverse edges too!
+                    # force_i contributions from r_{i->j} (out edges)
+                    # aggregate pairwise_force_contributions over reversed edges
+                    rg = dgl.reverse(g, copy_edata=True)
+                    rg.update_all(
+                        fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ij")
                     )
-                # print("stress1", stress, stress.shape)
-                # print("g.batch_size", g.batch_size)
+
+                    # combine dE / d(r_{j->i}) and dE / d(r_{i->j})
+                    forces = torch.squeeze(
+                        g.ndata["forces_ji"] - rg.ndata["forces_ij"]
+                    )
                 else:
-                    # print('Using batch_stress')
-                    stresses = []
-                    count_edge = 0
-                    count_node = 0
-                    for graph_id in range(g.batch_size):
-                        num_edges = g.batch_num_edges()[graph_id]
-                        num_nodes = 0
-                        st = -1 * (
-                            160.21766208
-                            * torch.matmul(
-                                r[count_edge : count_edge + num_edges].T,
-                                pair_forces[
-                                    count_edge : count_edge + num_edges
-                                ],
-                            )
-                            / g.ndata["V"][count_node + num_nodes]
-                        )
+                    forces = torch.squeeze(g.ndata["forces_ji"])
 
-                        count_edge = count_edge + num_edges
-                        num_nodes = g.batch_num_nodes()[graph_id]
-                        count_node = count_node + num_nodes
-                        # print("stresses.append",stresses[-1],stresses[-1].shape)
-                        for n in range(num_nodes):
-                            stresses.append(st)
-                    # stress = (stresses)
-                    stress = self.config.stress_multiplier * torch.cat(
-                        stresses
-                    )
-                # print("stress2", stress, stress.shape)
-                # virial = (
-                #    160.21766208
-                #    * 10
-                #    * torch.einsum("ij, ik->jk", result["r"], result["dy_dr"])
-                #    / 2
-                # )  # / ( g.ndata["V"][0])
+                if self.config.stresswise_weight != 0:
+                    # Under development, use with caution
+                    # 1 eV/Angstrom3 = 160.21766208 GPa
+                    # 1 GPa = 10 kbar
+                    # Following Virial stress formula, assuming inital velocity = 0
+                    # Save volume as g.gdta['V']?
+                    # print('pair_forces',pair_forces.shape)
+                    # print('r',r.shape)
+                    # print('g.ndata["V"]',g.ndata["V"].shape)
+                    if not self.config.batch_stress:
+                        # print('Not batch_stress')
+                        stress = (
+                            -1
+                            * 160.21766208
+                            * (
+                                torch.matmul(r.T, pair_forces)
+                                # / (2 * g.edata["V"])
+                                / (2 * g.ndata["V"][0])
+                            )
+                        )
+                    # print("stress1", stress, stress.shape)
+                    # print("g.batch_size", g.batch_size)
+                    else:
+                        # print('Using batch_stress')
+                        stresses = []
+                        count_edge = 0
+                        count_node = 0
+                        for graph_id in range(g.batch_size):
+                            num_edges = g.batch_num_edges()[graph_id]
+                            num_nodes = 0
+                            st = -1 * (
+                                160.21766208
+                                * torch.matmul(
+                                    r[count_edge : count_edge + num_edges].T,
+                                    pair_forces[
+                                        count_edge : count_edge + num_edges
+                                    ],
+                                )
+                                / g.ndata["V"][count_node + num_nodes]
+                            )
+
+                            count_edge = count_edge + num_edges
+                            num_nodes = g.batch_num_nodes()[graph_id]
+                            count_node = count_node + num_nodes
+                            # print("stresses.append",stresses[-1],stresses[-1].shape)
+                            for n in range(num_nodes):
+                                stresses.append(st)
+                        # stress = (stresses)
+                        stress = self.config.stress_multiplier * torch.cat(
+                            stresses
+                        )
+                    # print("stress2", stress, stress.shape)
+                    # virial = (
+                    #    160.21766208
+                    #    * 10
+                    #    * torch.einsum("ij, ik->jk", result["r"], result["dy_dr"])
+                    #    / 2
+                    # )  # / ( g.ndata["V"][0])
         if self.link:
             out = self.link(out)
 

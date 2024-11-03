@@ -13,6 +13,7 @@ from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
 from alignn.models.alignn_ff2 import ALIGNNFF2
+from alignn.models.alignn_eff import ALIGNNeFF
 from alignn.models.alignn import ALIGNN
 from jarvis.db.jsonutils import dumpjson
 import json
@@ -33,6 +34,8 @@ from alignn.utils import (
 # from sklearn.metrics import log_loss
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+torch.autograd.detect_anomaly()
 
 
 def train_dgl(
@@ -148,6 +151,7 @@ def train_dgl(
         "alignn_atomwise": ALIGNNAtomWise,
         "alignn": ALIGNN,
         "alignn_ff2": ALIGNNFF2,
+        "alignn_eff": ALIGNNeFF,
     }
     if config.random_seed is not None:
         random.seed(config.random_seed)
@@ -169,11 +173,6 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
-    from matgl.models import CHGNet, M3GNet
-    from matgl.utils.training import ModelLightningModule, PotentialLightningModule
-    #model = M3GNet(element_types=['Si'], is_intensive=False)
-    model = CHGNet(element_types=['Si'], is_intensive=False,threebody_cutoff=4)
-    net = PotentialLightningModule(model=model, stress_weight=0.0001, include_line_graph=True)
     print("net parameters", sum(p.numel() for p in net.parameters()))
     # print("device", device)
     net.to(device)
@@ -205,11 +204,11 @@ def train_dgl(
             optimizer,
         )
 
-    if (
-        config.model.name == "alignn_atomwise"
-        or config.model.name == "alignn_ff2"
-    ):
-
+    # if (
+    #    config.model.name == "alignn_atomwise"
+    #    or config.model.name == "alignn_ff2"
+    # ):
+    if "alignn_" in config.model.name:
         best_loss = np.inf
         criterion = nn.L1Loss()
         if classification:
@@ -233,8 +232,17 @@ def train_dgl(
                 # info["id"] = jid
                 optimizer.zero_grad()
                 if (config.model.alignn_layers) > 0:
-                    result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
-                    #result = net([dats[0].to(device), dats[1].to(device),lat=dats[2].to(device)])
+                    result = net(
+                        [
+                            dats[0].to(device),
+                            dats[1].to(device),
+                            dats[2].to(device),
+                        ]
+                    )
+                    # result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
+                    # result = net([dats[0].to(device), dats[1].to(device),lat=dats[2].to(device)])
+                    # batched_graph, batched_line_graph, torch.stack(lattices),torch.tensor(labels)
+
                 else:
                     result = net(dats[0].to(device))
                 # info = {}
@@ -351,8 +359,15 @@ def train_dgl(
                 optimizer.zero_grad()
                 # result = net([dats[0].to(device), dats[1].to(device)])
                 if (config.model.alignn_layers) > 0:
-                    #result = net([dats[0].to(device), dats[2].to(device),  dats[1].to(device)])
-                    result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
+                    # result = net([dats[0].to(device), dats[2].to(device),  dats[1].to(device)])
+                    # result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
+                    result = net(
+                        [
+                            dats[0].to(device),
+                            dats[1].to(device),
+                            dats[2].to(device),
+                        ]
+                    )
                 else:
                     result = net(dats[0].to(device))
                 # info = {}
@@ -496,7 +511,14 @@ def train_dgl(
                 info["id"] = jid
                 optimizer.zero_grad()
                 if (config.model.alignn_layers) > 0:
-                    result = net([dats[0].to(device), dats[1].to(device)])
+                    # result = net([dats[0].to(device), dats[1].to(device)])
+                    result = net(
+                        [
+                            dats[0].to(device),
+                            dats[1].to(device),
+                            dats[2].to(device),
+                        ]
+                    )
                 else:
                     result = net(dats[0].to(device))
                 loss1 = 0  # Such as energy

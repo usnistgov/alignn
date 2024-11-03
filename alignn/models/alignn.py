@@ -16,8 +16,10 @@ from typing import Literal
 from torch import nn
 from torch.nn import functional as F
 
-from alignn.models.utils import RBFExpansion
-from alignn.utils import BaseSettings
+# from alignn.models.utils import RBFExpansion
+# from alignn.utils import BaseSettings
+
+from pydantic_settings import BaseSettings
 
 
 class ALIGNNConfig(BaseSettings):

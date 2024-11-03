@@ -16,8 +16,12 @@ import torch
 import dgl
 from tqdm import tqdm
 
+# import matgl
 
-def temp_graph(atoms=None, cutoff=4.0, atom_features="cgcnn", dtype="float32"):
+
+def temp_graph(
+    atoms=None, cutoff=4.0, atom_features="atomic_number", dtype="float32"
+):
     """Construct a graph for a given cutoff."""
     TORCH_DTYPES = {
         "float16": torch.float16,
@@ -52,26 +56,29 @@ def temp_graph(atoms=None, cutoff=4.0, atom_features="cgcnn", dtype="float32"):
 
     # Create DGL graph
     g = dgl.graph((np.array(u), np.array(v)))
-
+    atom_feats = np.array(atom_feats)
     # Add data to the graph with the specified dtype
+    # print('atom_feats',atom_feats,atom_feats.shape)
     g.ndata["atom_features"] = torch.tensor(atom_feats, dtype=dtype)
-    g.edata["r"] = torch.tensor(r, dtype=dtype)
+    g.ndata["Z"] = torch.tensor(atom_feats, dtype=torch.int64)
+    g.edata["r"] = torch.tensor(np.array(r), dtype=dtype)
     g.edata["d"] = torch.tensor(d, dtype=dtype)
     g.edata["pbc_offset"] = torch.tensor(images, dtype=dtype)
+    g.edata["pbc_offshift"] = torch.tensor(images, dtype=dtype)
     g.edata["images"] = torch.tensor(images, dtype=dtype)
-    #g.edata["lattice"] = torch.tensor(torch.repeat_interleave(torch.tensor(atoms.lattice_mat.flatten()), atoms.num_atoms), dtype=dtype)
-    node_type=torch.tensor([0 for i in range(len(atoms.atomic_numbers))])
-    g.ndata['node_type']=node_type
+    # g.edata["lattice"] = torch.tensor(torch.repeat_interleave(torch.tensor(atoms.lattice_mat.flatten()), atoms.num_atoms), dtype=dtype)
+    node_type = torch.tensor([0 for i in range(len(atoms.atomic_numbers))])
+    g.ndata["node_type"] = node_type
     lattice_mat = atoms.lattice_mat
-    g.ndata["lattice"] = torch.tensor(
-       [lattice_mat for ii in range(g.num_nodes())]
-    , dtype=dtype)
-    g.edata["lattice"] = torch.tensor(
-       [lattice_mat for ii in range(g.num_edges())]
-    , dtype=dtype)
-    #g.ndata["coords"] = torch.tensor(atoms.cart_coords, dtype=dtype)
+    # g.ndata["lattice"] = torch.tensor(
+    #   [lattice_mat for ii in range(g.num_nodes())]
+    # , dtype=dtype)
+    # g.edata["lattice"] = torch.tensor(
+    #   [lattice_mat for ii in range(g.num_edges())]
+    # , dtype=dtype)
+    g.ndata["pos"] = torch.tensor(atoms.cart_coords, dtype=dtype)
     g.ndata["frac_coords"] = torch.tensor(atoms.frac_coords, dtype=dtype)
-    g.ndata["V"] = torch.tensor([atoms.volume] * atoms.num_atoms, dtype=dtype)
+    # g.ndata["V"] = torch.tensor([atoms.volume] * atoms.num_atoms, dtype=dtype)
 
     return g, u, v, r
 
@@ -80,33 +87,36 @@ def radius_graph_jarvis(
     atoms,
     cutoff_extra=0.5,
     cutoff=4.0,
-    atom_features="cgcnn",
+    atom_features="atomic_number",
     line_graph=True,
     dtype="float32",
+    max_attempts=10,
 ):
     """Construct radius graph with dynamic cutoff."""
-    while True:
-        try:
-            # Attempt to create the graph
-            g, u, v, r = temp_graph(
-                atoms=atoms,
-                cutoff=cutoff,
-                atom_features=atom_features,
-                dtype=dtype,
-            )
-            # Check if all atoms are included as nodes
-            if g.num_nodes() == len(atoms.elements):
-                # print(f"Graph constructed with cutoff: {cutoff}")
-                break  # Exit the loop when successful
-            # Increment the cutoff if the graph is incomplete
-            cutoff += cutoff_extra
-            # print(f"Increasing cutoff to: {cutoff}")
-
-        except Exception as exp:
-            # Handle exceptions and try again
-            print(f"Graph construction failed: {exp,cutoff}")
-            cutoff += cutoff_extra  # Try with a larger cutoff
-
+    count = 0
+    while count <= max_attempts:
+        # try:
+        # Attempt to create the graph
+        count += 1
+        g, u, v, r = temp_graph(
+            atoms=atoms,
+            cutoff=cutoff,
+            atom_features=atom_features,
+            dtype=dtype,
+        )
+        # Check if all atoms are included as nodes
+        if g.num_nodes() == len(atoms.elements):
+            # print(f"Graph constructed with cutoff: {cutoff}")
+            break  # Exit the loop when successful
+        # Increment the cutoff if the graph is incomplete
+        cutoff += cutoff_extra
+        # print(f"Increasing cutoff to: {cutoff}")
+    # except Exception as exp:
+    #    # Handle exceptions and try again
+    #    print(f"Graph construction failed: {exp,cutoff}")
+    #    cutoff += cutoff_extra  # Try with a larger cutoff
+    if count >= max_attempts:
+        raise ValueError("Failed after", max_attempts, atoms)
     # Optional: Create a line graph if requested
     if line_graph:
         lg = g.line_graph(shared=True)
@@ -506,18 +516,31 @@ class Graph(object):
         # u, v, r = build_undirected_edgedata(atoms, edges)
 
         # build up atom attribute tensor
+        comp = atoms.composition.to_dict()
+        comp_dict = {}
+        c_ind = 0
+        for ii, jj in comp.items():
+            if ii not in comp_dict:
+                comp_dict[ii] = c_ind
+                c_ind += 1
         sps_features = []
+        node_types = []
         for ii, s in enumerate(atoms.elements):
             feat = list(get_node_attributes(s, atom_features=atom_features))
             # if include_prdf_angles:
             #    feat=feat+list(prdf[ii])+list(adf[ii])
             sps_features.append(feat)
+            node_types.append(comp_dict[s])
         sps_features = np.array(sps_features)
         node_features = torch.tensor(sps_features).type(
             torch.get_default_dtype()
         )
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
+        g.ndata["node_type"] = torch.tensor(node_types, dtype=torch.int64)
+        node_type = torch.tensor([0 for i in range(len(atoms.atomic_numbers))])
+        g.ndata["node_type"] = node_type
+        # print('g.ndata["node_type"]',g.ndata["node_type"])
         g.edata["r"] = torch.tensor(r).type(torch.get_default_dtype())
         # images=torch.tensor(images).type(torch.get_default_dtype())
         # print('images',images.shape,r.shape)
@@ -528,6 +551,9 @@ class Graph(object):
         vol = atoms.volume
         g.ndata["V"] = torch.tensor([vol for ii in range(atoms.num_atoms)])
         g.ndata["coords"] = torch.tensor(atoms.cart_coords).type(
+            torch.get_default_dtype()
+        )
+        g.ndata["frac_coords"] = torch.tensor(atoms.frac_coords).type(
             torch.get_default_dtype()
         )
         if use_lattice_prop:
@@ -913,9 +939,11 @@ class StructureDataset(DGLDataset):
         )
         self.lattices = []
         for ii, i in df.iterrows():
-            self.lattices.append(Atoms.from_dict(i['atoms']).lattice_mat)
-        
-        self.lattices = torch.tensor(self.lattices).type(torch.get_default_dtype())
+            self.lattices.append(Atoms.from_dict(i["atoms"]).lattice_mat)
+
+        self.lattices = torch.tensor(self.lattices).type(
+            torch.get_default_dtype()
+        )
         self.transform = transform
 
         features = self._get_attribute_lookup(atom_features)
@@ -1035,7 +1063,12 @@ class StructureDataset(DGLDataset):
         if len(labels[0].size()) > 0:
             return batched_graph, batched_line_graph, torch.stack(labels)
         else:
-            return batched_graph, batched_line_graph, torch.tensor(lattices), torch.tensor(labels)
+            return (
+                batched_graph,
+                batched_line_graph,
+                torch.tensor(lattices),
+                torch.tensor(labels),
+            )
 
 
 """
