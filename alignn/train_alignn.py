@@ -13,7 +13,6 @@ from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-from alignn.models.alignn_ff2 import ALIGNNFF2, ALIGNNFF2Config
 import torch
 import time
 from jarvis.core.atoms import Atoms
@@ -326,20 +325,6 @@ def train_for_folder(
             tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
             print("Rest config", tmp)
             model = ALIGNNAtomWise(tmp)  # config.model)
-            print("model", model)
-            model.load_state_dict(
-                torch.load(restart_model_path, map_location=device)
-            )
-            model = model.to(device)
-        if config.model.name == "alignn_ff2":
-            rest_config = loadjson(
-                restart_model_path.replace("current_model.pt", "config.json")
-                # restart_model_path.replace("best_model.pt", "config.json")
-            )
-
-            tmp = ALIGNNFF2Config(**rest_config["model"])
-            print("Rest config", tmp)
-            model = ALIGNNFF2(tmp)  # config.model)
             print("model", model)
             model.load_state_dict(
                 torch.load(restart_model_path, map_location=device)

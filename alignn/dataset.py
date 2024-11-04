@@ -14,6 +14,8 @@ from tqdm import tqdm
 tqdm.pandas()
 
 
+# NOTE: Use lmd_dataset,
+# need to fix adding lattice in dataloader
 def load_graphs(
     dataset=[],
     name: str = "dft_3d",

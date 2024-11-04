@@ -12,8 +12,6 @@ from torch import nn
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
-from alignn.models.alignn_ff2 import ALIGNNFF2
-from alignn.models.alignn_eff import ALIGNNeFF
 from alignn.models.alignn import ALIGNN
 from jarvis.db.jsonutils import dumpjson
 import json
@@ -150,8 +148,6 @@ def train_dgl(
     _model = {
         "alignn_atomwise": ALIGNNAtomWise,
         "alignn": ALIGNN,
-        "alignn_ff2": ALIGNNFF2,
-        "alignn_eff": ALIGNNeFF,
     }
     if config.random_seed is not None:
         random.seed(config.random_seed)
@@ -239,9 +235,6 @@ def train_dgl(
                             dats[2].to(device),
                         ]
                     )
-                    # result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
-                    # result = net([dats[0].to(device), dats[1].to(device),lat=dats[2].to(device)])
-                    # batched_graph, batched_line_graph, torch.stack(lattices),torch.tensor(labels)
 
                 else:
                     result = net(dats[0].to(device))
@@ -359,8 +352,6 @@ def train_dgl(
                 optimizer.zero_grad()
                 # result = net([dats[0].to(device), dats[1].to(device)])
                 if (config.model.alignn_layers) > 0:
-                    # result = net([dats[0].to(device), dats[2].to(device),  dats[1].to(device)])
-                    # result = net(dats[0].to(device), dats[2].to(device),dats[1].to(device))
                     result = net(
                         [
                             dats[0].to(device),

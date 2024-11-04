@@ -6,8 +6,6 @@ import os
 from typing import Literal
 from alignn.utils import BaseSettings
 from alignn.models.alignn import ALIGNNConfig
-from alignn.models.alignn_ff2 import ALIGNNFF2Config
-from alignn.models.alignn_eff import ALIGNNeFFConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
 
 # import torch
@@ -211,8 +209,6 @@ class TrainingConfig(BaseSettings):
     # model configuration
     model: Union[
         ALIGNNConfig,
-        ALIGNNFF2Config,
-        ALIGNNeFFConfig,
         ALIGNNAtomWiseConfig,
         # CGCNNConfig,
         # ICGCNNConfig,

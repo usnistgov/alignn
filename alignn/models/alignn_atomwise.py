@@ -19,6 +19,7 @@ from alignn.models.utils import (
     RBFExpansion,
     compute_cartesian_coordinates,
     compute_pair_vector_and_distance,
+    MLPLayer,
 )
 from alignn.graphs import compute_bond_cosines
 from alignn.utils import BaseSettings
@@ -28,13 +29,15 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.alignn."""
 
     name: Literal["alignn_atomwise"]
-    alignn_layers: int = 4
-    gcn_layers: int = 4
-    atom_input_features: int = 92
+    alignn_layers: int = 2
+    gcn_layers: int = 2
+    atom_input_features: int = 1
+    # atom_input_features: int = 92
     edge_input_features: int = 80
     triplet_input_features: int = 40
     embedding_features: int = 64
-    hidden_features: int = 256
+    hidden_features: int = 64
+    # hidden_features: int = 256
     # fc_layers: int = 1
     # fc_features: int = 64
     output_features: int = 1
@@ -42,7 +45,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     calculate_gradient: bool = True
     atomwise_output_features: int = 0
     graphwise_weight: float = 1.0
-    gradwise_weight: float = 0.0
+    gradwise_weight: float = 1.0
     stresswise_weight: float = 0.0
     atomwise_weight: float = 0.0
     # if link == log, apply `exp` to final outputs
@@ -51,18 +54,20 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     zero_inflated: bool = False
     classification: bool = False
     force_mult_natoms: bool = False
-    energy_mult_natoms: bool = False
+    energy_mult_natoms: bool = True
     include_pos_deriv: bool = False
     use_cutoff_function: bool = False
-    inner_cutoff: float = 6  # Ansgtrom
+    inner_cutoff: float = 3  # Ansgtrom
     stress_multiplier: float = 1
-    add_reverse_forces: bool = False  # will make True as default soon
-    lg_on_fly: bool = False  # will make True as default soon
+    add_reverse_forces: bool = True  # will make True as default soon
+    lg_on_fly: bool = True  # will make True as default soon
     batch_stress: bool = True
     multiply_cutoff: bool = False
-    use_penalty: bool = False
+    use_penalty: bool = True
     extra_features: int = 0
-    exponent: int = 3
+    exponent: int = 5
+    penalty_factor: float = 0.1
+    penalty_threshold: float = 1
 
     class Config:
         """Configure model settings behavior."""
@@ -237,23 +242,6 @@ class ALIGNNConv(nn.Module):
         y, z = self.edge_update(lg, m, z)
 
         return x, y, z
-
-
-class MLPLayer(nn.Module):
-    """Multilayer perceptron layer helper."""
-
-    def __init__(self, in_features: int, out_features: int):
-        """Linear, Batchnorm, SiLU layer."""
-        super().__init__()
-        self.layer = nn.Sequential(
-            nn.Linear(in_features, out_features),
-            nn.LayerNorm(out_features),
-            nn.SiLU(),
-        )
-
-    def forward(self, x):
-        """Linear, Batchnorm, silu layer."""
-        return self.layer(x)
 
 
 class ALIGNNAtomWise(nn.Module):
@@ -478,14 +466,24 @@ class ALIGNNAtomWise(nn.Module):
         forces = torch.empty(1)
         # gradient = torch.empty(1)
         stress = torch.empty(1)
+        natoms = torch.tensor([gg.num_nodes() for gg in dgl.unbatch(g)]).to(
+            g.device
+        )
         if self.config.energy_mult_natoms:
-            en_out = out * g.num_nodes()
+            # print('g.num_nodes()',g.num_nodes())
+            # print('unbatch',dgl.unbatch(g))
+            # print('natoms',natoms)
+            # print('out',out,out.shape)
+            # print()
+            # print()
+            en_out = out * natoms  # g.num_nodes()
         else:
             en_out = out
         if self.config.use_penalty:
-            penalty_factor = 500.0  # Penalty weight, tune as needed
-            penalty_factor = 0.01  # Penalty weight, tune as needed
-            penalty_threshold = 1.0  # 1 angstrom
+            penalty_factor = (
+                self.config.penalty_factor
+            )  # Penalty weight, tune as needed
+            penalty_threshold = self.config.penalty_threshold  # 1 angstrom
 
             penalties = torch.where(
                 bondlength < penalty_threshold,
@@ -537,7 +535,7 @@ class ALIGNNAtomWise(nn.Module):
                 if self.config.add_reverse_forces:
                     # reduce over reverse edges too!
                     # force_i contributions from r_{i->j} (out edges)
-                    # aggregate pairwise_force_contributions over reversed edges
+                    # aggregate pairwise_force_contribs over reversed edges
                     rg = dgl.reverse(g, copy_edata=True)
                     rg.update_all(
                         fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ij")
@@ -554,7 +552,7 @@ class ALIGNNAtomWise(nn.Module):
                     # Under development, use with caution
                     # 1 eV/Angstrom3 = 160.21766208 GPa
                     # 1 GPa = 10 kbar
-                    # Following Virial stress formula, assuming inital velocity = 0
+                    # Virial stress formula, assuming inital velocity = 0
                     # Save volume as g.gdta['V']?
                     # print('pair_forces',pair_forces.shape)
                     # print('r',r.shape)
@@ -605,7 +603,8 @@ class ALIGNNAtomWise(nn.Module):
                     # virial = (
                     #    160.21766208
                     #    * 10
-                    #    * torch.einsum("ij, ik->jk", result["r"], result["dy_dr"])
+                    #    * torch.einsum("ij, ik->jk",
+                    #    result["r"], result["dy_dr"])
                     #    / 2
                     # )  # / ( g.ndata["V"][0])
         if self.link:

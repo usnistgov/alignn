@@ -3,7 +3,7 @@
     "dataset": "user_data",
     "target": "target",
     "atom_features": "cgcnn",
-    "neighbor_strategy": "radius_graph_jarvis",
+    "neighbor_strategy": "radius_graph",
     "id_tag": "jid",
     "dtype": "float32",
     "random_seed": 123,
@@ -40,7 +40,7 @@
     "distributed":false,
     "use_lmdb": true,
     "model": {
-        "name": "alignn_ff2",
+        "name": "alignn_atomwise",
         "atom_input_features": 92,
         "calculate_gradient":true,
         "atomwise_output_features":0,
