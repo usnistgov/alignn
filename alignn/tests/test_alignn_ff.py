@@ -43,9 +43,9 @@ Cartesian
 """
 
 
-def test_radius_graph_jarvis():
-    atoms = Poscar.from_string(pos).atoms
-    g, lg = radius_graph_jarvis(atoms=atoms)
+# def test_radius_graph_jarvis():
+#    atoms = Poscar.from_string(pos).atoms
+#    g, lg = radius_graph_jarvis(atoms=atoms)
 
 
 def test_alignnff():
@@ -56,6 +56,9 @@ def test_alignnff():
     old_g = Graph.from_atoms(atoms=atoms)
     g, lg = Graph.atom_dgl_multigraph(atoms)
     g, lg = Graph.atom_dgl_multigraph(atoms, neighbor_strategy="radius_graph")
+    g, lg = Graph.atom_dgl_multigraph(
+        atoms, neighbor_strategy="radius_graph_jarvis"
+    )
     model_path = default_path()
     print("model_path", model_path)
     print("atoms", atoms)

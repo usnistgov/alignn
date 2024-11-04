@@ -33,7 +33,7 @@ from alignn.utils import (
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-torch.autograd.detect_anomaly()
+# torch.autograd.detect_anomaly()
 
 
 def train_dgl(
