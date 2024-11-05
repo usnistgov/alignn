@@ -91,7 +91,7 @@ def radius_graph_jarvis(
     dtype="float32",
     max_attempts=10,
 ):
-    """Construct radius graph with dynamic cutoff."""
+    """Construct radius graph with jarvis tools."""
     count = 0
     while count <= max_attempts:
         # try:
@@ -270,7 +270,7 @@ def radius_graph(
     bond_tol=0.5,
     id=None,
     atol=1e-5,
-    cutoff_extra=3.5,
+    cutoff_extra=0.5,
 ):
     """Construct edge list for radius graph."""
 
@@ -343,18 +343,23 @@ def radius_graph(
         g = dgl.graph((u, v))
         return g, u, v, r, cell_images
 
-    g, u, v, r, cell_images = temp_graph(cutoff)
-    while (g.num_nodes()) != len(atoms.elements):
-        try:
+    # g, u, v, r, cell_images = temp_graph(cutoff)
+    while True:  # (g.num_nodes()) != len(atoms.elements):
+        # try:
+        g, u, v, r, cell_images = temp_graph(cutoff)
+        # g, u, v, r, cell_images = temp_graph(cutoff)
+        # print(atoms)
+        if (g.num_nodes()) == len(atoms.elements):
+            return u, v, r, cell_images
+        else:
             cutoff += cutoff_extra
-            g, u, v, r, cell_images = temp_graph(cutoff)
-            print("cutoff", id, cutoff)
-            print(atoms)
+            print("cutoff", id, cutoff, atoms)
 
-        except Exception as exp:
-            print("Graph exp", exp)
-            pass
-        return u, v, r, cell_images
+    # except Exception as exp:
+    #    print("Graph exp", exp,atoms)
+    #    cutoff += cutoff_extra
+    #    pass
+    # return u, v, r, cell_images
 
     return u, v, r, cell_images
 
@@ -534,6 +539,8 @@ class Graph(object):
         node_features = torch.tensor(sps_features).type(
             torch.get_default_dtype()
         )
+        # print("u", u)
+        # print("v", v)
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
         # g.ndata["node_type"] = torch.tensor(node_types, dtype=torch.int64)

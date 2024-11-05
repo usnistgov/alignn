@@ -51,7 +51,8 @@ Cartesian
 def test_alignnff():
     atoms = JAtoms.from_dict(get_jid_data()["atoms"])
     atoms = JAtoms.from_dict(
-        get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
+        get_jid_data(dataset="dft_3d", jid="JVASP-1002")["atoms"]
+        # get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
     )
     old_g = Graph.from_atoms(atoms=atoms)
     g, lg = Graph.atom_dgl_multigraph(atoms)
@@ -84,17 +85,19 @@ def test_alignnff():
     xx = ff.run_nvt_andersen(steps=5)
     # xx = ff.run_npt_nose_hoover(steps=5)
     atoms_al = JAtoms.from_dict(
-        get_jid_data(dataset="dft_3d", jid="JVASP-816")["atoms"]
+        get_jid_data(dataset="dft_3d", jid="JVASP-1002")["atoms"]
+        # get_jid_data(dataset="dft_3d", jid="JVASP-816")["atoms"]
     )
     atoms_al2o3 = JAtoms.from_dict(
-        get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
+        get_jid_data(dataset="dft_3d", jid="JVASP-1002")["atoms"]
+        # get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
     )
     intf = get_interface_energy(
         film_atoms=atoms_al,
         subs_atoms=atoms_al,
         model_path=model_path,
-        film_thickness=10,
-        subs_thickness=10,
+        film_thickness=5,
+        subs_thickness=5,
         # film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
     )
 

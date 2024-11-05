@@ -210,26 +210,4 @@ class TrainingConfig(BaseSettings):
     model: Union[
         ALIGNNConfig,
         ALIGNNAtomWiseConfig,
-        # CGCNNConfig,
-        # ICGCNNConfig,
-        # SimpleGCNConfig,
-        # DenseGCNConfig,
-        # ALIGNN_LN_Config,
-        # DenseALIGNNConfig,
-        # ACGCNNConfig,
     ] = ALIGNNAtomWiseConfig(name="alignn_atomwise")
-
-    # @root_validator()
-    # @model_validator(mode='before')
-    # def set_input_size(cls, values):
-    #    """Automatically configure node feature dimensionality."""
-    #    values["model"].atom_input_features = FEATURESET_SIZE[
-    #        values["atom_features"]
-    #    ]
-
-    #    return values
-
-    # @property
-    # def atom_input_features(self):
-    #     """Automatically configure node feature dimensionality."""
-    #     return FEATURESET_SIZE[self.atom_features]

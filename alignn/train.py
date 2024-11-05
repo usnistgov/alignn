@@ -53,14 +53,14 @@ def train_dgl(
     # print("rank", rank)
     # setup(rank, world_size)
     if rank == 0:
-        print("config:")
         # print(config)
         if type(config) is dict:
             try:
-                print(config)
+                print("Trying to convert dictionary.")
                 config = TrainingConfig(**config)
             except Exception as exp:
                 print("Check", exp)
+    print("config:", config.dict())
 
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
@@ -169,7 +169,9 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
-    print("net parameters", sum(p.numel() for p in net.parameters()))
+    print("Model parameters", sum(p.numel() for p in net.parameters()))
+    print("CUDA available", torch.cuda.is_available())
+    print("CUDA device count", int(torch.cuda.device_count()))
     # print("device", device)
     net.to(device)
     if use_ddp:
@@ -253,6 +255,9 @@ def train_dgl(
                 loss3 = 0  # Such as forces
                 loss4 = 0  # Such as stresses
                 if config.model.output_features is not None:
+                    # print('criterion',criterion)
+                    # print('result["out"]',result["out"])
+                    # print('dats[-1]',dats[-1])
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"],
                         dats[-1].to(device),
@@ -598,8 +603,10 @@ def train_dgl(
             with torch.no_grad():
                 ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
                 for dat, id in zip(test_loader, ids):
-                    g, lg, target = dat
-                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    g, lg, lat, target = dat
+                    out_data = best_model(
+                        [g.to(device), lg.to(device), lat.to(device)]
+                    )["out"]
                     # out_data = net([g.to(device), lg.to(device)])["out"]
                     # out_data = torch.exp(out_data.cpu())
                     # print('target',target)
@@ -632,8 +639,10 @@ def train_dgl(
             with torch.no_grad():
                 ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
                 for dat, id in zip(test_loader, ids):
-                    g, lg, target = dat
-                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    g, lg, lat, target = dat
+                    out_data = best_model(
+                        [g.to(device), lg.to(device), lat.to(device)]
+                    )["out"]
                     # out_data = net([g.to(device), lg.to(device)])["out"]
                     out_data = out_data.cpu().numpy().tolist()
                     if config.standard_scalar_and_pca:
@@ -673,8 +682,10 @@ def train_dgl(
             with torch.no_grad():
                 ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
                 for dat, id in zip(test_loader, ids):
-                    g, lg, target = dat
-                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    g, lg, lat, target = dat
+                    out_data = best_model(
+                        [g.to(device), lg.to(device), lat.to(device)]
+                    )["out"]
                     # out_data = net([g.to(device), lg.to(device)])["out"]
                     out_data = out_data.cpu().numpy().tolist()
                     if config.standard_scalar_and_pca:
@@ -710,8 +721,10 @@ def train_dgl(
             with torch.no_grad():
                 ids = train_loader.dataset.ids  # [test_loader.dataset.indices]
                 for dat, id in zip(train_loader, ids):
-                    g, lg, target = dat
-                    out_data = best_model([g.to(device), lg.to(device)])["out"]
+                    g, lg, lat, target = dat
+                    out_data = best_model(
+                        [g.to(device), lg.to(device), lat.to(device)]
+                    )["out"]
                     # out_data = net([g.to(device), lg.to(device)])["out"]
                     out_data = out_data.cpu().numpy().tolist()
                     if config.standard_scalar_and_pca:

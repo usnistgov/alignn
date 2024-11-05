@@ -326,8 +326,12 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             "energy": energy,  # * num_atoms,
             "forces": result["grad"].detach().cpu().numpy(),
             "stress": full_3x3_to_voigt_6_stress(
-                np.eye(3)
-                # result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+                # np.eye(3)
+                result["stresses"][:3]
+                .reshape(3, 3)
+                .detach()
+                .cpu()
+                .numpy()
             )
             / 160.21766208,
             "dipole": np.zeros(3),
