@@ -644,7 +644,7 @@ def train_dgl(
                         [g.to(device), lg.to(device), lat.to(device)]
                     )["out"]
                     # out_data = net([g.to(device), lg.to(device)])["out"]
-                    out_data = out_data.cpu().numpy().tolist()
+                    out_data = out_data.detach().cpu().numpy().tolist()
                     if config.standard_scalar_and_pca:
                         sc = pk.load(open("sc.pkl", "rb"))
                         out_data = list(
