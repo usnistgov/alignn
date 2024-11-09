@@ -186,9 +186,19 @@ def get_torch_dataset(
                     np.array(d[target_atomwise])
                 ).type(torch.get_default_dtype())
             if target_grad is not None and target_grad != "":
-                g.ndata[target_grad] = torch.tensor(
-                    np.array(d[target_grad])
-                ).type(torch.get_default_dtype())
+                # print('grad', np.array(d[target_grad]))
+                # print('grad shape',np.array(d[target_grad]).shape)
+                arr = np.array(d[target_grad])
+                try:
+                    g.ndata[target_grad] = torch.tensor(arr).type(
+                        torch.get_default_dtype()
+                    )
+                except Exception:
+                    arr = arr.reshape(1, -1)
+                    g.ndata[target_grad] = torch.tensor(arr).type(
+                        torch.get_default_dtype()
+                    )
+                    # print('arr',arr.shape)
             if target_stress is not None and target_stress != "":
                 stress = np.array(d[target_stress])
                 g.ndata[target_stress] = torch.tensor(
