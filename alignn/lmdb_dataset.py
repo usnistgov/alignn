@@ -112,6 +112,7 @@ def get_torch_dataset(
     target_atomwise="",
     target_grad="",
     target_stress="",
+    target_additional_output="",
     neighbor_strategy="k-nearest",
     atom_features="cgcnn",
     use_canonize="",
@@ -171,12 +172,12 @@ def get_torch_dataset(
                 torch.get_default_dtype()
             )
             label = torch.tensor(d[target]).type(torch.get_default_dtype())
+            natoms = len(d["atoms"]["elements"])
             # print('label',label,label.view(-1).long())
             if classification:
                 label = label.long()
                 # label = label.view(-1).long()
             if "extra_features" in d:
-                natoms = len(d["atoms"]["elements"])
                 g.ndata["extra_features"] = torch.tensor(
                     [d["extra_features"] for n in range(natoms)]
                 ).type(torch.get_default_dtype())
@@ -192,6 +193,14 @@ def get_torch_dataset(
                 stress = np.array(d[target_stress])
                 g.ndata[target_stress] = torch.tensor(
                     np.array([stress for ii in range(g.number_of_nodes())])
+                ).type(torch.get_default_dtype())
+            if (
+                target_additional_output is not None
+                and target_additional_output != ""
+            ):
+                additional_output = np.array(d[target_additional_output])
+                g.ndata[target_additional_output] = torch.tensor(
+                    ([additional_output for ii in range(natoms)])
                 ).type(torch.get_default_dtype())
 
             # labels.append(label)

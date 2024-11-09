@@ -122,6 +122,7 @@ def get_train_val_loaders(
     target_atomwise: str = "",
     target_grad: str = "",
     target_stress: str = "",
+    target_additional_output: str = "",
     atom_features: str = "cgcnn",
     neighbor_strategy: str = "k-nearest",
     n_train=None,
@@ -161,6 +162,7 @@ def get_train_val_loaders(
         from alignn.lmdb_dataset import get_torch_dataset
     else:
         print("Not using LMDB dataset, memory footprint maybe high.")
+        print("WARNING: not using LMDB might result errors.")
         from alignn.dataset import get_torch_dataset
     train_sample = filename + "_train.data"
     val_sample = filename + "_val.data"
@@ -373,6 +375,7 @@ def get_train_val_loaders(
             target_atomwise=target_atomwise,
             target_grad=target_grad,
             target_stress=target_stress,
+            target_additional_output=target_additional_output,
             neighbor_strategy=neighbor_strategy,
             use_canonize=use_canonize,
             name=dataset,
@@ -397,6 +400,7 @@ def get_train_val_loaders(
                 target_atomwise=target_atomwise,
                 target_grad=target_grad,
                 target_stress=target_stress,
+                target_additional_output=target_additional_output,
                 neighbor_strategy=neighbor_strategy,
                 use_canonize=use_canonize,
                 name=dataset,
@@ -424,6 +428,7 @@ def get_train_val_loaders(
                 target_atomwise=target_atomwise,
                 target_grad=target_grad,
                 target_stress=target_stress,
+                target_additional_output=target_additional_output,
                 neighbor_strategy=neighbor_strategy,
                 use_canonize=use_canonize,
                 name=dataset,

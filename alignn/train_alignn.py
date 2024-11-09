@@ -115,6 +115,12 @@ parser.add_argument(
     help="Name of the key for stress (3x3) level data such as forces",
 )
 
+parser.add_argument(
+    "--additional_output_key",
+    default="additional_output",
+    help="Name of the key for extra global output eg DOS",
+)
+
 
 parser.add_argument(
     "--output_dir",
@@ -150,6 +156,7 @@ def train_for_folder(
     atomwise_key="forces",
     gradwise_key="forces",
     stresswise_key="stresses",
+    additional_output_key="additional_output",
     file_format="poscar",
     restart_model_path=None,
     output_dir=None,
@@ -197,6 +204,7 @@ def train_for_folder(
 
     train_grad = False
     train_stress = False
+    train_additional_output = False
     train_atom = False
     try:
         if (
@@ -217,6 +225,13 @@ def train_for_folder(
             train_atom = True
         else:
             train_atom = False
+        if (
+            config.model.additional_output_features > 0
+            and config.model.additional_output_weight != 0
+        ):
+            train_additional_output = True
+        else:
+            train_additional_output = False
     except Exception as exp:
         print("exp", exp)
         pass
@@ -229,6 +244,7 @@ def train_for_folder(
     target_atomwise = None  # "atomwise_target"
     target_grad = None  # "atomwise_grad"
     target_stress = None  # "stresses"
+    target_additional_output = None  # "stresses"
 
     # mem = []
     # enp = []
@@ -283,11 +299,14 @@ def train_for_folder(
             info["stresses"] = stress  # - mean_force
             target_stress = "stresses"
 
-            # print("stresses",info["stresses"] )
+        if train_additional_output:
+            target_additional_output = "additional"
+            info["additional"] = i[additional_output_key]  # - mean_force
         if "extra_features" in i:
             info["extra_features"] = i["extra_features"]
         dataset.append(info)
     print("len dataset", len(dataset))
+    print("train_stress", train_stress)
     del dat
     # multioutput = False
     lists_length_equal = True
@@ -356,6 +375,7 @@ def train_for_folder(
         target_atomwise=target_atomwise,
         target_grad=target_grad,
         target_stress=target_stress,
+        target_additional_output=target_additional_output,
         n_train=config.n_train,
         n_val=config.n_val,
         n_test=config.n_test,
@@ -427,6 +447,7 @@ if __name__ == "__main__":
                 args.atomwise_key,
                 args.force_key,
                 args.stresswise_key,
+                args.additional_output_key,
                 args.file_format,
                 args.restart_model_path,
                 args.output_dir,
@@ -447,6 +468,7 @@ if __name__ == "__main__":
             args.atomwise_key,
             args.force_key,
             args.stresswise_key,
+            args.additional_output_key,
             args.file_format,
             args.restart_model_path,
             args.output_dir,

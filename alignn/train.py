@@ -28,12 +28,21 @@ from alignn.utils import (
     setup_optimizer,
     print_train_val_loss,
 )
+import dgl
 
 # from sklearn.metrics import log_loss
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # torch.autograd.detect_anomaly()
+
+figlet_alignn = """
+    _    _     ___ ____ _   _ _   _
+   / \  | |   |_ _/ ___| \ | | \ | |
+  / _ \ | |    | | |  _|  \| |  \| |
+ / ___ \| |___ | | |_| | |\  | |\  |
+/_/   \_\_____|___\____|_| \_|_| \_|
+"""
 
 
 def train_dgl(
@@ -169,9 +178,26 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
+    print(figlet_alignn)
     print("Model parameters", sum(p.numel() for p in net.parameters()))
     print("CUDA available", torch.cuda.is_available())
     print("CUDA device count", int(torch.cuda.device_count()))
+    try:
+        gpu_stats = torch.cuda.get_device_properties(0)
+        max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+        from platform import system as platform_system
+
+        platform_system = platform_system()
+        statistics = (
+            f"   GPU: {gpu_stats.name}. Max memory: {max_memory} GB"
+            + f". Platform = {platform_system}.\n"
+            f"   Pytorch: {torch.__version__}. CUDA = "
+            + f"{gpu_stats.major}.{gpu_stats.minor}."
+            + f" CUDA Toolkit = {torch.version.cuda}.\n"
+        )
+        print(statistics)
+    except Exception:
+        pass
     # print("device", device)
     net.to(device)
     if use_ddp:
@@ -224,6 +250,7 @@ def train_dgl(
             running_loss2 = 0
             running_loss3 = 0
             running_loss4 = 0
+            running_loss5 = 0
             train_result = []
             for dats, jid in zip(train_loader, train_loader.dataset.ids):
                 info = {}
@@ -249,11 +276,14 @@ def train_dgl(
                 info["pred_grad"] = []
                 info["target_stress"] = []
                 info["pred_stress"] = []
+                info["target_additional"] = []
+                info["pred_additional"] = []
 
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
                 loss4 = 0  # Such as stresses
+                loss5 = 0  # Such as dos
                 if config.model.output_features is not None:
                     # print('criterion',criterion)
                     # print('result["out"]',result["out"])
@@ -299,13 +329,23 @@ def train_dgl(
                     )
                     running_loss3 += loss3.item()
                 if config.model.stresswise_weight != 0:
+                    # print('unbatch',dgl.unbatch(dats[0]))
+
+                    targ_stress = torch.stack(
+                        [
+                            gg.ndata["stresses"][0]
+                            for gg in dgl.unbatch(dats[0])
+                        ]
+                    ).to(device)
+                    pred_stress = result["stresses"]
+                    # print('targ_stress',targ_stress,targ_stress.shape)
+                    # print('pred_stress',pred_stress,pred_stress.shape)
                     loss4 = config.model.stresswise_weight * criterion(
-                        (result["stresses"]).to(device),
-                        torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
+                        pred_stress.to(device),
+                        targ_stress.to(device),
                     )
                     info["target_stress"] = (
-                        torch.cat(tuple(dats[0].ndata["stresses"]))
-                        .cpu()
+                        targ_stress.cpu()
                         .numpy()
                         .tolist()
                         # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
@@ -314,10 +354,32 @@ def train_dgl(
                         result["stresses"].cpu().detach().numpy().tolist()
                     )
                     running_loss4 += loss4.item()
+                if config.model.additional_output_weight != 0:
+                    # print('unbatch',dgl.unbatch(dats[0]))
+                    additional_dat = [
+                        gg.ndata["additional"][0]
+                        for gg in dgl.unbatch(dats[0])
+                    ]
+                    # print('additional_dat',additional_dat,len(additional_dat))
+                    targ = torch.stack(additional_dat).to(device)
+                    # targ=torch.tensor(additional_dat).to( dats[0].device)
+                    # print('result["additional"]',result["additional"],result["additional"].shape)
+                    # print('targ',targ,targ.shape)
+                    # print('targ device',targ.device)
+                    loss5 = config.model.additional_output_weight * criterion(
+                        (result["additional"]).to(device),
+                        targ,
+                        # (dats[0].ndata["additional"]).to(device),
+                    )
+                    info["target_additional"] = targ.cpu().numpy().tolist()
+                    info["pred_additional"] = (
+                        result["additional"].cpu().detach().numpy().tolist()
+                    )
+                    running_loss5 += loss5.item()
                     # print("target_stress", info["target_stress"][0])
                     # print("pred_stress", info["pred_stress"][0])
                 train_result.append(info)
-                loss = loss1 + loss2 + loss3 + loss4
+                loss = loss1 + loss2 + loss3 + loss4 + loss5
                 loss.backward()
                 optimizer.step()
                 # optimizer.zero_grad() #never
@@ -337,6 +399,7 @@ def train_dgl(
                     running_loss2,
                     running_loss3,
                     running_loss4,
+                    running_loss5,
                 ]
             )
             dumpjson(
@@ -348,6 +411,7 @@ def train_dgl(
             val_loss2 = 0
             val_loss3 = 0
             val_loss4 = 0
+            val_loss5 = 0
             val_result = []
             # for dats in val_loader:
             val_init_time = time.time()
@@ -379,6 +443,7 @@ def train_dgl(
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
                 loss4 = 0  # Such as stresses
+                loss5 = 0  # Such as stresses
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"], dats[-1].to(device)
@@ -421,13 +486,22 @@ def train_dgl(
                     #    result["stress"].to(device),
                     #    dats[0].ndata["stresses"][0].to(device),
                     # )
+
+                    targ_stress = torch.stack(
+                        [
+                            gg.ndata["stresses"][0]
+                            for gg in dgl.unbatch(dats[0])
+                        ]
+                    ).to(device)
+                    pred_stress = result["stresses"]
+                    # print('targ_stress',targ_stress,targ_stress.shape)
+                    # print('pred_stress',pred_stress,pred_stress.shape)
                     loss4 = config.model.stresswise_weight * criterion(
-                        (result["stresses"]).to(device),
-                        torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
+                        pred_stress.to(device),
+                        targ_stress.to(device),
                     )
                     info["target_stress"] = (
-                        torch.cat(tuple(dats[0].ndata["stresses"]))
-                        .cpu()
+                        targ_stress.cpu()
                         .numpy()
                         .tolist()
                         # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
@@ -435,8 +509,31 @@ def train_dgl(
                     info["pred_stress"] = (
                         result["stresses"].cpu().detach().numpy().tolist()
                     )
+
                     val_loss4 += loss4.item()
-                loss = loss1 + loss2 + loss3 + loss4
+                if config.model.additional_output_weight != 0:
+                    additional_dat = [
+                        gg.ndata["additional"][0]
+                        for gg in dgl.unbatch(dats[0])
+                    ]
+                    # print('additional_dat',additional_dat,len(additional_dat))
+                    targ = torch.stack(additional_dat).to(device)
+                    # targ=torch.tensor(additional_dat).to( dats[0].device)
+                    # print('result["additional"]',result["additional"],result["additional"].shape)
+                    # print('targ',targ,targ.shape)
+                    # print('targ device',targ.device)
+                    loss5 = config.model.additional_output_weight * criterion(
+                        (result["additional"]).to(device),
+                        targ,
+                        # (dats[0].ndata["additional"]).to(device),
+                    )
+                    info["target_additional"] = targ.cpu().numpy().tolist()
+                    info["pred_additional"] = (
+                        result["additional"].cpu().detach().numpy().tolist()
+                    )
+
+                    val_loss5 += loss5.item()
+                loss = loss1 + loss2 + loss3 + loss4 + loss5
                 val_result.append(info)
                 val_loss += loss.item()
             # mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
@@ -472,8 +569,15 @@ def train_dgl(
                     data=val_result,
                 )
                 best_model = net
-            history_train.append(
-                [val_loss, val_loss1, val_loss2, val_loss3, val_loss4]
+            history_val.append(
+                [
+                    val_loss,
+                    val_loss1,
+                    val_loss2,
+                    val_loss3,
+                    val_loss4,
+                    val_loss5,
+                ]
             )
             # history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
             dumpjson(
@@ -488,11 +592,13 @@ def train_dgl(
                     running_loss2,
                     running_loss3,
                     running_loss4,
+                    running_loss5,
                     val_loss,
                     val_loss1,
                     val_loss2,
                     val_loss3,
                     val_loss4,
+                    val_loss5,
                     train_ep_time,
                     val_ep_time,
                     saving_msg=saving_msg,
@@ -559,19 +665,30 @@ def train_dgl(
                         result["grad"].cpu().detach().numpy().tolist()
                     )
                 if config.model.stresswise_weight != 0:
+
+                    targ_stress = torch.stack(
+                        [
+                            gg.ndata["stresses"][0]
+                            for gg in dgl.unbatch(dats[0])
+                        ]
+                    ).to(device)
+                    pred_stress = result["stresses"]
+                    # print('targ_stress',targ_stress,targ_stress.shape)
+                    # print('pred_stress',pred_stress,pred_stress.shape)
                     loss4 = config.model.stresswise_weight * criterion(
-                        result["stresses"].to(device),
-                        torch.cat(tuple(dats[0].ndata["stresses"])).to(device),
+                        pred_stress.to(device),
+                        targ_stress.to(device),
                     )
                     info["target_stress"] = (
-                        torch.cat(tuple(dats[0].ndata["stresses"]))
-                        .cpu()
+                        targ_stress.cpu()
                         .numpy()
                         .tolist()
+                        # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
                     )
                     info["pred_stress"] = (
                         result["stresses"].cpu().detach().numpy().tolist()
                     )
+
                 test_result.append(info)
                 loss = loss1 + loss2 + loss3 + loss4
                 if not classification:

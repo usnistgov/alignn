@@ -68,6 +68,8 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     exponent: int = 5
     penalty_factor: float = 0.1
     penalty_threshold: float = 1
+    additional_output_features: int = 0
+    additional_output_weight: float = 0
 
     class Config:
         """Configure model settings behavior."""
@@ -336,6 +338,10 @@ class ALIGNNAtomWise(nn.Module):
                 config.hidden_features, config.atomwise_output_features
             )
 
+        if config.additional_output_features:
+            self.fc_additional_output = nn.Linear(
+                config.hidden_features, config.additional_output_features
+            )
         if self.classification:
             self.fc = nn.Linear(config.hidden_features, 1)
             self.softmax = nn.Sigmoid()
@@ -442,6 +448,7 @@ class ALIGNNAtomWise(nn.Module):
             x, y = gcn_layer(g, x, y)
         # norm-activation-pool-classify
         out = torch.empty(1)
+        additional_out = torch.empty(1)
         if self.config.output_features is not None:
             h = self.readout(g, x)
             out = self.fc(h)
@@ -455,6 +462,9 @@ class ALIGNNAtomWise(nn.Module):
                 # print('out',out)
             else:
                 out = torch.squeeze(out)
+            if self.config.additional_output_features > 0:
+                additional_out = self.fc_additional_output(h)
+
         atomwise_pred = torch.empty(1)
         if (
             self.config.atomwise_output_features > 0
@@ -571,7 +581,6 @@ class ALIGNNAtomWise(nn.Module):
                     # print("stress1", stress, stress.shape)
                     # print("g.batch_size", g.batch_size)
                     else:
-                        # print('Using batch_stress')
                         stresses = []
                         count_edge = 0
                         count_node = 0
@@ -592,11 +601,8 @@ class ALIGNNAtomWise(nn.Module):
                             count_edge = count_edge + num_edges
                             num_nodes = g.batch_num_nodes()[graph_id]
                             count_node = count_node + num_nodes
-                            # print("stresses.append",stresses[-1],stresses[-1].shape)
-                            for n in range(num_nodes):
-                                stresses.append(st)
-                        # stress = (stresses)
-                        stress = self.config.stress_multiplier * torch.cat(
+                            stresses.append(st)
+                        stress = self.config.stress_multiplier * torch.stack(
                             stresses
                         )
                     # print("stress2", stress, stress.shape)
@@ -614,8 +620,38 @@ class ALIGNNAtomWise(nn.Module):
             # out = torch.max(out,dim=1)
             out = self.softmax(out)
         result["out"] = out
+        result["additional"] = additional_out
         result["grad"] = forces
         result["stresses"] = stress
         result["atomwise_pred"] = atomwise_pred
         # print(result)
         return result
+
+
+"""
+if __name__ == "__main__":
+    from jarvis.core.atoms import Atoms
+    from alignn.graphs import Graph
+
+    FIXTURES = {
+        "lattice_mat": [
+            [2.715, 2.715, 0],
+            [0, 2.715, 2.715],
+            [2.715, 0, 2.715],
+        ],
+        "coords": [[0, 0, 0], [0.25, 0.25, 0.25]],
+        "elements": ["Si", "Si"],
+    }
+    Si = Atoms(
+        lattice_mat=FIXTURES["lattice_mat"],
+        coords=FIXTURES["coords"],
+        elements=FIXTURES["elements"],
+    )
+    g, lg = Graph.atom_dgl_multi_graph(
+        atoms=Si, neighbor_strategy="radius_graph", cutoff=5
+    )
+    lat = torch.tensor(atoms.lattice_mat)
+    model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(name="alignn_atomwise"))
+    out = model([g, lg, lat])
+    print(out)
+"""

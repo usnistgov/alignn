@@ -115,17 +115,21 @@ def print_train_val_loss(
     running_loss2,
     running_loss3,
     running_loss4,
+    running_loss5,
     val_loss,
     val_loss1,
     val_loss2,
     val_loss3,
     val_loss4,
+    val_loss5,
     train_ep_time,
     val_ep_time,
     saving_msg="",
 ):
     """Train loss header."""
-    header = ("{:<12} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}").format(
+    header = (
+        "{:<12} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}"
+    ).format(
         "Train Loss:",
         "Epoch",
         "Total",
@@ -133,13 +137,15 @@ def print_train_val_loss(
         "Atom",
         "Grad",
         "Stress",
+        "Addn.",
         "Time",
     )
     print(header)
 
     # Train loss values
     train_row = (
-        "{:<12} {:<8} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} "
+        "{:<12} {:<8} {:<10.4f} {:<10.4f} "
+        + "{:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} "
         "{:<10.2f}"
     ).format(
         "",
@@ -149,12 +155,15 @@ def print_train_val_loss(
         running_loss2,
         running_loss3,
         running_loss4,
+        running_loss5,
         train_ep_time,
     )
     print(train_row)
 
     # Validation loss header
-    header = ("{:<12} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}").format(
+    header = (
+        "{:<12} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}"
+    ).format(
         "Val Loss:",
         "Epoch",
         "Total",
@@ -162,13 +171,15 @@ def print_train_val_loss(
         "Atom",
         "Grad",
         "Stress",
+        "Addn.",
         "Time",
     )
     print(header)
 
     # Validation loss values
     val_row = (
-        "{:<12} {:<8} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} "
+        "{:<12} {:<8} {:<10.4f} {:<10.4f} "
+        + "{:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} "
         "{:<10.2f} {:<10}"
     ).format(
         "",
@@ -178,6 +189,7 @@ def print_train_val_loss(
         val_loss2,
         val_loss3,
         val_loss4,
+        val_loss5,
         val_ep_time,
         saving_msg,
     )
