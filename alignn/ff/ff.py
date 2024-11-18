@@ -307,7 +307,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 (
                     g.to(self.device),
                     lg.to(self.device),
-                    torch.tensor(atoms.cell)
+                    torch.tensor(np.array(atoms.cell))
                     .type(torch.get_default_dtype())
                     .to(self.device),
                 )
@@ -321,19 +321,16 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             energy = result["out"].detach().cpu().numpy() * num_atoms
         else:
             energy = result["out"].detach().cpu().numpy()
-
+        stress = self.stress_wt * np.array(
+            full_3x3_to_voigt_6_stress(
+                result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+            )
+        )
+        # print('stress',stress)
         self.results = {
             "energy": energy,  # * num_atoms,
             "forces": result["grad"].detach().cpu().numpy(),
-            "stress": full_3x3_to_voigt_6_stress(
-                # np.eye(3)
-                result["stresses"][:3]
-                .reshape(3, 3)
-                .detach()
-                .cpu()
-                .numpy()
-            )
-            / 160.21766208,
+            "stress": stress,
             "dipole": np.zeros(3),
             "charges": np.zeros(len(atoms)),
             "magmom": 0.0,

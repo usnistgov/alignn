@@ -581,38 +581,38 @@ class ALIGNNAtomWise(nn.Module):
                     # print("stress1", stress, stress.shape)
                     # print("g.batch_size", g.batch_size)
                     else:
-                        stresses = []
-                        count_edge = 0
-                        count_node = 0
-                        for graph_id in range(g.batch_size):
-                            num_edges = g.batch_num_edges()[graph_id]
-                            num_nodes = 0
-                            st = -1 * (
-                                160.21766208
-                                * torch.matmul(
-                                    r[count_edge : count_edge + num_edges].T,
-                                    pair_forces[
-                                        count_edge : count_edge + num_edges
-                                    ],
-                                )
-                                / g.ndata["V"][count_node + num_nodes]
-                            )
+                        # stresses = []
+                        # count_edge = 0
+                        # count_node = 0
+                        # for graph_id in range(g.batch_size):
+                        #    num_edges = g.batch_num_edges()[graph_id]
+                        #    num_nodes = 0
+                        #    st = -1 * (
+                        #        160.21766208
+                        #        * torch.matmul(
+                        #            r[count_edge : count_edge + num_edges].T,
+                        #            pair_forces[
+                        #                count_edge : count_edge + num_edges
+                        #            ],
+                        #        )
+                        #        / g.ndata["V"][count_node + num_nodes]
+                        #    )
 
-                            count_edge = count_edge + num_edges
-                            num_nodes = g.batch_num_nodes()[graph_id]
-                            count_node = count_node + num_nodes
-                            stresses.append(st)
-                        stress = self.config.stress_multiplier * torch.stack(
-                            stresses
-                        )
-                    # print("stress2", stress, stress.shape)
-                    # virial = (
-                    #    160.21766208
-                    #    * 10
-                    #    * torch.einsum("ij, ik->jk",
-                    #    result["r"], result["dy_dr"])
-                    #    / 2
-                    # )  # / ( g.ndata["V"][0])
+                        #    count_edge = count_edge + num_edges
+                        #    num_nodes = g.batch_num_nodes()[graph_id]
+                        #    count_node = count_node + num_nodes
+                        #    stresses.append(st)
+                        # stress = self.config.stress_multiplier * torch.stack(
+                        #    stresses
+                        # )
+                        stress = (
+                            # 160.21766208
+                            # * 10
+                            -1
+                            * torch.einsum("ij, ik->jk", r, pair_forces)
+                            / 2
+                            # / (2 * g.ndata["V"][0])
+                        )  ## / ( g.ndata["V"][0])
         if self.link:
             out = self.link(out)
 
