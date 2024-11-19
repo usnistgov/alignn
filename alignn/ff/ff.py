@@ -223,6 +223,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         device=None,
         model=None,
         config=None,
+        force_mult_batchsize=True,
         path=".",
         model_filename="best_model.pt",
         config_filename="config.json",
@@ -243,8 +244,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         self.config = config
         self.include_stress = include_stress
         self.stress_wt = stress_wt
-        # self.force_multiplier = force_multiplier
-        # self.force_mult_natoms = force_mult_natoms
+        self.force_mult_batchsize = force_mult_batchsize
         if self.config is None:
             config = loadjson(os.path.join(path, config_filename))
             # print('config',config)
@@ -253,7 +253,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         if self.include_stress:
             self.implemented_properties = ["energy", "forces", "stress"]
             if config["model"]["stresswise_weight"] == 0:
-                config["model"]["stresswise_weight"] = 0.1
+                config["model"]["stresswise_weight"] = 0.1  # self.stress_wt
         else:
             self.implemented_properties = ["energy", "forces"]
 
@@ -276,13 +276,9 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     map_location=self.device,
                 )
             )
-        else:
-            model = self.model
-        model.to(device)
-        model.eval()
-
-        self.net = model
-        self.net.to(self.device)
+            model.to(device)
+            model.eval()
+            self.model = model
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
@@ -303,7 +299,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
         if self.config["model"]["alignn_layers"] > 0:
             # g,lg = g
-            result = self.net(
+            result = self.model(
                 (
                     g.to(self.device),
                     lg.to(self.device),
@@ -313,7 +309,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 )
             )
         else:
-            result = self.net(
+            result = self.model(
                 (g.to(self.device, torch.tensor(atoms.cell).to(self.device)))
             )
         # print ('stress',result["stress"].detach().numpy())
@@ -326,15 +322,14 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
             )
         )
-        # print('stress',stress)
+        forces = result["grad"].detach().cpu().numpy()
+        if self.force_mult_batchsize:
+            forces *= self.config["batch_size"]
+            # stress*=self.config['batch_size']
         self.results = {
             "energy": energy,  # * num_atoms,
-            "forces": result["grad"].detach().cpu().numpy(),
+            "forces": forces,
             "stress": stress,
-            "dipole": np.zeros(3),
-            "charges": np.zeros(len(atoms)),
-            "magmom": 0.0,
-            "magmoms": np.zeros(len(atoms)),
         }
 
 
