@@ -410,7 +410,8 @@ References
 6) [Graph neural network predictions of metal organic framework CO2 adsorption properties](https://www.sciencedirect.com/science/article/pii/S092702562200163X)
 7) [Rapid Prediction of Phonon Structure and Properties using an Atomistic Line Graph Neural Network (ALIGNN)](https://journals.aps.org/prmaterials/abstract/10.1103/PhysRevMaterials.7.023803)
 8) [Unified graph neural network force-field for the periodic table](https://pubs.rsc.org/en/content/articlehtml/2023/dd/d2dd00096b)
-9) [Large Scale Benchmark of Materials Design Methods](https://arxiv.org/abs/2306.11688)
+9) [Large Scale Benchmark of Materials Design Methods](https://www.nature.com/articles/s41524-024-01259-w)
+10) [CHIPS-FF](https://github.com/usnistgov/chipsff)
 
 
 Please see detailed publications list [here](https://jarvis-tools.readthedocs.io/en/master/publications.html).
