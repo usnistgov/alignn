@@ -69,18 +69,18 @@ def test_models():
     test_clean()
 
 
-# def test_pretrained():
-#    box = [[2.715, 2.715, 0], [0, 2.715, 2.715], [2.715, 0, 2.715]]
-#    coords = [[0, 0, 0], [0.25, 0.2, 0.25]]
-#    elements = ["Si", "Si"]
-#    Si = Atoms(lattice_mat=box, coords=coords, elements=elements)
-#    prd = get_prediction(atoms=Si)
-#    print(prd)
-#    cmd1 = "python alignn/pretrained.py"
-#    os.system(cmd1)
-#    get_multiple_predictions(atoms_array=[Si, Si])
-#    cmd1 = "rm *.json"
-#    os.system(cmd1)
+def test_pretrained():
+    box = [[2.715, 2.715, 0], [0, 2.715, 2.715], [2.715, 0, 2.715]]
+    coords = [[0, 0, 0], [0.25, 0.2, 0.25]]
+    elements = ["Si", "Si"]
+    Si = Atoms(lattice_mat=box, coords=coords, elements=elements)
+    prd = get_prediction(atoms=Si)
+    print(prd)
+    cmd1 = "python alignn/pretrained.py"
+    os.system(cmd1)
+    get_multiple_predictions(atoms_array=[Si, Si])
+    cmd1 = "rm *.json"
+    os.system(cmd1)
 
 
 def test_alignn_train_regression():

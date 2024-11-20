@@ -1074,7 +1074,7 @@ class StructureDataset(DGLDataset):
             return (
                 batched_graph,
                 batched_line_graph,
-                torch.tensor(lattices),
+                torch.stack(lattices),
                 torch.tensor(labels),
             )
 

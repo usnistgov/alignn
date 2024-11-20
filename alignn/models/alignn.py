@@ -291,7 +291,7 @@ class ALIGNN(nn.Module):
         if len(self.alignn_layers) > 0:
             # print('features2',features.shape)
 
-            g, lg = g
+            g, lg, lat = g
             lg = lg.local_var()
 
             # angle features (fixed)

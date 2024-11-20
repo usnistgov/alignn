@@ -4,9 +4,9 @@ from alignn.ff.ff import (
     default_path,
     ev_curve,
     ForceField,
-    get_figshare_model_ff
+    get_figshare_model_ff,
 )
-from alignn.graphs import Graph, radius_graph_jarvis
+from alignn.graphs import Graph, radius_graph_jarvis, radius_graph_old
 from alignn.ff.ff import phonons
 from jarvis.core.atoms import ase_to_atoms
 from jarvis.db.figshare import get_jid_data
@@ -71,11 +71,14 @@ def test_graph_builder():
     g, lg = Graph.atom_dgl_multigraph(
         atoms, neighbor_strategy="radius_graph_jarvis"
     )
+    g = radius_graph_old(atoms)
 
 
 def test_ev():
     atoms = Poscar.from_string(pos).atoms
-    model_path = get_figshare_model_ff(model_name="v10.30.2024_dft_3d_307k") #default_path()
+    model_path = get_figshare_model_ff(
+        model_name="v10.30.2024_dft_3d_307k"
+    )  # default_path()
     print("model_path", model_path)
     print("atoms", atoms)
     # atoms = atoms.make_supercell_matrix([2, 2, 2])
@@ -89,8 +92,10 @@ def test_ev():
 
 def test_ev():
     atoms = Poscar.from_string(pos).atoms
-    #model_path = default_path()
-    model_path = get_figshare_model_ff(model_name="v10.30.2024_dft_3d_307k") #default_path()
+    # model_path = default_path()
+    model_path = get_figshare_model_ff(
+        model_name="v10.30.2024_dft_3d_307k"
+    )  # default_path()
     ff = ForceField(
         jarvis_atoms=atoms,
         model_path=model_path,
@@ -106,18 +111,19 @@ def test_ev():
     # xx = ff.run_npt_nose_hoover(steps=5)
 
 
-
-
 def test_phonons():
     atoms = Poscar.from_string(pos).atoms.get_primitive_atoms
-    #model_path = default_path()
-    model_path = get_figshare_model_ff(model_name="v10.30.2024_dft_3d_307k") #default_path()
+    # model_path = default_path()
+    model_path = get_figshare_model_ff(
+        model_name="v10.30.2024_dft_3d_307k"
+    )  # default_path()
     ph = phonons(model_path=model_path, atoms=(atoms))
 
-#print('test_graph_builder')
-#test_graph_builder()
-#print('test_ev')
-#test_ev()
-#print('test_phonons')
-#test_phonons()
+
+# print('test_graph_builder')
+test_graph_builder()
+# print('test_ev')
+# test_ev()
+# print('test_phonons')
+# test_phonons()
 # test_alignnff()
