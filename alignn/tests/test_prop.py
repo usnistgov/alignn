@@ -176,7 +176,7 @@ def test_alignn_train_ff():
 
 
 def test_clean():
-    cmd = "rm *.pt *.csv *.json *range"
+    cmd = "rm *.pt *.traj *.csv *.json *range"
     os.system(cmd)
 
 

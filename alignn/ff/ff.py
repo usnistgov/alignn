@@ -613,10 +613,10 @@ class ForceField(object):
         interval=1,
         temperature_K=300,
         steps=1000,
-        taut=49.11347394232032,
-        taup=98.22694788464064,
-        pressure=None,
-        compressibility=None,
+        taut=5.0 * units.fs,
+        taup=500.0 * units.fs,
+        pressure=1.0 * units.bar,
+        compressibility=5e-7 / units.bar,
         initial_temperature_K=None,
     ):
         """Run NPT."""
@@ -633,7 +633,7 @@ class ForceField(object):
             taup=taup,
             pressure=pressure,
             compressibility=compressibility,
-            communicator=self.communicator,
+            # communicator=self.communicator,
         )
         # Create monitors for logfile and a trajectory file
         # logfile = os.path.join(".", "%s.log" % filename)

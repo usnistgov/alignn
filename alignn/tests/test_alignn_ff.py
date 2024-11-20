@@ -7,7 +7,7 @@ from alignn.ff.ff import (
     get_figshare_model_ff,
 )
 from alignn.graphs import Graph, radius_graph_jarvis, radius_graph_old
-from alignn.ff.ff import phonons,ase_phonon
+from alignn.ff.ff import phonons, ase_phonon
 from jarvis.core.atoms import ase_to_atoms
 from jarvis.db.figshare import get_jid_data
 from jarvis.core.atoms import Atoms
@@ -83,7 +83,7 @@ def test_ev():
     print("atoms", atoms)
     # atoms = atoms.make_supercell_matrix([2, 2, 2])
     # atoms=atoms.strain_atoms(.05)
-    ev = ev_curve(atoms=atoms, model_path=model_path,on_relaxed_struct=True)
+    ev = ev_curve(atoms=atoms, model_path=model_path, on_relaxed_struct=True)
     # surf = surface_energy(atoms=atoms, model_path=model_path)
     # print('surf',surf)
     # vac = vacancy_formation(atoms=atoms, model_path=model_path)
@@ -108,6 +108,7 @@ def test_ev():
     xx = ff.run_nve_velocity_verlet(steps=5)
     xx = ff.run_nvt_langevin(steps=5)
     xx = ff.run_nvt_andersen(steps=5)
+    xx = ff.run_npt_berendsen(steps=5)
     # xx = ff.run_npt_nose_hoover(steps=5)
 
 
@@ -118,12 +119,18 @@ def test_phonons():
         model_name="v10.30.2024_dft_3d_307k"
     )  # default_path()
     ph = phonons(model_path=model_path, atoms=(atoms))
-    ase_phonon(atoms=atoms,model_path=model_path)
+    ase_phonon(atoms=atoms, model_path=model_path)
+
+
+def test_qclean():
+    cmd = "rm *.pt *.traj *.csv *.json *range"
+    os.system(cmd)
+
 
 # print('test_graph_builder')
-#test_graph_builder()
+# test_graph_builder()
 # print('test_ev')
 # test_ev()
 # print('test_phonons')
-test_phonons()
+# test_phonons()
 # test_alignnff()
