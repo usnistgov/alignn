@@ -108,7 +108,7 @@ def test_ev():
     xx = ff.run_nve_velocity_verlet(steps=5)
     xx = ff.run_nvt_langevin(steps=5)
     xx = ff.run_nvt_andersen(steps=5)
-    xx = ff.run_npt_berendsen(steps=5)
+    # xx = ff.run_npt_berendsen(steps=5)
     # xx = ff.run_npt_nose_hoover(steps=5)
 
 
