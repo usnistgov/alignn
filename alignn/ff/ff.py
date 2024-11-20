@@ -8,7 +8,6 @@ from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
 import matplotlib.pyplot as plt
-from jarvis.analysis.thermodynamics.energetics import unary_energy
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.optimize import BFGS
 from ase.optimize.bfgslinesearch import BFGSLineSearch
@@ -30,15 +29,11 @@ from ase.stress import full_3x3_to_voigt_6_stress
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
-from alignn.pretrained import get_prediction
 from jarvis.analysis.structure.spacegroup import (
     Spacegroup3D,
-    symmetrically_distinct_miller_indices,
+    # symmetrically_distinct_miller_indices,
 )
-from jarvis.analysis.interface.zur import make_interface
-from jarvis.analysis.defects.surface import Surface
 from jarvis.core.kpoints import Kpoints3D as Kpoints
 import zipfile
 from ase import Atoms as AseAtoms
@@ -51,11 +46,15 @@ from sklearn.metrics import mean_absolute_error
 from tqdm import tqdm
 import torch
 
-try:
-    from gpaw import GPAW, PW
-except Exception:
-    pass
-# plt.switch_backend("agg")
+# from jarvis.analysis.thermodynamics.energetics import unary_energy
+# from jarvis.analysis.defects.vacancy import Vacancy
+# from jarvis.analysis.defects.surface import Surface
+# from alignn.pretrained import get_prediction
+# from jarvis.analysis.interface.zur import make_interface
+# try:
+#    from gpaw import GPAW, PW
+# except Exception:
+#    pass
 
 # Reference: https://doi.org/10.1039/D2DD00096B
 
@@ -229,7 +228,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         config_filename="config.json",
         output_dir=None,
         batch_stress=True,
-        stress_wt=0.1,
+        stress_wt=0.03,
         **kwargs,
     ):
         """Initialize class."""
@@ -871,6 +870,7 @@ def ev_curve(
     return x, y, eos, kv
 
 
+"""
 def vacancy_formation(
     atoms=None,
     jid="",
@@ -883,7 +883,6 @@ def vacancy_formation(
     using_wyckoffs=True,
     on_relaxed_struct=True,
 ):
-    """Get vacancy energy."""
     if atoms is None:
         from jarvis.db.figshare import data
 
@@ -975,7 +974,6 @@ def surface_energy(
     thickness=25,
     model_filename="best_model.pt",
 ):
-    """Get surface energy."""
     if atoms is None:
         from jarvis.db.figshare import data
 
@@ -1065,7 +1063,6 @@ def get_interface_energy(
     from_conventional_structure=True,
     gpaw_verify=False,
 ):
-    """Get work of adhesion."""
     film_surf = Surface(
         film_atoms,
         indices=film_index,
@@ -1091,14 +1088,6 @@ def get_interface_energy(
         atol=atol,
         apply_strain=apply_strain,
     )
-    """
-    print('film')
-    print(het['film_sl'])
-    print('subs')
-    print(het['subs_sl'])
-    print('intf')
-    print(het['interface'])
-    """
     a = get_prediction(
         atoms=het["film_sl"], model_name="jv_optb88vdw_total_energy_alignn"
     )[0]
@@ -1180,6 +1169,7 @@ def get_interface_energy(
     info["film_sl"] = het["film_sl"].to_dict()
     info["subs_sl"] = het["subs_sl"].to_dict()
     return info
+"""
 
 
 def phonons(

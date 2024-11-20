@@ -65,7 +65,7 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     penalty_threshold: float = 1
     additional_output_features: int = 0
     additional_output_weight: float = 0
-    stress_method: int = 4
+    stress_method: int = 1
     link: Literal["identity", "log", "logit"] = "identity"
     batch_stress: bool = True
 

@@ -3,10 +3,8 @@ from jarvis.core.atoms import Atoms as JAtoms
 from alignn.ff.ff import (
     default_path,
     ev_curve,
-    surface_energy,
-    vacancy_formation,
     ForceField,
-    get_interface_energy,
+    get_figshare_model_ff
 )
 from alignn.graphs import Graph, radius_graph_jarvis
 from alignn.ff.ff import phonons
@@ -42,25 +40,42 @@ Cartesian
 3.7801334214124656 6.383208181964002 7.430329467399411
 """
 
-
+pos = """System
+1.0
+5.49363 0.0 0.0
+-0.0 5.49363 0.0
+0.0 0.0 5.49363
+Si
+8
+direct
+0.25 0.75 0.25 Si
+0.0 0.0 0.5 Si
+0.25 0.25 0.75 Si
+0.0 0.5 0.0 Si
+0.75 0.75 0.75 Si
+0.5 0.0 0.0 Si
+0.75 0.25 0.25 Si
+0.5 0.5 0.5 Si
+"""
 # def test_radius_graph_jarvis():
 #    atoms = Poscar.from_string(pos).atoms
 #    g, lg = radius_graph_jarvis(atoms=atoms)
 
 
-def test_alignnff():
-    atoms = JAtoms.from_dict(get_jid_data()["atoms"])
-    atoms = JAtoms.from_dict(
-        get_jid_data(dataset="dft_3d", jid="JVASP-1002")["atoms"]
-        # get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
-    )
+def test_graph_builder():
+
+    atoms = Poscar.from_string(pos).atoms
     old_g = Graph.from_atoms(atoms=atoms)
     g, lg = Graph.atom_dgl_multigraph(atoms)
     g, lg = Graph.atom_dgl_multigraph(atoms, neighbor_strategy="radius_graph")
     g, lg = Graph.atom_dgl_multigraph(
         atoms, neighbor_strategy="radius_graph_jarvis"
     )
-    model_path = default_path()
+
+
+def test_ev():
+    atoms = Poscar.from_string(pos).atoms
+    model_path = get_figshare_model_ff(model_name="v10.30.2024_dft_3d_307k") #default_path()
     print("model_path", model_path)
     print("atoms", atoms)
     # atoms = atoms.make_supercell_matrix([2, 2, 2])
@@ -71,6 +86,11 @@ def test_alignnff():
     # vac = vacancy_formation(atoms=atoms, model_path=model_path)
     # print('vac',vac)
 
+
+def test_ev():
+    atoms = Poscar.from_string(pos).atoms
+    #model_path = default_path()
+    model_path = get_figshare_model_ff(model_name="v10.30.2024_dft_3d_307k") #default_path()
     ff = ForceField(
         jarvis_atoms=atoms,
         model_path=model_path,
@@ -84,30 +104,20 @@ def test_alignnff():
     xx = ff.run_nvt_langevin(steps=5)
     xx = ff.run_nvt_andersen(steps=5)
     # xx = ff.run_npt_nose_hoover(steps=5)
-    atoms_al = JAtoms.from_dict(
-        get_jid_data(dataset="dft_3d", jid="JVASP-1002")["atoms"]
-        # get_jid_data(dataset="dft_3d", jid="JVASP-816")["atoms"]
-    )
-    atoms_al2o3 = JAtoms.from_dict(
-        get_jid_data(dataset="dft_3d", jid="JVASP-1002")["atoms"]
-        # get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
-    )
-    intf = get_interface_energy(
-        film_atoms=atoms_al,
-        subs_atoms=atoms_al,
-        model_path=model_path,
-        film_thickness=5,
-        subs_thickness=5,
-        # film_atoms=atoms_al, subs_atoms=atoms_al2o3, model_path=model_path
-    )
+
+
 
 
 def test_phonons():
-    atoms = Atoms.from_dict(
-        get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
-    )
-    ph_path = fd_path()
-    ph = phonons(model_path=ph_path, atoms=(atoms))
+    atoms = Poscar.from_string(pos).atoms.get_primitive_atoms
+    #model_path = default_path()
+    model_path = get_figshare_model_ff(model_name="v10.30.2024_dft_3d_307k") #default_path()
+    ph = phonons(model_path=model_path, atoms=(atoms))
 
-
+#print('test_graph_builder')
+#test_graph_builder()
+#print('test_ev')
+#test_ev()
+#print('test_phonons')
+#test_phonons()
 # test_alignnff()
