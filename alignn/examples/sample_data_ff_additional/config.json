@@ -77,8 +77,8 @@
         "use_penalty": true,
         "extra_features": 0,
         "exponent": 5,
-        "additional_output_features":400,
-        "additional_output_weight":0.1,
+        "additional_output_features": 400,
+        "additional_output_weight": 0.1,
         "penalty_factor": 0.1,
         "penalty_threshold": 1.0
     }
