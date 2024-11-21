@@ -20,7 +20,7 @@ from alignn.ff.ff import (
     ForceField,
 )
 from jarvis.io.vasp.inputs import Poscar
-
+import os
 # JVASP-25139
 pos = """Rb8
 1.0

@@ -223,6 +223,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         model=None,
         config=None,
         force_mult_batchsize=True,
+        stress_method=None,
         path=".",
         model_filename="best_model.pt",
         config_filename="config.json",
@@ -249,6 +250,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             # print('config',config)
             # config=TrainingConfig(**config).dict()
             self.config = config
+        if stress_method is not None:
+            config["model"]["stress_method"] = stress_method  # self.stress_wt
         if self.include_stress:
             self.implemented_properties = ["energy", "forces", "stress"]
             if config["model"]["stresswise_weight"] == 0:
@@ -322,8 +325,11 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         )
         forces = result["grad"].detach().cpu().numpy()
+        # print('self.config["batch_size"]',self.config["batch_size"])
         if self.force_mult_batchsize:
-            forces *= self.config["batch_size"]
+            # print('forces1',forces)
+            forces = np.array(forces) * self.config["batch_size"]
+            # print('forces2',forces)
             # stress*=self.config['batch_size']
         self.results = {
             "energy": energy,  # * num_atoms,
