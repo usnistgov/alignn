@@ -8,6 +8,7 @@ from ase.md.nvtberendsen import NVTBerendsen
 from ase.md.nptberendsen import NPTBerendsen
 from ase.io import Trajectory
 import matplotlib.pyplot as plt
+from jarvis.analysis.thermodynamics.energetics import unary_energy
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.optimize import BFGS
 from ase.optimize.bfgslinesearch import BFGSLineSearch
@@ -29,11 +30,15 @@ from ase.stress import full_3x3_to_voigt_6_stress
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
+from alignn.pretrained import get_prediction
 from jarvis.analysis.structure.spacegroup import (
     Spacegroup3D,
-    # symmetrically_distinct_miller_indices,
+    symmetrically_distinct_miller_indices,
 )
+from jarvis.analysis.interface.zur import make_interface
+from jarvis.analysis.defects.surface import Surface
 from jarvis.core.kpoints import Kpoints3D as Kpoints
 import zipfile
 from ase import Atoms as AseAtoms
@@ -46,15 +51,11 @@ from sklearn.metrics import mean_absolute_error
 from tqdm import tqdm
 import torch
 
-# from jarvis.analysis.thermodynamics.energetics import unary_energy
-# from jarvis.analysis.defects.vacancy import Vacancy
-# from jarvis.analysis.defects.surface import Surface
-# from alignn.pretrained import get_prediction
-# from jarvis.analysis.interface.zur import make_interface
-# try:
-#    from gpaw import GPAW, PW
-# except Exception:
-#    pass
+try:
+    from gpaw import GPAW, PW
+except Exception:
+    pass
+# plt.switch_backend("agg")
 
 # Reference: https://doi.org/10.1039/D2DD00096B
 
@@ -222,14 +223,12 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         device=None,
         model=None,
         config=None,
-        force_mult_batchsize=True,
-        stress_method=None,
         path=".",
         model_filename="best_model.pt",
         config_filename="config.json",
         output_dir=None,
         batch_stress=True,
-        stress_wt=0.03,
+        stress_wt=0.1,
         **kwargs,
     ):
         """Initialize class."""
@@ -244,18 +243,17 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         self.config = config
         self.include_stress = include_stress
         self.stress_wt = stress_wt
-        self.force_mult_batchsize = force_mult_batchsize
+        # self.force_multiplier = force_multiplier
+        # self.force_mult_natoms = force_mult_natoms
         if self.config is None:
             config = loadjson(os.path.join(path, config_filename))
             # print('config',config)
             # config=TrainingConfig(**config).dict()
             self.config = config
-        if stress_method is not None:
-            config["model"]["stress_method"] = stress_method  # self.stress_wt
         if self.include_stress:
             self.implemented_properties = ["energy", "forces", "stress"]
             if config["model"]["stresswise_weight"] == 0:
-                config["model"]["stresswise_weight"] = 0.1  # self.stress_wt
+                config["model"]["stresswise_weight"] = 0.1
         else:
             self.implemented_properties = ["energy", "forces"]
 
@@ -278,9 +276,13 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     map_location=self.device,
                 )
             )
-            model.to(device)
-            model.eval()
-            self.model = model
+        else:
+            model = self.model
+        model.to(device)
+        model.eval()
+
+        self.net = model
+        self.net.to(self.device)
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
@@ -301,17 +303,17 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
         if self.config["model"]["alignn_layers"] > 0:
             # g,lg = g
-            result = self.model(
+            result = self.net(
                 (
                     g.to(self.device),
                     lg.to(self.device),
-                    torch.tensor(np.array(atoms.cell))
+                    torch.tensor(atoms.cell)
                     .type(torch.get_default_dtype())
                     .to(self.device),
                 )
             )
         else:
-            result = self.model(
+            result = self.net(
                 (g.to(self.device, torch.tensor(atoms.cell).to(self.device)))
             )
         # print ('stress',result["stress"].detach().numpy())
@@ -319,22 +321,25 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             energy = result["out"].detach().cpu().numpy() * num_atoms
         else:
             energy = result["out"].detach().cpu().numpy()
-        stress = self.stress_wt * np.array(
-            full_3x3_to_voigt_6_stress(
-                result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
-            )
-        )
-        forces = result["grad"].detach().cpu().numpy()
-        # print('self.config["batch_size"]',self.config["batch_size"])
-        if self.force_mult_batchsize:
-            # print('forces1',forces)
-            forces = np.array(forces) * self.config["batch_size"]
-            # print('forces2',forces)
-            # stress*=self.config['batch_size']
+
         self.results = {
             "energy": energy,  # * num_atoms,
-            "forces": forces,
-            "stress": stress,
+            "forces": result["grad"].detach().cpu().numpy()
+            * self.config["batch_size"],
+            "stress": full_3x3_to_voigt_6_stress(
+                # np.eye(3)
+                result["stresses"][:3]
+                .reshape(3, 3)
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            * self.stress_wt
+            / 160.21766208,
+            "dipole": np.zeros(3),
+            "charges": np.zeros(len(atoms)),
+            "magmom": 0.0,
+            "magmoms": np.zeros(len(atoms)),
         }
 
 
@@ -619,10 +624,10 @@ class ForceField(object):
         interval=1,
         temperature_K=300,
         steps=1000,
-        taut=5.0 * units.fs,
-        taup=500.0 * units.fs,
-        pressure=1.0 * units.bar,
-        compressibility=5e-7 / units.bar,
+        taut=49.11347394232032,
+        taup=98.22694788464064,
+        pressure=None,
+        compressibility=None,
         initial_temperature_K=None,
     ):
         """Run NPT."""
@@ -639,7 +644,7 @@ class ForceField(object):
             taup=taup,
             pressure=pressure,
             compressibility=compressibility,
-            # communicator=self.communicator,
+            communicator=self.communicator,
         )
         # Create monitors for logfile and a trajectory file
         # logfile = os.path.join(".", "%s.log" % filename)
@@ -876,7 +881,6 @@ def ev_curve(
     return x, y, eos, kv
 
 
-"""
 def vacancy_formation(
     atoms=None,
     jid="",
@@ -889,6 +893,7 @@ def vacancy_formation(
     using_wyckoffs=True,
     on_relaxed_struct=True,
 ):
+    """Get vacancy energy."""
     if atoms is None:
         from jarvis.db.figshare import data
 
@@ -980,6 +985,7 @@ def surface_energy(
     thickness=25,
     model_filename="best_model.pt",
 ):
+    """Get surface energy."""
     if atoms is None:
         from jarvis.db.figshare import data
 
@@ -1069,6 +1075,7 @@ def get_interface_energy(
     from_conventional_structure=True,
     gpaw_verify=False,
 ):
+    """Get work of adhesion."""
     film_surf = Surface(
         film_atoms,
         indices=film_index,
@@ -1094,6 +1101,14 @@ def get_interface_energy(
         atol=atol,
         apply_strain=apply_strain,
     )
+    """
+    print('film')
+    print(het['film_sl'])
+    print('subs')
+    print(het['subs_sl'])
+    print('intf')
+    print(het['interface'])
+    """
     a = get_prediction(
         atoms=het["film_sl"], model_name="jv_optb88vdw_total_energy_alignn"
     )[0]
@@ -1175,7 +1190,6 @@ def get_interface_energy(
     info["film_sl"] = het["film_sl"].to_dict()
     info["subs_sl"] = het["subs_sl"].to_dict()
     return info
-"""
 
 
 def phonons(
@@ -1481,3 +1495,93 @@ def ase_phonon(
     fig.savefig(filename)
     plt.close()
     return bs
+
+
+if __name__ == "__main__":
+    """
+    atoms = JarvisAtoms.from_dict(
+        # get_jid_data(jid="JVASP-867", dataset="dft_3d")["atoms"]
+        # get_jid_data(jid="JVASP-1002", dataset="dft_3d")["atoms"]
+        get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    )
+    mlearn = "/wrk/knc6/ALINN_FC/FD_mult/temp_new"  # mlearn_path()
+    phonons(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    """
+    ff = get_figshare_model_ff()
+    print("ff", ff)
+    # phonons3(atoms=atoms, model_path=mlearn, enforce_c_size=3)
+    # ase_phonon(atoms=atoms, model_path=mlearn)
+
+"""
+if __name__ == "__main__":
+
+    from jarvis.db.figshare import get_jid_data
+    from jarvis.core.atoms import Atoms
+
+    # atoms = Spacegroup3D(
+    #   JarvisAtoms.from_dict(
+    #       get_jid_data(jid="JVASP-816", dataset="dft_3d")["atoms"]
+    #   )
+    # ).conventional_standard_structure
+    # atoms = JarvisAtoms.from_poscar("POSCAR")
+    # atoms = atoms.make_supercell_matrix([2, 2, 2])
+    # print(atoms)
+    model_path = default_path()
+    print("model_path", model_path)
+    # atoms=atoms.strain_atoms(.05)
+    # print(atoms)
+    # ev = ev_curve(atoms=atoms, model_path=model_path)
+    # surf = surface_energy(atoms=atoms, model_path=model_path)
+    # print(surf)
+    # vac = vacancy_formation(atoms=atoms, model_path=model_path)
+    # print(vac)
+
+    # ff = ForceField(
+    #    jarvis_atoms=atoms,
+    #    model_path=model_path,
+    # )
+    # en,fs = ff.unrelaxed_atoms()
+    # print ('en',en)
+    # print('fs',fs)
+    # phonons(atoms=atoms)
+    # phonons3(atoms=atoms)
+    # ff.set_momentum_maxwell_boltzmann(temperature_K=300)
+    # xx = ff.optimize_atoms(optimizer="FIRE")
+    # print("optimized st", xx)
+    # xx = ff.run_nve_velocity_verlet(steps=5)
+    # xx = ff.run_nvt_langevin(steps=5)
+    # xx = ff.run_nvt_andersen(steps=5)
+    # xx = ff.run_npt_nose_hoover(steps=20000, temperature_K=1800)
+    # print(xx)
+    atoms_al = Atoms.from_dict(
+        get_jid_data(dataset="dft_3d", jid="JVASP-816")["atoms"]
+    )
+    surf = surface_energy(atoms=atoms_al, model_path=model_path)
+    # atoms_al2o3 = Atoms.from_dict(
+    #    get_jid_data(dataset="dft_3d", jid="JVASP-32")["atoms"]
+    # )
+    # atoms_sio2 = Atoms.from_dict(
+    #    get_jid_data(dataset="dft_3d", jid="JVASP-58349")["atoms"]
+    # )
+    # atoms_cu = Atoms.from_dict(
+    #    get_jid_data(dataset="dft_3d", jid="JVASP-867")["atoms"]
+    # )
+    # atoms_cu2o = Atoms.from_dict(
+    #    get_jid_data(dataset="dft_3d", jid="JVASP-1216")["atoms"]
+    # )
+    # atoms_graph = Atoms.from_dict(
+    #    get_jid_data(dataset="dft_3d", jid="JVASP-48")["atoms"]
+    # )
+    # intf = get_interface_energy(
+    #    film_atoms=atoms_cu,
+    #    subs_atoms=atoms_cu2o,
+    #    film_thickness=25,
+    #    subs_thickness=25,
+    #    model_path=model_path,
+    #    seperation=4.5,
+    #    subs_index=[1, 1, 1],
+    #    film_index=[1, 1, 1],
+    # )
+    # print(intf)
+    print(surf)
+"""

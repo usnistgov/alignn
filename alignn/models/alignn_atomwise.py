@@ -29,45 +29,47 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     """Hyperparameter schema for jarvisdgl.models.alignn."""
 
     name: Literal["alignn_atomwise"]
-    alignn_layers: int = 4
-    gcn_layers: int = 4
-    # atom_input_features: int = 1
-    atom_input_features: int = 92
+    alignn_layers: int = 2
+    gcn_layers: int = 2
+    atom_input_features: int = 1
+    # atom_input_features: int = 92
     edge_input_features: int = 80
     triplet_input_features: int = 40
     embedding_features: int = 64
-    # hidden_features: int = 64
-    hidden_features: int = 256
+    hidden_features: int = 64
+    # hidden_features: int = 256
+    # fc_layers: int = 1
+    # fc_features: int = 64
     output_features: int = 1
     grad_multiplier: int = -1
     calculate_gradient: bool = True
     atomwise_output_features: int = 0
     graphwise_weight: float = 1.0
-    gradwise_weight: float = 0.0
+    gradwise_weight: float = 1.0
     stresswise_weight: float = 0.0
     atomwise_weight: float = 0.0
+    # if link == log, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
     classification: bool = False
     force_mult_natoms: bool = False
-    energy_mult_natoms: bool = False
-    # energy_mult_natoms: bool = True
+    energy_mult_natoms: bool = True
     include_pos_deriv: bool = False
     use_cutoff_function: bool = False
-    inner_cutoff: float = 6  # Ansgtrom
+    inner_cutoff: float = 3  # Ansgtrom
     stress_multiplier: float = 1
     add_reverse_forces: bool = True  # will make True as default soon
     lg_on_fly: bool = True  # will make True as default soon
+    batch_stress: bool = True
     multiply_cutoff: bool = False
     use_penalty: bool = True
     extra_features: int = 0
-    exponent: int = 3
+    exponent: int = 5
     penalty_factor: float = 0.1
     penalty_threshold: float = 1
     additional_output_features: int = 0
     additional_output_weight: float = 0
-    stress_method: int = 1
-    link: Literal["identity", "log", "logit"] = "identity"
-    batch_stress: bool = True
 
     class Config:
         """Configure model settings behavior."""
@@ -380,7 +382,7 @@ class ALIGNNAtomWise(nn.Module):
             features = self.extra_feature_embedding(features)
         g = g.local_var()
         result = {}
-        # print('g',g)
+
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
         # print('x1',x,x.shape)
@@ -557,42 +559,28 @@ class ALIGNNAtomWise(nn.Module):
                     forces = torch.squeeze(g.ndata["forces_ji"])
 
                 if self.config.stresswise_weight != 0:
-                    if self.config.stress_method == 1:
-                        g.ndata["cart_coords"] = compute_cartesian_coordinates(
-                            g, lat
-                        )
-                        r, bondlength = compute_pair_vector_and_distance(g)
-                        stress = -160.21766208 * (
-                            torch.matmul(r.T, pair_forces)
-                            # / (2 * g.edata["V"])
-                            / (2 * g.ndata["V"][0])
-                        )
-                    if self.config.stress_method == 2:
-                        cart_coords = compute_cartesian_coordinates(
-                            g, lat
-                        ).view(g.batch_size, -1, 3)
-                        forces_batched = forces.view(g.batch_size, -1, 3)
-                        vols = torch.abs(torch.det(lat))
-                        if vols.ndim == 0:
-                            vols = vols.unsqueeze(0)
-                        stresses = []
-                        for graph_id in range(g.batch_size):
-                            st = (
-                                -160.21766208
-                                * torch.matmul(
-                                    cart_coords[graph_id].T,
-                                    forces_batched[graph_id],
-                                )
-                                / (vols[graph_id])
-                            )
-                            stresses.append(st)
-                            # print(st)
-                        stress = torch.stack(stresses)
-                    if self.config.stress_method == 3:
+                    # Under development, use with caution
+                    # 1 eV/Angstrom3 = 160.21766208 GPa
+                    # 1 GPa = 10 kbar
+                    # Virial stress formula, assuming inital velocity = 0
+                    # Save volume as g.gdta['V']?
+                    # print('pair_forces',pair_forces.shape)
+                    # print('r',r.shape)
+                    # print('g.ndata["V"]',g.ndata["V"].shape)
+                    if not self.config.batch_stress:
+                        # print('Not batch_stress')
                         stress = (
-                            -1 * torch.einsum("ij, ik->jk", r, pair_forces) / 2
+                            -1
+                            * 160.21766208
+                            * (
+                                torch.matmul(r.T, pair_forces)
+                                # / (2 * g.edata["V"])
+                                / (2 * g.ndata["V"][0])
+                            )
                         )
-                    if self.config.stress_method == 4:
+                    # print("stress1", stress, stress.shape)
+                    # print("g.batch_size", g.batch_size)
+                    else:
                         stresses = []
                         count_edge = 0
                         count_node = 0
@@ -617,6 +605,14 @@ class ALIGNNAtomWise(nn.Module):
                         stress = self.config.stress_multiplier * torch.stack(
                             stresses
                         )
+                    # print("stress2", stress, stress.shape)
+                    # virial = (
+                    #    160.21766208
+                    #    * 10
+                    #    * torch.einsum("ij, ik->jk",
+                    #    result["r"], result["dy_dr"])
+                    #    / 2
+                    # )  # / ( g.ndata["V"][0])
         if self.link:
             out = self.link(out)
 
