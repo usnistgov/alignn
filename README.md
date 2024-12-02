@@ -187,42 +187,43 @@ Atomisitic line graph neural network-based FF (ALIGNN-FF) can be used to model b
 [ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html) provides interface to various codes. An example for ALIGNN-FF is give below. Note that there are multiple pretrained ALIGNN-FF models available, here we use the deafult_path model. As more accurate models are developed, they will be made available as well:
 
 ```
-from alignn.ff.ff import (
-    AlignnAtomwiseCalculator,
-    default_path,
-    mptraj_path,
-    wt01_path,
-)
-import matplotlib.pyplot as plt
-from ase import Atom, Atoms
-import time
-from ase.build import bulk
+from alignn.ff.ff import AlignnAtomwiseCalculator,default_path
+from jarvis.io.vasp.inputs import Poscar
 import numpy as np
 import matplotlib.pyplot as plt
-from ase.build import make_supercell
-%matplotlib inline
-
 model_path = default_path()
 calc = AlignnAtomwiseCalculator(path=model_path)
+# Source: https://www.ctcms.nist.gov/~knc6/static/JARVIS-DFT/JVASP-1002.xml
+poscar="""Si2
+1.0
+3.3641499856336465 -2.5027128e-09 1.94229273881412
+1.121382991333525 3.1717517190189715 1.9422927388141193
+-2.5909987e-09 -1.8321133e-09 3.884586486670313
+Si
+2
+Cartesian
+3.92483875 2.77528125 6.7980237500000005
+0.56069125 0.39646875 0.9711462500000001
+"""
+dx=np.arange(-0.1, 0.1, 0.01)
+atoms=Poscar.from_string(poscar).atoms
+print(atoms)
+y = []
+vol = []
+for i in dx:
+    struct = atoms.strain_atoms(i)
+    struct_ase=struct.ase_converter()
+    struct_ase.calc=calc
+    y.append(struct_ase.get_potential_energy())
+    vol.append(struct.volume)
 
-t1 = time.time()
-# a = 5.43
-lattice_params = np.linspace(5.2, 5.6)
-fcc_energies = []
-ready = True
-for a in lattice_params:
-    atoms = bulk("Si", "diamond", a=a)
-    atoms.set_tags(np.ones(len(atoms)))
-    atoms.calc = calc
-    e = atoms.get_potential_energy()
-    fcc_energies.append(e)
-t2 = time.time()
-print("Time", t2 - t1)
-plt.plot(lattice_params, fcc_energies, "-o")
-plt.title("Si")
-plt.xlabel("Lattice constant ($\AA$)")
-plt.ylabel("Total energy (eV)")
-plt.show()
+
+
+plt.plot(vol,y,'-o')
+plt.xlabel('Volume ($\AA^3$)')
+plt.ylabel('Total energy (eV)')
+plt.savefig('Si_JVASP-1002.png')
+plt.close()
 ```
 
 To train ALIGNN-FF use `train_alignn.py` script which uses `atomwise_alignn` model:
