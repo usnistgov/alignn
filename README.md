@@ -167,9 +167,17 @@ To finetune model, use `--restart_model_path` tag as well in the above with the 
 train_alignn.py --root_dir "alignn/examples/sample_data_ff" --restart_model_path "temp/best_model.pt" --config "alignn/examples/sample_data_ff/config_example_atomwise.json" --output_dir="temp1"
 ```
 
-Starting version v2024.10.30, we also allow global training for multi-output along with energy (graph wise output), forces (atomwise gradients), charges/magnetic moments etc. (atomwise but non-gradients) properties with or without additional fingerprints/features in graph. See examples [here](https://github.com/usnistgov/alignn/tree/develop/alignn/examples). 
+Starting version v2024.10.30, we also allow global training for multi-output along with energy (graph wise output), forces (atomwise gradients), charges/magnetic moments etc. (atomwise but non-gradients) properties with or without additional fingerprints/features in graph. See examples [here](https://github.com/usnistgov/alignn/tree/main/alignn/examples). 
 
-Users can also try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the [alignn/scripts/train_*.py](https://github.com/usnistgov/alignn/tree/main/alignn/scripts) folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.
+Multi-GPU training is allowed with `DistributedDataParallel` with `torchrun` command. This feature is not thoroughly tested yet. 
+Example:
+
+```
+torchrun --nproc_per_node=4 train_alignn.py --root_dir DataDir --config config.json --output_dir temp
+```
+For multi-GPU training make sure you have correct SLURM/PBS script setup correctly such as `#SBATCH -n 4, #SBATCH -N 1, #SBATCH --gres=gpu:4` etc.
+
+High-throughput like training: Users can also try training using multiple example scripts to run multiple dataset (such as JARVIS-DFT, Materials project, QM9_JCTC etc.). Look into the [alignn/scripts/train_*.py](https://github.com/usnistgov/alignn/tree/main/alignn/scripts) folder. This is done primarily to make the trainings more automated rather than making folder/ csv files etc.
 These scripts automatically download datasets from [Databases in jarvis-tools](https://jarvis-tools.readthedocs.io/en/master/databases.html) and train several models. Make sure you specify your specific queuing system details in the scripts.
 
 
@@ -213,7 +221,7 @@ run_alignn_ff.py -h
 Several supporting scripts for stucture optimization, equation of states, phonon and related calculations are provided in the repo as well. If you need further assistance for a particular task, feel free to raise an GitHus issue.
 
 <a name="webapp"></a>
-Web-app
+Web-apps
 ------------
 
 A basic web-app is for direct-prediction available at [JARVIS-ALIGNN app](https://jarvis.nist.gov/jalignn/). Given atomistic structure in POSCAR format it predict formation energy, total energy per atom and bandgap using data trained on JARVIS-DFT dataset.
