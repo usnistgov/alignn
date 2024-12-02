@@ -191,7 +191,7 @@ def test_calculator():
     energy = ase_atoms.get_potential_energy()
     forces = ase_atoms.get_forces()
     stress = ase_atoms.get_stress()
-    print("round(energy,3)", round(energy, 3))
+    print("energy", energy)
     print("max(forces.flatten()),3)", max(forces.flatten()))
     print("max(stress.flatten()),3)", max(stress.flatten()))
     # assert round(energy,3)==round(-60.954999923706055,3)

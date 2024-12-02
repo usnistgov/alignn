@@ -127,24 +127,25 @@ def get_figshare_model_ff(
 
 def default_path():
     """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="v5.27.2024")
+    dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
+    # dpath = get_figshare_model_ff(model_name="v5.27.2024")
     # dpath = get_figshare_model_ff(model_name="v8.29.2024_dft_3d")
     # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
     # dpath = get_figshare_model_ff(model_name="alignnff_fmult")
-    # print("model_path", dpath)
+    print("model_path", dpath)
     return dpath
 
 
 def mp_2mill():
-    """Get defaukt model path."""
-    dpath = get_figshare_model_ff(model_name="revised")
+    """Get default model path."""
+    dpath = get_figshare_model_ff(model_name="v12.2.2024_mp_1.5mill")
     # print("model_path", dpath)
     return dpath
 
 
 def mp_167k():
     """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="alignnff_fmult")
+    dpath = get_figshare_model_ff(model_name="v12.2.2024_mp_187k")
     # print("model_path", dpath)
     return dpath
 
@@ -152,13 +153,6 @@ def mp_167k():
 def jv_307k():
     """Get MPtraj model path."""
     dpath = get_figshare_model_ff(model_name="v8.29.2024_mpf")
-    # print("model_path", dpath)
-    return dpath
-
-
-def jv_2mill():
-    """Get model trained on mlearn path."""
-    dpath = get_figshare_model_ff(model_name="fmult_mlearn_only")
     # print("model_path", dpath)
     return dpath
 
@@ -216,7 +210,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         device=None,
         model=None,
         config=None,
-        path=".",
+        path=None,
         model_filename="best_model.pt",
         config_filename="config.json",
         output_dir=None,
@@ -224,7 +218,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         force_mult_natoms=False,
         force_mult_batchsize=True,
         force_multiplier=1,
-        stress_wt=0.1,
+        stress_wt=0.05,
     ):
         """Initialize class."""
         super(AlignnAtomwiseCalculator, self).__init__(
@@ -239,6 +233,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         self.force_mult_natoms = force_mult_natoms
         self.force_mult_batchsize = force_mult_batchsize
         self.force_multiplier = force_multiplier
+        if path is None and model is None:
+            path = default_path()
         if self.config is None:
             config = loadjson(os.path.join(path, config_filename))
             self.config = config
