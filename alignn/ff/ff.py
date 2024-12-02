@@ -1183,6 +1183,7 @@ def phonons(
     on_relaxed_struct=False,
     force_mult_natoms=False,
     stress_wt=0.1,
+    force_multiplier=1,
     dim=[2, 2, 2],
     freq_conversion_factor=33.3566830,  # ThztoCm-1
     phonopy_bands_figname="phonopy_bands.png",
@@ -1197,6 +1198,7 @@ def phonons(
         force_mult_natoms=force_mult_natoms,
         stress_wt=stress_wt,
         model_filename=model_filename,
+        force_multiplier=force_multiplier,
     )
 
     from phonopy import Phonopy
@@ -1331,8 +1333,8 @@ def phonons3(
     on_relaxed_struct=False,
     dim=[2, 2, 2],
     distance=0.2,
-    stress_wt=-4800,
-    force_multiplier=2,
+    stress_wt=0.1,
+    force_multiplier=1,
 ):
     """Make Phonon3 calculation setup."""
     from phono3py import Phono3py
