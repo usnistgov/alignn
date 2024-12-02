@@ -1176,6 +1176,7 @@ def get_interface_energy(
 
 def phonons(
     atoms=None,
+    calc=None,
     enforce_c_size=8,
     line_density=5,
     model_path=".",
@@ -1193,13 +1194,14 @@ def phonons(
     distance=0.2,
 ):
     """Make Phonon calculation setup."""
-    calc = AlignnAtomwiseCalculator(
-        path=model_path,
-        force_mult_natoms=force_mult_natoms,
-        stress_wt=stress_wt,
-        model_filename=model_filename,
-        force_multiplier=force_multiplier,
-    )
+    if calc is None:
+        calc = AlignnAtomwiseCalculator(
+            path=model_path,
+            force_mult_natoms=force_mult_natoms,
+            stress_wt=stress_wt,
+            model_filename=model_filename,
+            force_multiplier=force_multiplier,
+        )
 
     from phonopy import Phonopy
     from phonopy.file_IO import (
@@ -1326,6 +1328,7 @@ def phonons(
 
 def phonons3(
     atoms=None,
+    calc=None,
     enforce_c_size=8,
     line_density=5,
     model_path=".",
@@ -1339,9 +1342,12 @@ def phonons3(
     """Make Phonon3 calculation setup."""
     from phono3py import Phono3py
 
-    calc = AlignnAtomwiseCalculator(
-        path=model_path, force_multiplier=force_multiplier, stress_wt=stress_wt
-    )
+    if calc is None:
+        calc = AlignnAtomwiseCalculator(
+            path=model_path,
+            force_multiplier=force_multiplier,
+            stress_wt=stress_wt,
+        )
 
     # kpoints = Kpoints().kpath(atoms, line_density=line_density)
     # dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
@@ -1391,6 +1397,7 @@ def ase_phonon(
     N=2,
     path=[],
     jid=None,
+    calc=None,
     npoints=100,
     dataset="dft_3d",
     delta=0.01,
@@ -1402,9 +1409,10 @@ def ase_phonon(
     force_multiplier=1,
 ):
     """Get phonon bandstructure and DOS using ASE."""
-    calc = AlignnAtomwiseCalculator(
-        path=model_path, force_multiplier=force_multiplier
-    )
+    if calc is None:
+        calc = AlignnAtomwiseCalculator(
+            path=model_path, force_multiplier=force_multiplier
+        )
     # Setup crystal and EMT calculator
     # atoms = bulk("Al", "fcc", a=4.05)
 
