@@ -11,7 +11,7 @@ import os
 from jarvis.core.atoms import Atoms
 from alignn.train_alignn import train_for_folder
 from jarvis.db.figshare import get_jid_data
-from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, revised_path
+from alignn.ff.ff import AlignnAtomwiseCalculator, default_path
 import torch
 from jarvis.db.jsonutils import loadjson, dumpjson
 from alignn.config import TrainingConfig

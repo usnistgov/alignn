@@ -15,8 +15,6 @@ from alignn.ff.ff import (
     AlignnAtomwiseCalculator,
     default_path,
     wt10_path,
-    alignnff_fmult,
-    fd_path,
     ForceField,
 )
 from jarvis.io.vasp.inputs import Poscar
