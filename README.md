@@ -432,7 +432,8 @@ References
 7) [Rapid Prediction of Phonon Structure and Properties using an Atomistic Line Graph Neural Network (ALIGNN)](https://journals.aps.org/prmaterials/abstract/10.1103/PhysRevMaterials.7.023803)
 8) [Unified graph neural network force-field for the periodic table](https://pubs.rsc.org/en/content/articlehtml/2023/dd/d2dd00096b)
 9) [Large Scale Benchmark of Materials Design Methods](https://www.nature.com/articles/s41524-024-01259-w)
-10) [CHIPS-FF: Benchmarking universal force-fields](https://github.com/usnistgov/chipsff)
+10) [Prediction of Magnetic Properties in van der Waals Magnets using Graph Neural Networks](https://doi.org/10.1103/PhysRevMaterials.8.114002)
+11) [CHIPS-FF: Benchmarking universal force-fields](https://github.com/usnistgov/chipsff)
 
 
 Please see detailed publications list [here](https://jarvis-tools.readthedocs.io/en/master/publications.html).
