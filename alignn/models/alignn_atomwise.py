@@ -479,16 +479,9 @@ class ALIGNNAtomWise(nn.Module):
         natoms = torch.tensor([gg.num_nodes() for gg in dgl.unbatch(g)]).to(
             g.device
         )
+        en_out = out
         if self.config.energy_mult_natoms:
-            # print('g.num_nodes()',g.num_nodes())
-            # print('unbatch',dgl.unbatch(g))
-            # print('natoms',natoms)
-            # print('out',out,out.shape)
-            # print()
-            # print()
             en_out = out * natoms  # g.num_nodes()
-        else:
-            en_out = out
         if self.config.use_penalty:
             penalty_factor = (
                 self.config.penalty_factor
@@ -559,16 +552,22 @@ class ALIGNNAtomWise(nn.Module):
                     forces = torch.squeeze(g.ndata["forces_ji"])
 
                 if self.config.stresswise_weight != 0:
+                    # print("self.config.batch_stress",self.config.batch_stress)
                     # Under development, use with caution
                     # 1 eV/Angstrom3 = 160.21766208 GPa
                     # 1 GPa = 10 kbar
                     # Virial stress formula, assuming inital velocity = 0
-                    # Save volume as g.gdta['V']?
-                    # print('pair_forces',pair_forces.shape)
-                    # print('r',r.shape)
-                    # print('g.ndata["V"]',g.ndata["V"].shape)
                     if not self.config.batch_stress:
                         # print('Not batch_stress')
+                        g.ndata["cart_coords"] = compute_cartesian_coordinates(
+                            g, lat
+                        )
+                        r, bondlength = compute_pair_vector_and_distance(g)
+                        stress = -160.21766208 * (
+                            torch.matmul(r.T, pair_forces)
+                            # / (2 * g.edata["V"])
+                            / (2 * g.ndata["V"][0])
+                        )
                         stress = (
                             -1
                             * 160.21766208
@@ -578,6 +577,25 @@ class ALIGNNAtomWise(nn.Module):
                                 / (2 * g.ndata["V"][0])
                             )
                         )
+                        # cart_coords = compute_cartesian_coordinates(
+                        #    g, lat
+                        # ).view(g.batch_size, -1, 3)
+                        # forces_batched = forces.view(g.batch_size, -1, 3)
+                        # vols = torch.abs(torch.det(lat))
+                        # if vols.ndim == 0:
+                        #    vols = vols.unsqueeze(0)
+                        # stresses = []
+                        # for graph_id in range(g.batch_size):
+                        #    st = (
+                        #        -160.21766208
+                        #        * torch.matmul(
+                        #            cart_coords[graph_id].T,
+                        #            forces_batched[graph_id],
+                        #        )
+                        #        / (vols[graph_id])
+                        #    )
+                        #    stresses.append(st)
+                        # stress = torch.stack(stresses)
                     # print("stress1", stress, stress.shape)
                     # print("g.batch_size", g.batch_size)
                     else:
