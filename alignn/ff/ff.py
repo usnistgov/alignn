@@ -49,6 +49,7 @@ from ase.cell import Cell
 from matplotlib.gridspec import GridSpec
 from sklearn.metrics import mean_absolute_error
 from tqdm import tqdm
+import torch
 
 try:
     from gpaw import GPAW, PW
@@ -126,7 +127,8 @@ def get_figshare_model_ff(
 
 def default_path():
     """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="v5.27.2024")
+    dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
+    # dpath = get_figshare_model_ff(model_name="v5.27.2024")
     # dpath = get_figshare_model_ff(model_name="v8.29.2024_dft_3d")
     # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
     # dpath = get_figshare_model_ff(model_name="alignnff_fmult")
@@ -134,59 +136,45 @@ def default_path():
     return dpath
 
 
-def revised_path():
-    """Get defaukt model path."""
-    dpath = get_figshare_model_ff(model_name="revised")
-    print("model_path", dpath)
-    return dpath
-
-
-def alignnff_fmult():
+def mp_2mill():
     """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="alignnff_fmult")
-    print("model_path", dpath)
+    dpath = get_figshare_model_ff(model_name="v12.2.2024_mp_1.5mill")
+    # print("model_path", dpath)
     return dpath
 
 
-def mptraj_path():
+def mp_167k():
+    """Get default model path."""
+    dpath = get_figshare_model_ff(model_name="v12.2.2024_mp_187k")
+    # print("model_path", dpath)
+    return dpath
+
+
+def jv_307k():
     """Get MPtraj model path."""
     dpath = get_figshare_model_ff(model_name="v8.29.2024_mpf")
-    print("model_path", dpath)
-    return dpath
-
-
-def mlearn_path():
-    """Get model trained on mlearn path."""
-    dpath = get_figshare_model_ff(model_name="fmult_mlearn_only")
-    print("model_path", dpath)
-    return dpath
-
-
-def fd_path():
-    """Get defaukt model path."""
-    dpath = get_figshare_model_ff(model_name="alignnff_fd")
-    print("model_path", dpath)
+    # print("model_path", dpath)
     return dpath
 
 
 def wt01_path():
     """Get defaukt model path."""
     dpath = get_figshare_model_ff(model_name="alignnff_wt01")
-    print("model_path", dpath)
+    # print("model_path", dpath)
     return dpath
 
 
 def wt1_path():
     """Get defaukt model path."""
     dpath = get_figshare_model_ff(model_name="alignnff_wt1")
-    print("model_path", dpath)
+    # print("model_path", dpath)
     return dpath
 
 
 def wt10_path():
     """Get defaukt model path."""
     dpath = get_figshare_model_ff(model_name="alignnff_wt10")
-    print("model_path", dpath)
+    # print("model_path", dpath)
     return dpath
 
 
@@ -216,86 +204,80 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         ignore_bad_restart_file=ignore_bad_restart_file,
         label=None,
         include_stress=True,
+        intensive=True,
         atoms=None,
         directory=".",
         device=None,
-        path=".",
+        model=None,
+        config=None,
+        path=None,
         model_filename="best_model.pt",
         config_filename="config.json",
-        keep_data_order=False,
-        classification_threshold=None,
-        batch_size=None,
-        epochs=None,
         output_dir=None,
-        stress_wt=1.0,
-        force_multiplier=1.0,
-        force_mult_natoms=False,
         batch_stress=True,
-        **kwargs,
+        force_mult_natoms=False,
+        force_mult_batchsize=True,
+        force_multiplier=1,
+        stress_wt=0.05,
     ):
         """Initialize class."""
         super(AlignnAtomwiseCalculator, self).__init__(
-            restart, ignore_bad_restart_file, label, atoms, directory, **kwargs
-        )
+            restart, ignore_bad_restart_file, label, atoms, directory
+        )  # , **kwargs
+        self.model = model
         self.device = device
+        self.intensive = intensive
+        self.config = config
         self.include_stress = include_stress
         self.stress_wt = stress_wt
-        config = loadjson(os.path.join(path, config_filename))
-        self.config = config
-        self.force_multiplier = force_multiplier
         self.force_mult_natoms = force_mult_natoms
-        # config = TrainingConfig(**config)
-        # if type(config) is dict:
-        #    try:
-        #        config = TrainingConfig(**config)
-        #    except Exception as exp:
-        #        print("Check", exp)
+        self.force_mult_batchsize = force_mult_batchsize
+        self.force_multiplier = force_multiplier
+        if path is None and model is None:
+            path = default_path()
+        if self.config is None:
+            config = loadjson(os.path.join(path, config_filename))
+            self.config = config
+        if self.force_mult_natoms:
+            self.config["model"]["force_mult_natoms"] = True
         if self.include_stress:
             self.implemented_properties = ["energy", "forces", "stress"]
-            if config["model"]["stresswise_weight"] == 0:
-                config["model"]["stresswise_weight"] = 0.1
+            if self.config["model"]["stresswise_weight"] == 0:
+                self.config["model"]["stresswise_weight"] = 0.1
         else:
             self.implemented_properties = ["energy", "forces"]
 
-        config["keep_data_order"] = keep_data_order
-        if classification_threshold is not None:
-            config["classification_threshold"] = float(
-                classification_threshold
-            )
-        if output_dir is not None:
-            config["output_dir"] = output_dir
-        if batch_size is not None:
-            config["batch_size"] = int(batch_size)
-        if epochs is not None:
-            config["epochs"] = int(epochs)
         if batch_stress is not None:
-            config["model"]["batch_stress"] = batch_stress
-        # config["model.output_features"] = 1
-        # print('config',config["model"])
+            self.config["model"]["batch_stress"] = batch_stress
         import torch
 
         if self.device is None:
             self.device = torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu"
             )
-        model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config["model"]))
-        model.state_dict()
-        model.load_state_dict(
-            torch.load(
-                os.path.join(path, model_filename), map_location=self.device
-            )
-        )
-        model.to(device)
-        model.eval()
+        if self.model is None:
 
-        self.net = model
-        self.net.to(self.device)
+            if self.config["model"]["name"] == "alignn_atomwise":
+                model = ALIGNNAtomWise(
+                    ALIGNNAtomWiseConfig(**self.config["model"])
+                )
+            model.state_dict()
+            model.load_state_dict(
+                torch.load(
+                    os.path.join(path, model_filename),
+                    map_location=self.device,
+                )
+            )
+            model.to(device)
+            model.eval()
+            self.model = model
+        else:
+            model = self.model
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
         j_atoms = ase_to_atoms(atoms)
         num_atoms = j_atoms.num_atoms
-        # g, lg = Graph.atom_dgl_multigraph(
         g, lg = Graph.atom_dgl_multigraph(
             j_atoms,
             neighbor_strategy=self.config["neighbor_strategy"],
@@ -304,32 +286,43 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             atom_features=self.config["atom_features"],
             use_canonize=self.config["use_canonize"],
         )
+
         if self.config["model"]["alignn_layers"] > 0:
-            # g,lg = g
-            result = self.net((g.to(self.device), lg.to(self.device)))
+            result = self.model(
+                (
+                    g.to(self.device),
+                    lg.to(self.device),
+                    torch.tensor(atoms.cell)
+                    .type(torch.get_default_dtype())
+                    .to(self.device),
+                )
+            )
         else:
-            result = self.net((g.to(self.device)))
-        # print ('stress',result["stress"].detach().numpy())
-        if self.force_mult_natoms:
-            mult = num_atoms
-        else:
-            mult = 1
-        # print('result["stresses"]',result["stresses"],result["stresses"].shape)
-        self.results = {
-            "energy": result["out"].detach().cpu().numpy() * num_atoms,
-            "forces": result["grad"].detach().cpu().numpy()
-            * mult
-            * self.force_multiplier,
-            "stress": full_3x3_to_voigt_6_stress(
+            result = self.model(
+                (g.to(self.device, torch.tensor(atoms.cell).to(self.device)))
+            )
+        forces = forces = (
+            result["grad"].detach().cpu().numpy() * self.force_multiplier
+        )
+        stress = (
+            full_3x3_to_voigt_6_stress(
                 result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
             )
             * self.stress_wt
-            # * num_atoms,
-            / 160.21766208,
-            "dipole": np.zeros(3),
-            "charges": np.zeros(len(atoms)),
-            "magmom": 0.0,
-            "magmoms": np.zeros(len(atoms)),
+            / 160.21766208
+        )
+        energy = result["out"].detach().cpu().numpy()
+        if self.intensive:
+            energy *= num_atoms
+        if self.force_mult_natoms:
+            forces *= num_atoms
+        if self.force_mult_batchsize:
+            forces *= self.config["batch_size"]
+
+        self.results = {
+            "energy": energy,
+            "forces": forces,
+            "stress": stress,
         }
 
 
@@ -394,7 +387,6 @@ class ForceField(object):
                 include_stress=self.include_stress,
                 model_filename=self.model_filename,
                 stress_wt=self.stress_wt,
-                force_multiplier=self.force_multiplier,
                 force_mult_natoms=self.force_mult_natoms,
                 batch_stress=self.batch_stress,
                 # device="cuda" if torch.cuda.is_available() else "cpu",
@@ -1184,13 +1176,15 @@ def get_interface_energy(
 
 def phonons(
     atoms=None,
+    calc=None,
     enforce_c_size=8,
     line_density=5,
     model_path=".",
     model_filename="best_model.pt",
     on_relaxed_struct=False,
     force_mult_natoms=False,
-    stress_wt=-4800,
+    stress_wt=0.1,
+    force_multiplier=1,
     dim=[2, 2, 2],
     freq_conversion_factor=33.3566830,  # ThztoCm-1
     phonopy_bands_figname="phonopy_bands.png",
@@ -1198,15 +1192,16 @@ def phonons(
     write_fc=False,
     min_freq_tol=-0.05,
     distance=0.2,
-    force_multiplier=1,
 ):
     """Make Phonon calculation setup."""
-    calc = AlignnAtomwiseCalculator(
-        path=model_path,
-        force_mult_natoms=force_mult_natoms,
-        force_multiplier=force_multiplier,
-        stress_wt=stress_wt,
-    )
+    if calc is None:
+        calc = AlignnAtomwiseCalculator(
+            path=model_path,
+            force_mult_natoms=force_mult_natoms,
+            stress_wt=stress_wt,
+            model_filename=model_filename,
+            force_multiplier=force_multiplier,
+        )
 
     from phonopy import Phonopy
     from phonopy.file_IO import (
@@ -1333,6 +1328,7 @@ def phonons(
 
 def phonons3(
     atoms=None,
+    calc=None,
     enforce_c_size=8,
     line_density=5,
     model_path=".",
@@ -1340,15 +1336,18 @@ def phonons3(
     on_relaxed_struct=False,
     dim=[2, 2, 2],
     distance=0.2,
-    stress_wt=-4800,
-    force_multiplier=2,
+    stress_wt=0.1,
+    force_multiplier=1,
 ):
     """Make Phonon3 calculation setup."""
     from phono3py import Phono3py
 
-    calc = AlignnAtomwiseCalculator(
-        path=model_path, force_multiplier=force_multiplier, stress_wt=stress_wt
-    )
+    if calc is None:
+        calc = AlignnAtomwiseCalculator(
+            path=model_path,
+            force_multiplier=force_multiplier,
+            stress_wt=stress_wt,
+        )
 
     # kpoints = Kpoints().kpath(atoms, line_density=line_density)
     # dim = get_supercell_dims(cvn, enforce_c_size=enforce_c_size)
@@ -1398,6 +1397,7 @@ def ase_phonon(
     N=2,
     path=[],
     jid=None,
+    calc=None,
     npoints=100,
     dataset="dft_3d",
     delta=0.01,
@@ -1409,9 +1409,10 @@ def ase_phonon(
     force_multiplier=1,
 ):
     """Get phonon bandstructure and DOS using ASE."""
-    calc = AlignnAtomwiseCalculator(
-        path=model_path, force_multiplier=force_multiplier
-    )
+    if calc is None:
+        calc = AlignnAtomwiseCalculator(
+            path=model_path, force_multiplier=force_multiplier
+        )
     # Setup crystal and EMT calculator
     # atoms = bulk("Al", "fcc", a=4.05)
 

@@ -9,20 +9,120 @@ from collections import OrderedDict
 from jarvis.analysis.structure.neighbors import NeighborsAnalysis
 from jarvis.core.specie import chem_data, get_node_attributes
 import math
-
-# from jarvis.core.atoms import Atoms
 from collections import defaultdict
 from typing import List, Tuple, Sequence, Optional
 from dgl.data import DGLDataset
-
 import torch
 import dgl
+from tqdm import tqdm
+from jarvis.core.atoms import Atoms
 
-try:
-    from tqdm import tqdm
-except Exception as exp:
-    print("tqdm is not installed.", exp)
-    pass
+# import matgl
+
+
+def temp_graph(
+    atoms=None, cutoff=4.0, atom_features="atomic_number", dtype="float32"
+):
+    """Construct a graph for a given cutoff."""
+    TORCH_DTYPES = {
+        "float16": torch.float16,
+        "float32": torch.float32,
+        "float64": torch.float64,
+        "bfloat": torch.bfloat16,
+    }
+    dtype = TORCH_DTYPES[dtype]
+    u, v, r, d, images, atom_feats = [], [], [], [], [], []
+    elements = atoms.elements
+
+    # Loop over each atom in the structure
+    for ii, i in enumerate(atoms.cart_coords):
+        # Get neighbors within the cutoff distance
+        neighs = atoms.lattice.get_points_in_sphere(
+            atoms.frac_coords, i, cutoff, distance_vector=True
+        )
+
+        # Filter out self-loops (exclude cases where atom is bonded to itself)
+        valid_indices = neighs[2] != ii
+
+        u.extend([ii] * np.sum(valid_indices))
+        d.extend(neighs[1][valid_indices])
+        v.extend(neighs[2][valid_indices])
+        images.extend(neighs[3][valid_indices])
+        r.extend(neighs[4][valid_indices])
+
+        feat = list(
+            get_node_attributes(elements[ii], atom_features=atom_features)
+        )
+        atom_feats.append(feat)
+
+    # Create DGL graph
+    g = dgl.graph((np.array(u), np.array(v)))
+    atom_feats = np.array(atom_feats)
+    # Add data to the graph with the specified dtype
+    # print('atom_feats',atom_feats,atom_feats.shape)
+    g.ndata["atom_features"] = torch.tensor(atom_feats, dtype=dtype)
+    g.ndata["Z"] = torch.tensor(atom_feats, dtype=torch.int64)
+    g.edata["r"] = torch.tensor(np.array(r), dtype=dtype)
+    g.edata["d"] = torch.tensor(d, dtype=dtype)
+    # g.edata["pbc_offset"] = torch.tensor(images, dtype=dtype)
+    # g.edata["pbc_offshift"] = torch.tensor(images, dtype=dtype)
+    g.edata["images"] = torch.tensor(images, dtype=dtype)
+    # node_type = torch.tensor([0 for i in range(len(atoms.atomic_numbers))])
+    # g.ndata["node_type"] = node_type
+    # lattice_mat = atoms.lattice_mat
+    # g.ndata["lattice"] = torch.tensor(
+    #   [lattice_mat for ii in range(g.num_nodes())]
+    # , dtype=dtype)
+    # g.edata["lattice"] = torch.tensor(
+    #   [lattice_mat for ii in range(g.num_edges())]
+    # , dtype=dtype)
+    g.ndata["pos"] = torch.tensor(atoms.cart_coords, dtype=dtype)
+    g.ndata["frac_coords"] = torch.tensor(atoms.frac_coords, dtype=dtype)
+
+    return g, u, v, r
+
+
+def radius_graph_jarvis(
+    atoms,
+    cutoff_extra=0.5,
+    cutoff=4.0,
+    atom_features="atomic_number",
+    line_graph=True,
+    dtype="float32",
+    max_attempts=10,
+):
+    """Construct radius graph with jarvis tools."""
+    count = 0
+    while count <= max_attempts:
+        # try:
+        # Attempt to create the graph
+        count += 1
+        g, u, v, r = temp_graph(
+            atoms=atoms,
+            cutoff=cutoff,
+            atom_features=atom_features,
+            dtype=dtype,
+        )
+        # Check if all atoms are included as nodes
+        if g.num_nodes() == len(atoms.elements):
+            # print(f"Graph constructed with cutoff: {cutoff}")
+            break  # Exit the loop when successful
+        # Increment the cutoff if the graph is incomplete
+        cutoff += cutoff_extra
+        # print(f"Increasing cutoff to: {cutoff}")
+    # except Exception as exp:
+    #    # Handle exceptions and try again
+    #    print(f"Graph construction failed: {exp,cutoff}")
+    #    cutoff += cutoff_extra  # Try with a larger cutoff
+    if count >= max_attempts:
+        raise ValueError("Failed after", max_attempts, atoms)
+    # Optional: Create a line graph if requested
+    if line_graph:
+        lg = g.line_graph(shared=True)
+        lg.apply_edges(compute_bond_cosines)
+        return g, lg
+
+    return g
 
 
 def canonize_edge(
@@ -124,7 +224,7 @@ def nearest_neighbor_edges(
             else:
                 edges[(site_idx, dst)].add(tuple(image))
 
-    return edges
+    return edges, images
 
 
 def build_undirected_edgedata(
@@ -138,7 +238,7 @@ def build_undirected_edgedata(
     """
     # second pass: construct *undirected* graph
     # import pprint
-    u, v, r = [], [], []
+    u, v, r, all_images = [], [], [], []
     for (src_id, dst_id), images in edges.items():
         for dst_image in images:
             # fractional coordinate for periodic image of dst
@@ -154,12 +254,14 @@ def build_undirected_edgedata(
                 u.append(uu)
                 v.append(vv)
                 r.append(dd)
+                all_images.append(dst_image)
     u, v, r = (np.array(x) for x in (u, v, r))
     u = torch.tensor(u)
     v = torch.tensor(v)
     r = torch.tensor(r).type(torch.get_default_dtype())
+    all_images = torch.tensor(all_images).type(torch.get_default_dtype())
 
-    return u, v, r
+    return u, v, r, all_images
 
 
 def radius_graph(
@@ -168,7 +270,7 @@ def radius_graph(
     bond_tol=0.5,
     id=None,
     atol=1e-5,
-    cutoff_extra=3.5,
+    cutoff_extra=0.5,
 ):
     """Construct edge list for radius graph."""
 
@@ -205,6 +307,8 @@ def radius_graph(
         # tile periodic images into X_dst
         # index id_dst into X_dst maps to atom id as id_dest % num_atoms
         X_dst = (cell_images @ lattice_mat)[:, None, :] + X_src
+        # cell_images = cell_images[:,None,:]+cell_images
+        # print('cell_images',cell_images,cell_images.shape)
         X_dst = X_dst.reshape(-1, 3)
         # pairwise distances between atoms in (0,0,0) cell
         # and atoms in all periodic image
@@ -221,11 +325,15 @@ def radius_graph(
                 atol=atol,
             ),
         )
+
         # get node indices for edgelist from neighbor mask
         u, v = torch.where(neighbor_mask)
+        # cell_images=cell_images[neighbor_mask]
+        # u, v = torch.where(neighbor_mask)
         # print("u2v2", u, v, u.shape, v.shape)
         # print("v1", v, v.shape)
         # print("v2", v % num_atoms, (v % num_atoms).shape)
+        cell_images = cell_images[v // num_atoms]
 
         r = (X_dst[v] - X_src[u]).float()
         # gk = dgl.knn_graph(X_dst, 12)
@@ -233,22 +341,27 @@ def radius_graph(
         # print("gk", gk)
         v = v % num_atoms
         g = dgl.graph((u, v))
-        return g, u, v, r
+        return g, u, v, r, cell_images
 
-    g, u, v, r = temp_graph(cutoff)
-    while (g.num_nodes()) != len(atoms.elements):
-        try:
+    # g, u, v, r, cell_images = temp_graph(cutoff)
+    while True:  # (g.num_nodes()) != len(atoms.elements):
+        # try:
+        g, u, v, r, cell_images = temp_graph(cutoff)
+        # g, u, v, r, cell_images = temp_graph(cutoff)
+        # print(atoms)
+        if (g.num_nodes()) == len(atoms.elements):
+            return u, v, r, cell_images
+        else:
             cutoff += cutoff_extra
-            g, u, v, r = temp_graph(cutoff)
-            print("cutoff", id, cutoff)
-            print(atoms)
+            print("cutoff", id, cutoff, atoms)
 
-        except Exception as exp:
-            print("Graph exp", exp)
-            pass
-        return u, v, r
+    # except Exception as exp:
+    #    print("Graph exp", exp,atoms)
+    #    cutoff += cutoff_extra
+    #    pass
+    # return u, v, r, cell_images
 
-    return u, v, r
+    return u, v, r, cell_images
 
 
 ###
@@ -369,25 +482,36 @@ class Graph(object):
         # use_canonize: bool = False,
         use_lattice_prop: bool = False,
         cutoff_extra=3.5,
+        dtype="float32",
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
+        # print('stratgery', neighbor_strategy)
         if neighbor_strategy == "k-nearest":
-            edges = nearest_neighbor_edges(
+            edges, images = nearest_neighbor_edges(
                 atoms=atoms,
                 cutoff=cutoff,
                 max_neighbors=max_neighbors,
                 id=id,
                 use_canonize=use_canonize,
             )
-            u, v, r = build_undirected_edgedata(atoms, edges)
+            u, v, r, images = build_undirected_edgedata(atoms, edges)
         elif neighbor_strategy == "radius_graph":
             # print('HERE')
             # import sys
             # sys.exit()
-            u, v, r = radius_graph(
+            u, v, r, images = radius_graph(
                 atoms, cutoff=cutoff, cutoff_extra=cutoff_extra
             )
+        elif neighbor_strategy == "radius_graph_jarvis":
+            g, lg = radius_graph_jarvis(
+                atoms,
+                cutoff=cutoff,
+                atom_features=atom_features,
+                line_graph=compute_line_graph,
+                dtype=dtype,
+            )
+            return g, lg
         else:
             raise ValueError("Not implemented yet", neighbor_strategy)
         # elif neighbor_strategy == "voronoi":
@@ -396,22 +520,50 @@ class Graph(object):
         # u, v, r = build_undirected_edgedata(atoms, edges)
 
         # build up atom attribute tensor
+        # comp = atoms.composition.to_dict()
+        # comp_dict = {}
+        # c_ind = 0
+        # for ii, jj in comp.items():
+        #    if ii not in comp_dict:
+        #        comp_dict[ii] = c_ind
+        #        c_ind += 1
         sps_features = []
+        # node_types = []
         for ii, s in enumerate(atoms.elements):
             feat = list(get_node_attributes(s, atom_features=atom_features))
             # if include_prdf_angles:
             #    feat=feat+list(prdf[ii])+list(adf[ii])
             sps_features.append(feat)
+            # node_types.append(comp_dict[s])
         sps_features = np.array(sps_features)
         node_features = torch.tensor(sps_features).type(
             torch.get_default_dtype()
         )
+        # print("u", u)
+        # print("v", v)
         g = dgl.graph((u, v))
         g.ndata["atom_features"] = node_features
-        g.edata["r"] = r
+        # g.ndata["node_type"] = torch.tensor(node_types, dtype=torch.int64)
+        # node_type = torch.tensor([0 for i in range(len(atoms.atm_num))])
+        # g.ndata["node_type"] = node_type
+        # print('g.ndata["node_type"]',g.ndata["node_type"])
+        g.edata["r"] = torch.tensor(np.array(r)).type(
+            torch.get_default_dtype()
+        )
+        # images=torch.tensor(images).type(torch.get_default_dtype())
+        # print('images',images.shape,r.shape)
+        # print('type',torch.get_default_dtype())
+        g.edata["images"] = torch.tensor(np.array(images)).type(
+            torch.get_default_dtype()
+        )
         vol = atoms.volume
         g.ndata["V"] = torch.tensor([vol for ii in range(atoms.num_atoms)])
-        g.ndata["coords"] = torch.tensor(atoms.cart_coords)
+        # g.ndata["coords"] = torch.tensor(atoms.cart_coords).type(
+        #    torch.get_default_dtype()
+        # )
+        g.ndata["frac_coords"] = torch.tensor(atoms.frac_coords).type(
+            torch.get_default_dtype()
+        )
         if use_lattice_prop:
             lattice_prop = np.array(
                 [atoms.lattice.lat_lengths(), atoms.lattice.lat_angles()]
@@ -729,6 +881,8 @@ class StructureDataset(DGLDataset):
         classification=False,
         id_tag="jid",
         sampler=None,
+        lattices=None,
+        dtype="float32",
     ):
         """Pytorch Dataset for atomistic graphs.
 
@@ -746,6 +900,7 @@ class StructureDataset(DGLDataset):
         self.target_stress = target_stress
         self.line_graph = line_graph
         print("df", df)
+        self.lattices = lattices
         self.labels = self.df[target]
 
         if (
@@ -788,6 +943,13 @@ class StructureDataset(DGLDataset):
 
         self.ids = self.df[id_tag]
         self.labels = torch.tensor(self.df[target]).type(
+            torch.get_default_dtype()
+        )
+        self.lattices = []
+        for ii, i in df.iterrows():
+            self.lattices.append(Atoms.from_dict(i["atoms"]).lattice_mat)
+
+        self.lattices = torch.tensor(self.lattices).type(
             torch.get_default_dtype()
         )
         self.transform = transform
@@ -865,14 +1027,15 @@ class StructureDataset(DGLDataset):
         """Get StructureDataset sample."""
         g = self.graphs[idx]
         label = self.labels[idx]
+        lattice = self.lattices[idx]
         # id = self.ids[idx]
         if self.transform:
             g = self.transform(g)
 
         if self.line_graph:
-            return g, self.line_graphs[idx], label
+            return g, self.line_graphs[idx], lattice, label
 
-        return g, label
+        return g, lattice, label
 
     def setup_standardizer(self, ids):
         """Atom-wise feature standardization transform."""
@@ -893,22 +1056,27 @@ class StructureDataset(DGLDataset):
     @staticmethod
     def collate(samples: List[Tuple[dgl.DGLGraph, torch.Tensor]]):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, labels = map(list, zip(*samples))
+        graphs, lattices, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
-        return batched_graph, torch.tensor(labels)
+        return batched_graph, torch.tensor(lattices), torch.tensor(labels)
 
     @staticmethod
     def collate_line_graph(
         samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
     ):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, line_graphs, labels = map(list, zip(*samples))
+        graphs, line_graphs, lattices, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         batched_line_graph = dgl.batch(line_graphs)
         if len(labels[0].size()) > 0:
             return batched_graph, batched_line_graph, torch.stack(labels)
         else:
-            return batched_graph, batched_line_graph, torch.tensor(labels)
+            return (
+                batched_graph,
+                batched_line_graph,
+                torch.stack(lattices),
+                torch.tensor(labels),
+            )
 
 
 """

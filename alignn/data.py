@@ -122,6 +122,7 @@ def get_train_val_loaders(
     target_atomwise: str = "",
     target_grad: str = "",
     target_stress: str = "",
+    target_additional_output: str = "",
     atom_features: str = "cgcnn",
     neighbor_strategy: str = "k-nearest",
     n_train=None,
@@ -153,6 +154,7 @@ def get_train_val_loaders(
     world_size=0,
     rank=0,
     use_lmdb: bool = True,
+    dtype="float32",
 ):
     """Help function to set up JARVIS train and val dataloaders."""
     if use_lmdb:
@@ -160,6 +162,7 @@ def get_train_val_loaders(
         from alignn.lmdb_dataset import get_torch_dataset
     else:
         print("Not using LMDB dataset, memory footprint maybe high.")
+        print("WARNING: not using LMDB might result errors.")
         from alignn.dataset import get_torch_dataset
     train_sample = filename + "_train.data"
     val_sample = filename + "_val.data"
@@ -372,6 +375,7 @@ def get_train_val_loaders(
             target_atomwise=target_atomwise,
             target_grad=target_grad,
             target_stress=target_stress,
+            target_additional_output=target_additional_output,
             neighbor_strategy=neighbor_strategy,
             use_canonize=use_canonize,
             name=dataset,
@@ -383,6 +387,7 @@ def get_train_val_loaders(
             output_dir=output_dir,
             sampler=train_sampler,
             tmp_name=tmp_name,
+            dtype=dtype,
             # tmp_name="train_data",
         )
         tmp_name = filename + "val_data"
@@ -395,6 +400,7 @@ def get_train_val_loaders(
                 target_atomwise=target_atomwise,
                 target_grad=target_grad,
                 target_stress=target_stress,
+                target_additional_output=target_additional_output,
                 neighbor_strategy=neighbor_strategy,
                 use_canonize=use_canonize,
                 name=dataset,
@@ -406,6 +412,7 @@ def get_train_val_loaders(
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
                 tmp_name=tmp_name,
+                dtype=dtype,
                 # tmp_name="val_data",
             )
             if len(dataset_val) > 0
@@ -421,6 +428,7 @@ def get_train_val_loaders(
                 target_atomwise=target_atomwise,
                 target_grad=target_grad,
                 target_stress=target_stress,
+                target_additional_output=target_additional_output,
                 neighbor_strategy=neighbor_strategy,
                 use_canonize=use_canonize,
                 name=dataset,
@@ -431,6 +439,7 @@ def get_train_val_loaders(
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
                 tmp_name=tmp_name,
+                dtype=dtype,
                 # tmp_name="test_data",
             )
             if len(dataset_test) > 0

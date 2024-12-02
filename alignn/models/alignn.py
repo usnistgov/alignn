@@ -4,20 +4,16 @@ A prototype crystal line graph network dgl implementation.
 """
 
 from typing import Tuple, Union
-
 import dgl
 import dgl.function as fn
 import numpy as np
 import torch
 from dgl.nn import AvgPooling
-
-# from dgl.nn.functional import edge_softmax
 from typing import Literal
 from torch import nn
 from torch.nn import functional as F
-
 from alignn.models.utils import RBFExpansion
-from alignn.utils import BaseSettings
+from pydantic_settings import BaseSettings
 
 
 class ALIGNNConfig(BaseSettings):
@@ -295,7 +291,7 @@ class ALIGNN(nn.Module):
         if len(self.alignn_layers) > 0:
             # print('features2',features.shape)
 
-            g, lg = g
+            g, lg, lat = g
             lg = lg.local_var()
 
             # angle features (fixed)
@@ -309,9 +305,9 @@ class ALIGNN(nn.Module):
         g = g.local_var()
         # initial node features: atom feature network...
         x = g.ndata.pop("atom_features")
-        # print('x1',x.shape)
+        # print("x1", x, x.shape)
         x = self.atom_embedding(x)
-        # print('x2',x.shape)
+        # print("x2", x, x.shape)
 
         # initial bond features
         bondlength = torch.norm(g.edata.pop("r"), dim=1)
@@ -327,7 +323,7 @@ class ALIGNN(nn.Module):
 
         # norm-activation-pool-classify
         h = self.readout(g, x)
-        # print('h',h.shape)
+        # print("h", h, h.shape)
         # print('features',features.shape)
         if self.config.extra_features != 0:
             h_feat = self.readout_feat(g, features)

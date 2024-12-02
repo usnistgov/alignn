@@ -311,8 +311,9 @@ def get_prediction(
         cutoff=float(cutoff),
         max_neighbors=max_neighbors,
     )
+    lat = torch.tensor(atoms.lattice_mat)
     out_data = (
-        model([g.to(device), lg.to(device)])
+        model([g.to(device), lg.to(device), lat.to(device)])
         .detach()
         .cpu()
         .numpy()
@@ -411,8 +412,8 @@ def get_multiple_predictions(
     with torch.no_grad():
         ids = test_loader.dataset.ids
         for dat, id in zip(test_loader, ids):
-            g, lg, target = dat
-            out_data = model([g.to(device), lg.to(device)])
+            g, lg, lat, target = dat
+            out_data = model([g.to(device), lg.to(device), lat.to(device)])
             out_data = out_data.cpu().numpy().tolist()
             target = target.cpu().numpy().flatten().tolist()
             info = {}

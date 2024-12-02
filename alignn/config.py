@@ -8,16 +8,7 @@ from alignn.utils import BaseSettings
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
 
-# from alignn.models.modified_cgcnn import CGCNNConfig
-# from alignn.models.icgcnn import ICGCNNConfig
-# from alignn.models.gcn import SimpleGCNConfig
-# from alignn.models.densegcn import DenseGCNConfig
-# from pydantic import model_validator
-# from alignn.models.dense_alignn import DenseALIGNNConfig
-# from alignn.models.alignn_cgcnn import ACGCNNConfig
-# from alignn.models.alignn_layernorm import ALIGNNConfig as ALIGNN_LN_Config
-
-# from typing import List
+# import torch
 
 try:
     VERSION = (
@@ -162,14 +153,13 @@ class TrainingConfig(BaseSettings):
     ] = "dft_3d"
     target: TARGET_ENUM = "exfoliation_energy"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
-    neighbor_strategy: Literal["k-nearest", "voronoi", "radius_graph"] = (
-        "k-nearest"
-    )
+    neighbor_strategy: Literal[
+        "k-nearest", "voronoi", "radius_graph", "radius_graph_jarvis"
+    ] = "k-nearest"
     id_tag: Literal["jid", "id", "_oqmd_entry_id"] = "jid"
 
-    # logging configuration
-
     # training configuration
+    dtype: str = "float32"
     random_seed: Optional[int] = 123
     classification_threshold: Optional[float] = None
     # target_range: Optional[List] = None
@@ -220,26 +210,4 @@ class TrainingConfig(BaseSettings):
     model: Union[
         ALIGNNConfig,
         ALIGNNAtomWiseConfig,
-        # CGCNNConfig,
-        # ICGCNNConfig,
-        # SimpleGCNConfig,
-        # DenseGCNConfig,
-        # ALIGNN_LN_Config,
-        # DenseALIGNNConfig,
-        # ACGCNNConfig,
     ] = ALIGNNAtomWiseConfig(name="alignn_atomwise")
-
-    # @root_validator()
-    # @model_validator(mode='before')
-    # def set_input_size(cls, values):
-    #    """Automatically configure node feature dimensionality."""
-    #    values["model"].atom_input_features = FEATURESET_SIZE[
-    #        values["atom_features"]
-    #    ]
-
-    #    return values
-
-    # @property
-    # def atom_input_features(self):
-    #     """Automatically configure node feature dimensionality."""
-    #     return FEATURESET_SIZE[self.atom_features]

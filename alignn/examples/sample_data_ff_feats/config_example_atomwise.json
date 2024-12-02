@@ -36,20 +36,19 @@
     "cutoff": 8.0,
     "max_neighbors": 12,
     "keep_data_order": true,
-    "distributed":false,
+    "distributed": false,
     "model": {
         "name": "alignn_atomwise",
         "atom_input_features": 92,
-        "calculate_gradient":true,
-        "atomwise_output_features":0,
-        "alignn_layers":4,
-        "gcn_layers":4,
+        "calculate_gradient": true,
+        "atomwise_output_features": 0,
+        "alignn_layers": 4,
+        "gcn_layers": 4,
         "output_features": 1,
         "extra_features": 6,
-        "graphwise_weight":0.0,
-        "gradwise_weight":0.0,
-        "atomwise_weight":0.0,
-        "stresswise_weight":0.0
-          
+        "graphwise_weight": 0.0,
+        "gradwise_weight": 0.0,
+        "atomwise_weight": 0.0,
+        "stresswise_weight": 0.0
     }
 }

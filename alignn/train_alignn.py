@@ -115,6 +115,12 @@ parser.add_argument(
     help="Name of the key for stress (3x3) level data such as forces",
 )
 
+parser.add_argument(
+    "--additional_output_key",
+    default="additional_output",
+    help="Name of the key for extra global output eg DOS",
+)
+
 
 parser.add_argument(
     "--output_dir",
@@ -150,6 +156,7 @@ def train_for_folder(
     atomwise_key="forces",
     gradwise_key="forces",
     stresswise_key="stresses",
+    additional_output_key="additional_output",
     file_format="poscar",
     restart_model_path=None,
     output_dir=None,
@@ -197,20 +204,37 @@ def train_for_folder(
 
     train_grad = False
     train_stress = False
+    train_additional_output = False
     train_atom = False
-    if config.model.calculate_gradient and config.model.gradwise_weight != 0:
-        train_grad = True
-    else:
-        train_grad = False
-    if config.model.calculate_gradient and config.model.stresswise_weight != 0:
-        train_stress = True
-    else:
-        train_stress = False
-    if config.model.atomwise_weight != 0:
-        train_atom = True
-    else:
-        train_atom = False
-
+    try:
+        if (
+            config.model.calculate_gradient
+            and config.model.gradwise_weight != 0
+        ):
+            train_grad = True
+        else:
+            train_grad = False
+        if (
+            config.model.calculate_gradient
+            and config.model.stresswise_weight != 0
+        ):
+            train_stress = True
+        else:
+            train_stress = False
+        if config.model.atomwise_weight != 0:
+            train_atom = True
+        else:
+            train_atom = False
+        if (
+            config.model.additional_output_features > 0
+            and config.model.additional_output_weight != 0
+        ):
+            train_additional_output = True
+        else:
+            train_additional_output = False
+    except Exception as exp:
+        print("exp", exp)
+        pass
     # if config.model.atomwise_weight == 0:
     #    train_atom = False
     # if config.model.gradwise_weight == 0:
@@ -220,6 +244,7 @@ def train_for_folder(
     target_atomwise = None  # "atomwise_target"
     target_grad = None  # "atomwise_grad"
     target_stress = None  # "stresses"
+    target_additional_output = None  # "stresses"
 
     # mem = []
     # enp = []
@@ -274,11 +299,14 @@ def train_for_folder(
             info["stresses"] = stress  # - mean_force
             target_stress = "stresses"
 
-            # print("stresses",info["stresses"] )
+        if train_additional_output:
+            target_additional_output = "additional"
+            info["additional"] = i[additional_output_key]  # - mean_force
         if "extra_features" in i:
             info["extra_features"] = i["extra_features"]
         dataset.append(info)
     print("len dataset", len(dataset))
+    print("train_stress", train_stress)
     del dat
     # multioutput = False
     lists_length_equal = True
@@ -314,36 +342,8 @@ def train_for_folder(
             )
 
             tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
-            # tmp = ALIGNNAtomWiseConfig(
-            #    name="alignn_atomwise",
-            #    output_features=config.model.output_features,
-            #    alignn_layers=config.model.alignn_layers,
-            #    atomwise_weight=config.model.atomwise_weight,
-            #    stresswise_weight=config.model.stresswise_weight,
-            #    graphwise_weight=config.model.graphwise_weight,
-            #    gradwise_weight=config.model.gradwise_weight,
-            #    gcn_layers=config.model.gcn_layers,
-            #    atom_input_features=config.model.atom_input_features,
-            #    edge_input_features=config.model.edge_input_features,
-            #    triplet_input_features=config.model.triplet_input_features,
-            #    embedding_features=config.model.embedding_features,
-            # )
             print("Rest config", tmp)
-            # for i,j in config_dict['model'].items():
-            #    print ('i',i)
-            #    tmp.i=j
-            # print ('tmp1',tmp)
             model = ALIGNNAtomWise(tmp)  # config.model)
-            # model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(
-            #    name="alignn_atomwise",
-            #    output_features=1,
-            #    graphwise_weight=1,
-            #    alignn_layers=4,
-            #    gradwise_weight=10,
-            #    stresswise_weight=0.01,
-            #    atomwise_weight=0,
-            #      )
-            #    )
             print("model", model)
             model.load_state_dict(
                 torch.load(restart_model_path, map_location=device)
@@ -375,6 +375,7 @@ def train_for_folder(
         target_atomwise=target_atomwise,
         target_grad=target_grad,
         target_stress=target_stress,
+        target_additional_output=target_additional_output,
         n_train=config.n_train,
         n_val=config.n_val,
         n_test=config.n_test,
@@ -402,6 +403,7 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
         use_lmdb=config.use_lmdb,
+        dtype=config.dtype,
     )
     # print("dataset", dataset[0])
     t1 = time.time()
@@ -445,6 +447,7 @@ if __name__ == "__main__":
                 args.atomwise_key,
                 args.force_key,
                 args.stresswise_key,
+                args.additional_output_key,
                 args.file_format,
                 args.restart_model_path,
                 args.output_dir,
@@ -465,6 +468,7 @@ if __name__ == "__main__":
             args.atomwise_key,
             args.force_key,
             args.stresswise_key,
+            args.additional_output_key,
             args.file_format,
             args.restart_model_path,
             args.output_dir,

@@ -11,9 +11,12 @@ import os
 from jarvis.core.atoms import Atoms
 from alignn.train_alignn import train_for_folder
 from jarvis.db.figshare import get_jid_data
-from alignn.ff.ff import AlignnAtomwiseCalculator, default_path, revised_path
+from alignn.ff.ff import AlignnAtomwiseCalculator, default_path
 import torch
 from jarvis.db.jsonutils import loadjson, dumpjson
+from alignn.config import TrainingConfig
+
+world_size = int(torch.cuda.device_count())
 
 plt.switch_backend("agg")
 
@@ -21,50 +24,27 @@ config = {
     "dataset": "dft_2d",
     "target": "formation_energy_peratom",
     # "target": "optb88vdw_bandgap",
-    "n_train": 50,
-    "n_test": 25,
-    "n_val": 25,
-    "num_workers": 0,
+    "n_train": 4,
+    "n_test": 4,
+    "n_val": 4,
     "atom_features": "cgcnn",
     "neighbor_strategy": "k-nearest",
     "epochs": 2,
-    "save_dataloader": False,
-    "batch_size": 10,
-    "weight_decay": 1e-05,
-    "learning_rate": 0.01,
-    "criterion": "mse",
-    "optimizer": "adamw",
-    "scheduler": "onecycle",
-    "num_workers": 4,
+    "batch_size": 2,
     "model": {
-        "name": "alignn",
+        "name": "alignn_atomwise",
+        "calculate_gradient": False,
+        "energy_mult_natoms": False,
+        "atom_input_features": 92,
     },
 }
 
-
-# def test_runtime_training():
-#    cmd1 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --config "alignn/examples/sample_data/config_example.json"'
-#    os.system(cmd1)
-#    cmd2 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data" --classification_threshold 0.01 --config "alignn/examples/sample_data/config_example.json"'
-#    os.system(cmd2)
-#    cmd3 = 'python alignn/train_folder.py --root_dir "alignn/examples/sample_data_multi_prop" --config "alignn/examples/sample_data/config_example.json"'
-#    os.system(cmd3)
-
-
-# def test_minor_configs():
-#    tmp = config
-#    # tmp["log_tensorboard"] = True
-#    tmp["n_early_stopping"] = 2
-#    tmp["model"]["name"] = "alignn"
-#    config["write_predictions"] = True
-#    result = train_dgl(tmp)
+config = TrainingConfig(**config)
 
 
 def test_models():
+    test_clean()
 
-    config["write_predictions"] = True
-    config["model"]["name"] = "alignn_atomwise"
-    config["filename"] = "X"
     t1 = time.time()
     result = train_dgl(config)
     t2 = time.time()
@@ -74,12 +54,11 @@ def test_models():
     print()
     print()
     print()
-
-    config["model"]["name"] = "alignn_atomwise"
-    config["filename"] = "Y"
-    config["classification_threshold"] = 0.0
+    test_clean()
+    config.classification_threshold = 0.0
+    # config.model.classification = True
     t1 = time.time()
-    result = train_dgl(config)
+    # result = train_dgl(config,model=None)
     t2 = time.time()
     print("Total time", t2 - t1)
     # print("train=", result["train"])
@@ -87,36 +66,7 @@ def test_models():
     print()
     print()
     print()
-
-    """
-
-    config["model"]["name"] = "simplegcn"
-    config["write_predictions"] = False
-    config["save_dataloader"] = False
-    t1 = time.time()
-    result = train_dgl(config)
-    t2 = time.time()
-    print("Total time", t2 - t1)
-    print("train=", result["train"])
-    print("validation=", result["validation"])
-    print()
-    print()
-    print()
-    """
-    """
-    x = []
-    y = []
-    for i in result["EOS"]:
-        x.append(i[0].cpu().numpy().tolist())
-        y.append(i[1].cpu().numpy().tolist())
-    x = np.array(x, dtype="float").flatten()
-    y = np.array(y, dtype="float").flatten()
-    plt.plot(x, y, ".")
-    plt.xlabel("DFT")
-    plt.ylabel("ML")
-    plt.savefig("compare.png")
-    plt.close()
-    """
+    test_clean()
 
 
 def test_pretrained():
@@ -129,9 +79,8 @@ def test_pretrained():
     cmd1 = "python alignn/pretrained.py"
     os.system(cmd1)
     get_multiple_predictions(atoms_array=[Si, Si])
-
-
-world_size = int(torch.cuda.device_count())
+    cmd1 = "rm *.json"
+    os.system(cmd1)
 
 
 def test_alignn_train_regression():
@@ -222,6 +171,13 @@ def test_alignn_train_ff():
     train_for_folder(
         rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
+    cmd = "rm *.pt *.csv *.json *range"
+    os.system(cmd)
+
+
+def test_clean():
+    cmd = "rm *.pt *.traj *.csv *.json *range"
+    os.system(cmd)
 
 
 def test_calculator():
@@ -235,7 +191,7 @@ def test_calculator():
     energy = ase_atoms.get_potential_energy()
     forces = ase_atoms.get_forces()
     stress = ase_atoms.get_stress()
-    print("round(energy,3)", round(energy, 3))
+    print("energy", energy)
     print("max(forces.flatten()),3)", max(forces.flatten()))
     print("max(stress.flatten()),3)", max(stress.flatten()))
     # assert round(energy,3)==round(-60.954999923706055,3)
@@ -281,15 +237,19 @@ def test_del_files():
     for i in fnames:
         cmd = "rm -r " + i
         os.system(cmd)
-    cmd="rm -r *train_data *val_data *test_data"
+    cmd = "rm -r *train_data *val_data *test_data"
     os.system(cmd)
 
+
+test_clean()
+# test_pretrained()
+# test_models()
 # test_alignn_train_ff()
+# test_alignn_train_regression_multi_out()
+
 # test_alignn_train_classification()
 # test_alignn_train()
 # test_minor_configs()
-# test_pretrained()
 # test_runtime_training()
 # test_alignn_train()
-# test_models()
 # test_calculator()

@@ -14,6 +14,8 @@ from tqdm import tqdm
 tqdm.pandas()
 
 
+# NOTE: Use lmd_dataset,
+# need to fix adding lattice in dataloader
 def load_graphs(
     dataset=[],
     name: str = "dft_3d",
@@ -26,6 +28,7 @@ def load_graphs(
     id_tag="jid",
     # extra_feats_json=None,
     map_size=1e12,
+    dtype="float32",
 ):
     """Construct crystal graphs.
 
@@ -54,6 +57,7 @@ def load_graphs(
             compute_line_graph=False,
             use_canonize=use_canonize,
             neighbor_strategy=neighbor_strategy,
+            dtype=dtype,
         )
 
     if cachedir is not None:
@@ -84,6 +88,7 @@ def load_graphs(
                 use_canonize=use_canonize,
                 neighbor_strategy=neighbor_strategy,
                 id=i[id_tag],
+                dtype=dtype,
             )
             # print ('ii',ii)
             if "extra_features" in i:
@@ -124,6 +129,7 @@ def get_torch_dataset(
     output_dir=".",
     tmp_name="dataset",
     sampler=None,
+    dtype="float32",
 ):
     """Get Torch Dataset."""
     df = pd.DataFrame(dataset)
@@ -147,6 +153,7 @@ def get_torch_dataset(
         cutoff_extra=cutoff_extra,
         max_neighbors=max_neighbors,
         id_tag=id_tag,
+        dtype=dtype,
     )
     data = StructureDataset(
         df,
@@ -160,5 +167,6 @@ def get_torch_dataset(
         id_tag=id_tag,
         classification=classification,
         sampler=sampler,
+        dtype=dtype,
     )
     return data
