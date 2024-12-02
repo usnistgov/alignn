@@ -132,7 +132,7 @@ def default_path():
     # dpath = get_figshare_model_ff(model_name="v8.29.2024_dft_3d")
     # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
     # dpath = get_figshare_model_ff(model_name="alignnff_fmult")
-    print("model_path", dpath)
+    # print("model_path", dpath)
     return dpath
 
 
