@@ -237,7 +237,7 @@ Similarly, a web-app for [ALIGNN-FF](https://jarvis.nist.gov/jalignnff/) for str
 <a name="alignnff"></a>
 ALIGNN-FF ASE Calculaor
 -------------------------
-
+![ALIGNN FF](https://github.com/usnistgov/alignn/blob/develop/alignn/tex/animation.gif)
 
 
 [ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html) provides interface to various codes. An example for ALIGNN-FF is give below. Note that there are multiple pretrained ALIGNN-FF models available, here we use the deafult_path model. As more accurate models are developed, they will be made available as well:
