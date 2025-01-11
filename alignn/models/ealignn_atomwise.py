@@ -21,6 +21,7 @@ from alignn.models.utils import (
     compute_pair_vector_and_distance,
     MLPLayer,
     lightweight_line_graph,
+    remove_net_torque,
 )
 from alignn.graphs import compute_bond_cosines
 from alignn.utils import BaseSettings
@@ -45,7 +46,8 @@ class eALIGNNAtomWiseConfig(BaseSettings):
     stresswise_weight: float = 0.0
     atomwise_weight: float = 0.0
     classification: bool = False
-    energy_mult_natoms: bool = True
+    energy_mult_natoms: bool = True  # Make it false for regression only
+    remove_torque: bool = True
     inner_cutoff: float = 2.8  # Ansgtrom
     use_penalty: bool = True
     extra_features: int = 0
@@ -390,6 +392,11 @@ class eALIGNNAtomWise(nn.Module):
             forces = torch.squeeze(
                 g.ndata["forces_ji"] - rg.ndata["forces_ij"]
             )
+            if self.config.remove_torque:
+                # print('forces1',forces,forces.shape)
+                # print('natoms',natoms,natoms.shape)
+                forces = remove_net_torque(g, forces, natoms)
+                # print('forces2',forces,forces.shape)
 
             if self.config.stresswise_weight != 0:
                 stresses = []
