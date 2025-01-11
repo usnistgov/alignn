@@ -131,25 +131,47 @@ def lightweight_line_graph(
     feature_name: str,
     filter_condition: Callable[[torch.Tensor], torch.Tensor],
 ) -> dgl.DGLGraph:
-    """Make the line graphs lightweight."""
+    """Make the line graphs lightweight with preserved node ordering.
+
+    Args:
+        input_graph: Input DGL graph
+        feature_name: Name of the edge feature to filter on
+        filter_condition: Takes edge features and returns boolean mask
+
+    Returns:
+        Filtered edges while preserving original node ordering
+    """
+    # Get active edges based on filter condition
     active_edges = torch.logical_not(
         filter_condition(input_graph.edata[feature_name])
     )
+
+    # Get filtered edges
     source_nodes, destination_nodes = input_graph.edges()
     source_nodes, destination_nodes = (
         source_nodes[active_edges],
         destination_nodes[active_edges],
     )
+
+    # Get edge IDs for the active edges
     edge_ids = active_edges.nonzero().squeeze()
 
+    # Create new graph with same number of nodes as input graph
     new_graph = dgl.graph(
-        (source_nodes, destination_nodes), device=input_graph.device
+        (source_nodes, destination_nodes),
+        num_nodes=input_graph.num_nodes(),
+        device=input_graph.device,
     )
-    new_graph.edata["edge_ids"] = edge_ids
 
+    # Copy edge IDs
+    new_graph.edata["edge_ids"] = edge_ids
+    # print('input_graph',input_graph)
+    # print('new_graph',new_graph)
+    # Copy all node features directly (maintaining same number of nodes)
     for node_feature, node_value in input_graph.ndata.items():
         new_graph.ndata[node_feature] = node_value
 
+    # Copy filtered edge features
     for edge_feature, edge_value in input_graph.edata.items():
         new_graph.edata[edge_feature] = edge_value[active_edges]
 
