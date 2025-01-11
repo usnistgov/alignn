@@ -1,6 +1,6 @@
 """Shared model-building components."""
 
-from typing import Optional
+from typing import Optional, Callable
 import numpy as np
 import torch
 import torch.nn as nn
@@ -123,6 +123,36 @@ def compute_cartesian_coordinates(g, lattice, dtype=torch.float32):
     )  # Shape: (N, 3)
 
     return cart_coords
+
+
+def lightweight_line_graph(
+    input_graph: dgl.DGLGraph,
+    feature_name: str,
+    filter_condition: Callable[[torch.Tensor], torch.Tensor],
+) -> dgl.DGLGraph:
+    """Make the line graphs lightweight."""
+    active_edges = torch.logical_not(
+        filter_condition(input_graph.edata[feature_name])
+    )
+    source_nodes, destination_nodes = input_graph.edges()
+    source_nodes, destination_nodes = (
+        source_nodes[active_edges],
+        destination_nodes[active_edges],
+    )
+    edge_ids = active_edges.nonzero().squeeze()
+
+    new_graph = dgl.graph(
+        (source_nodes, destination_nodes), device=input_graph.device
+    )
+    new_graph.edata["edge_ids"] = edge_ids
+
+    for node_feature, node_value in input_graph.ndata.items():
+        new_graph.ndata[node_feature] = node_value
+
+    for edge_feature, edge_value in input_graph.edata.items():
+        new_graph.edata[edge_feature] = edge_value[active_edges]
+
+    return new_graph
 
 
 class MLPLayer(nn.Module):

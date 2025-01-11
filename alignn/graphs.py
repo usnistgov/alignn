@@ -353,7 +353,7 @@ def radius_graph(
             return u, v, r, cell_images
         else:
             cutoff += cutoff_extra
-            print("cutoff", id, cutoff, atoms)
+            # print("cutoff", id, cutoff, atoms)
 
     # except Exception as exp:
     #    print("Graph exp", exp,atoms)

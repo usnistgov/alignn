@@ -79,7 +79,7 @@ class TorchLMDBDataset(Dataset):
         graphs, lattices, labels = map(list, zip(*samples))
         # graphs, lgs, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
-        return batched_graph, torch.tensor(lattices), torch.tensor(labels)
+        return batched_graph, torch.stack(lattices), torch.tensor(labels)
 
     @staticmethod
     def collate_line_graph(
