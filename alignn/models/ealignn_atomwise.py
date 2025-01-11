@@ -46,7 +46,7 @@ class eALIGNNAtomWiseConfig(BaseSettings):
     atomwise_weight: float = 0.0
     classification: bool = False
     energy_mult_natoms: bool = True
-    inner_cutoff: float = 3  # Ansgtrom
+    inner_cutoff: float = 2.8  # Ansgtrom
     use_penalty: bool = True
     extra_features: int = 0
     penalty_factor: float = 0.1
@@ -287,7 +287,7 @@ class eALIGNNAtomWise(nn.Module):
         if self.config.calculate_gradient:
             r.requires_grad_(True)
         bondlength = torch.norm(r, dim=1)
-        if len(self.alignn_layers) > 0:
+        if (self.config.alignn_layers) > 0:
             g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
             g.ndata["cart_coords"].requires_grad_(True)
             r, bondlength = compute_pair_vector_and_distance(g)
@@ -363,8 +363,6 @@ class eALIGNNAtomWise(nn.Module):
             en_out += total_penalty
 
         if self.config.calculate_gradient:
-            # dx = r
-
             # force calculation based on bond displacement vectors
             # autograd gives dE / d{r_{i->j}}
             pair_forces = (
@@ -383,9 +381,6 @@ class eALIGNNAtomWise(nn.Module):
             g.update_all(
                 fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ji")
             )
-            # reduce over reverse edges too!
-            # force_i contributions from r_{i->j} (out edges)
-            # aggregate pairwise_force_contribs over reversed edges
             rg = dgl.reverse(g, copy_edata=True)
             rg.update_all(
                 fn.copy_e("pair_forces", "m"), fn.sum("m", "forces_ij")
@@ -418,12 +413,10 @@ class eALIGNNAtomWise(nn.Module):
                     stresses.append(st)
                 stress = self.config.stress_multiplier * torch.stack(stresses)
         if self.classification:
-            # out = torch.max(out,dim=1)
             out = self.softmax(out)
         result["out"] = out
         result["additional"] = additional_out
         result["grad"] = forces
         result["stresses"] = stress
         result["atomwise_pred"] = atomwise_pred
-        # print(result)
         return result
