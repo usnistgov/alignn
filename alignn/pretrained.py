@@ -325,6 +325,7 @@ def get_prediction(
 
 def get_multiple_predictions(
     atoms_array=[],
+    jids=[],
     cutoff=8,
     neighbor_strategy="k-nearest",
     max_neighbors=12,
@@ -359,11 +360,11 @@ def get_multiple_predictions(
     # get_multiple_predictions(atoms_array=atoms_array)
 
     mem = []
-    for i, ii in enumerate(atoms_array):
+    for i, ii in tqdm(enumerate(atoms_array), total=len(atoms_array)):
         info = {}
-        info["atoms"] = ii.to_dict()
+        info["atoms"] = ii  # .to_dict()
         info["prop"] = -9999  # place-holder only
-        info["jid"] = str(i)
+        info["jid"] = jids[i]  # str(i)
         mem.append(info)
 
     if model is None:
