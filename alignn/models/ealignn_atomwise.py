@@ -421,6 +421,7 @@ class eALIGNNAtomWise(nn.Module):
                 stress = self.config.stress_multiplier * torch.stack(stresses)
         if self.classification:
             out = self.softmax(out)
+        # print('out',out)
         result["out"] = out
         result["additional"] = additional_out
         result["grad"] = forces
