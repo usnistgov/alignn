@@ -48,8 +48,8 @@ class eALIGNNAtomWiseConfig(BaseSettings):
     atomwise_weight: float = 0.0
     classification: bool = False
     energy_mult_natoms: bool = True  # Make it false for regression only
-    remove_torque: bool = True
-    inner_cutoff: float = 2.8  # Ansgtrom
+    remove_torque: bool = True  # True
+    inner_cutoff: float = 4  # Ansgtrom
     use_penalty: bool = True
     extra_features: int = 0
     penalty_factor: float = 0.1

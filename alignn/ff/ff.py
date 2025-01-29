@@ -30,6 +30,10 @@ from ase.stress import full_3x3_to_voigt_6_stress
 from jarvis.db.jsonutils import loadjson
 from alignn.graphs import Graph
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+from alignn.models.ealignn_atomwise import (
+    eALIGNNAtomWise,
+    eALIGNNAtomWiseConfig,
+)
 from alignn.models.alignn import ALIGNN, ALIGNNConfig
 from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
@@ -258,7 +262,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
         if (
             batch_stress is not None
-            and self.config["model"]["name"] == "alignn_atomwise"
+            and "atomwise" in self.config["model"]["name"]
         ):
             self.config["model"]["batch_stress"] = batch_stress
         import torch
@@ -273,10 +277,14 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 model = ALIGNNAtomWise(
                     ALIGNNAtomWiseConfig(**self.config["model"])
                 )
-            if self.config["model"]["name"] == "alignn":
+            elif self.config["model"]["name"] == "alignn":
                 model = ALIGNN(ALIGNNConfig(**self.config["model"]))
+            elif self.config["model"]["name"] == "ealignn_atomwise":
+                model = eALIGNNAtomWise(
+                    eALIGNNAtomWiseConfig(**self.config["model"])
+                )
             model.state_dict()
-            if self.config["model"]["name"] == "alignn_atomwise":
+            if "atomwise" in self.config["model"]["name"]:
                 model.load_state_dict(
                     torch.load(
                         os.path.join(path, model_filename),
@@ -323,16 +331,13 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             result = self.model(
                 (g.to(self.device, torch.tensor(atoms.cell).to(self.device)))
             )
-        if self.config["model"]["name"] == "alignn_atomwise":
+        if "atomwise" in self.config["model"]["name"]:
             forces = forces = (
                 result["grad"].detach().cpu().numpy() * self.force_multiplier
             )
         else:
             forces = np.zeros((3, 3))
-        if (
-            self.config["model"]["name"] == "alignn_atomwise"
-            and self.trained_stress
-        ):
+        if "atomwise" in self.config["model"]["name"] and self.trained_stress:
             stress = (
                 full_3x3_to_voigt_6_stress(
                     result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
@@ -342,7 +347,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         else:
             stress = np.zeros((3, 3))
-        if self.config["model"]["name"] == "alignn_atomwise":
+        if "atomwise" in self.config["model"]["name"]:
             energy = result["out"].detach().cpu().numpy()
         else:
             energy = result.detach().cpu().numpy()
