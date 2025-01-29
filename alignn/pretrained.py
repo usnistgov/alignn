@@ -17,6 +17,7 @@ from alignn.graphs import Graph
 from jarvis.db.jsonutils import dumpjson
 import pandas as pd
 from alignn.dataset import get_torch_dataset
+import numpy as np
 
 # from jarvis.core.graphs import Graph
 
@@ -358,10 +359,13 @@ def get_multiple_predictions(
     #      atoms=Atoms.from_poscar(i)
     #      atoms_array.append(atoms)
     # get_multiple_predictions(atoms_array=atoms_array)
-
+    if not jids:
+        jids = ["id-" + str(i) for i in np.arange(len(atoms_array))]
     mem = []
     for i, ii in tqdm(enumerate(atoms_array), total=len(atoms_array)):
         info = {}
+        if isinstance(ii, Atoms):
+            ii = ii.to_dict()
         info["atoms"] = ii  # .to_dict()
         info["prop"] = -9999  # place-holder only
         info["jid"] = jids[i]  # str(i)

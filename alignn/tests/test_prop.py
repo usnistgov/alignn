@@ -242,7 +242,7 @@ def test_del_files():
 
 
 test_clean()
-# test_pretrained()
+#test_pretrained()
 # test_models()
 # test_alignn_train_ff()
 # test_alignn_train_regression_multi_out()
