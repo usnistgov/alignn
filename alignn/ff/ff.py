@@ -66,7 +66,16 @@ except Exception:
 
 
 def get_all_models():
-    json_path = os.path.join(os.path.dirname(__file__), "all_models_ff.json")
+    json_path = os.path.join(
+        os.path.dirname(__file__), "all_models_alignn_atomwise.json"
+    )
+    return loadjson(json_path)
+
+
+def get_all_models_prop():
+    json_path = os.path.join(
+        os.path.dirname(__file__), "all_models_alignn.json"
+    )
     return loadjson(json_path)
 
 
