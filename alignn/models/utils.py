@@ -137,10 +137,10 @@ def lightweight_line_graph(
     Args:
         input_graph: Input DGL graph (can be batched)
         feature_name: Name of the edge feature to filter on
-        filter_condition: Function that takes edge features and returns boolean mask
+        filter_condition: Take edge features and returns boolean mask
 
     Returns:
-        New DGL graph with filtered edges while preserving original node ordering
+        New DGL graph with filtered edges preserving original node ordering
     """
     # Check if graph is batched
     is_batched = (
@@ -149,7 +149,7 @@ def lightweight_line_graph(
 
     if is_batched:
         # Get the batch size and number of nodes per graph
-        batch_size = input_graph.batch_size
+        # batch_size = input_graph.batch_size
         graph_list = dgl.unbatch(input_graph)
         processed_graphs = []
 
