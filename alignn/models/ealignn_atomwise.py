@@ -7,6 +7,7 @@ from typing import Tuple, Union
 from torch.autograd import grad
 import dgl
 import dgl.function as fn
+
 # import numpy as np
 from dgl.nn import AvgPooling
 import torch
@@ -56,7 +57,7 @@ class eALIGNNAtomWiseConfig(BaseSettings):
     additional_output_features: int = 0
     additional_output_weight: float = 0
     stress_multiplier: float = 1
-    #Extra
+    # Extra
     grad_multiplier: int = -1
     link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
@@ -69,6 +70,7 @@ class eALIGNNAtomWiseConfig(BaseSettings):
     batch_stress: bool = True
     multiply_cutoff: bool = False
     exponent: int = 5
+
 
 class EdgeGatedGraphConv(nn.Module):
     """Edge gated graph convolution from arxiv:1711.07553.
