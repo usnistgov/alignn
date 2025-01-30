@@ -27,7 +27,9 @@ tqdm.pandas()
 Name of the model, figshare link, number of outputs,
 extra config params (optional)
 """
-# For ALIGNN-FF pretrained models see, alignn/ff/ff.py
+# See also, alignn/ff/ff.py
+# Both alignn and alignn_atomwise
+# models are shared
 all_models = {
     "jv_formation_energy_peratom_alignn": [
         "https://figshare.com/ndownloader/files/31458679",
