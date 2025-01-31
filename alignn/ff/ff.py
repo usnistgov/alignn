@@ -25,16 +25,18 @@ from ase import units
 from ase.md import Langevin
 from ase.md.npt import NPT
 from ase.md.andersen import Andersen
-import ase.calculators.calculator
-from ase.stress import full_3x3_to_voigt_6_stress
+
+# import ase.calculators.calculator
+# from ase.stress import full_3x3_to_voigt_6_stress
 from jarvis.db.jsonutils import loadjson
-from alignn.graphs import Graph
-from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-from alignn.models.ealignn_atomwise import (
-    eALIGNNAtomWise,
-    eALIGNNAtomWiseConfig,
-)
-from alignn.models.alignn import ALIGNN, ALIGNNConfig
+
+# from alignn.graphs import Graph
+# from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+# from alignn.models.ealignn_atomwise import (
+#    eALIGNNAtomWise,
+#    eALIGNNAtomWiseConfig,
+# )
+# from alignn.models.alignn import ALIGNN, ALIGNNConfig
 from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
 from alignn.pretrained import get_prediction
@@ -54,7 +56,13 @@ from ase.cell import Cell
 from matplotlib.gridspec import GridSpec
 from sklearn.metrics import mean_absolute_error
 from tqdm import tqdm
-import torch
+
+# import torch
+from alignn.ff.calculators import (
+    AlignnAtomwiseCalculator,
+)  # Import from new location
+
+__all__ = ["AlignnAtomwiseCalculator"]
 
 try:
     from gpaw import GPAW, PW
@@ -204,174 +212,6 @@ def ase_to_atoms(ase_atoms):
         #         pbc=True,
         cartesian=True,
     )
-
-
-ignore_bad_restart_file = ase.calculators.calculator.Calculator._deprecated
-
-
-class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
-    """Module for ASE Calculator interface."""
-
-    def __init__(
-        self,
-        restart=None,
-        ignore_bad_restart_file=ignore_bad_restart_file,
-        label=None,
-        include_stress=True,
-        intensive=True,
-        atoms=None,
-        directory=".",
-        device=None,
-        model=None,
-        config=None,
-        path=None,
-        model_filename="best_model.pt",
-        config_filename="config.json",
-        output_dir=None,
-        batch_stress=True,
-        force_mult_natoms=False,
-        force_mult_batchsize=True,
-        force_multiplier=1,
-        stress_wt=0.05,
-    ):
-        """Initialize class."""
-        super(AlignnAtomwiseCalculator, self).__init__(
-            restart, ignore_bad_restart_file, label, atoms, directory
-        )  # , **kwargs
-        self.model = model
-        self.device = device
-        self.intensive = intensive
-        self.config = config
-        self.include_stress = include_stress
-        self.stress_wt = stress_wt
-        self.force_mult_natoms = force_mult_natoms
-        self.force_mult_batchsize = force_mult_batchsize
-        self.force_multiplier = force_multiplier
-        self.trained_stress = False
-        if path is None and model is None:
-            path = default_path()
-        if self.config is None:
-            config = loadjson(os.path.join(path, config_filename))
-            self.config = config
-        if self.force_mult_natoms:
-            self.config["model"]["force_mult_natoms"] = True
-        if self.include_stress:
-            self.implemented_properties = ["energy", "forces", "stress"]
-            if (
-                "stresswise_weight" in self.config["model"]
-                and self.config["model"]["stresswise_weight"] == 0
-            ):
-                self.trained_stress = False
-                self.config["model"]["stresswise_weight"] = 0.1
-            else:
-                self.trained_stress = True
-
-        else:
-            self.implemented_properties = ["energy", "forces"]
-
-        if (
-            batch_stress is not None
-            and "atomwise" in self.config["model"]["name"]
-        ):
-            self.config["model"]["batch_stress"] = batch_stress
-        import torch
-
-        if self.device is None:
-            self.device = torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu"
-            )
-        if self.model is None:
-
-            if self.config["model"]["name"] == "alignn_atomwise":
-                model = ALIGNNAtomWise(
-                    ALIGNNAtomWiseConfig(**self.config["model"])
-                )
-            elif self.config["model"]["name"] == "alignn":
-                model = ALIGNN(ALIGNNConfig(**self.config["model"]))
-            elif self.config["model"]["name"] == "ealignn_atomwise":
-                model = eALIGNNAtomWise(
-                    eALIGNNAtomWiseConfig(**self.config["model"])
-                )
-            model.state_dict()
-            if "atomwise" in self.config["model"]["name"]:
-                model.load_state_dict(
-                    torch.load(
-                        os.path.join(path, model_filename),
-                        map_location=self.device,
-                    )
-                )
-            else:
-                model.load_state_dict(
-                    torch.load(
-                        os.path.join(path, model_filename),
-                        map_location=self.device,
-                    )["model"]
-                )
-            model.to(device)
-            model.eval()
-            self.model = model
-        else:
-            model = self.model
-
-    def calculate(self, atoms, properties=None, system_changes=None):
-        """Calculate properties."""
-        j_atoms = ase_to_atoms(atoms)
-        num_atoms = j_atoms.num_atoms
-        g, lg = Graph.atom_dgl_multigraph(
-            j_atoms,
-            neighbor_strategy=self.config["neighbor_strategy"],
-            cutoff=self.config["cutoff"],
-            max_neighbors=self.config["max_neighbors"],
-            atom_features=self.config["atom_features"],
-            use_canonize=self.config["use_canonize"],
-        )
-
-        if self.config["model"]["alignn_layers"] > 0:
-            result = self.model(
-                (
-                    g.to(self.device),
-                    lg.to(self.device),
-                    torch.tensor(atoms.cell)
-                    .type(torch.get_default_dtype())
-                    .to(self.device),
-                )
-            )
-        else:
-            result = self.model(
-                (g.to(self.device, torch.tensor(atoms.cell).to(self.device)))
-            )
-        if "atomwise" in self.config["model"]["name"]:
-            forces = forces = (
-                result["grad"].detach().cpu().numpy() * self.force_multiplier
-            )
-        else:
-            forces = np.zeros((3, 3))
-        if "atomwise" in self.config["model"]["name"] and self.trained_stress:
-            stress = (
-                full_3x3_to_voigt_6_stress(
-                    result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
-                )
-                * self.stress_wt
-                / 160.21766208
-            )
-        else:
-            stress = np.zeros((3, 3))
-        if "atomwise" in self.config["model"]["name"]:
-            energy = result["out"].detach().cpu().numpy()
-        else:
-            energy = result.detach().cpu().numpy()
-        if self.intensive:
-            energy *= num_atoms
-        if self.force_mult_natoms:
-            forces *= num_atoms
-        if self.force_mult_batchsize:
-            forces *= self.config["batch_size"]
-
-        self.results = {
-            "energy": energy,
-            "forces": forces,
-            "stress": stress,
-        }
 
 
 class ForceField(object):
