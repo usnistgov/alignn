@@ -125,6 +125,11 @@ def test_qclean():
     os.system(cmd)
 
 
+def test_ialignn_ff():
+    from alignn.ff.calculators import iAlignnAtomwiseCalculator
+    calc = iAlignnAtomwiseCalculator()
+    atoms = Poscar.from_string(pos).atoms.ase_converter()
+    results=atoms.calc.results
 # print('test_graph_builder')
 # test_graph_builder()
 # print('test_ev')
