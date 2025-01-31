@@ -25,18 +25,7 @@ from ase import units
 from ase.md import Langevin
 from ase.md.npt import NPT
 from ase.md.andersen import Andersen
-
-# import ase.calculators.calculator
-# from ase.stress import full_3x3_to_voigt_6_stress
 from jarvis.db.jsonutils import loadjson
-
-# from alignn.graphs import Graph
-# from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
-# from alignn.models.ealignn_atomwise import (
-#    eALIGNNAtomWise,
-#    eALIGNNAtomWiseConfig,
-# )
-# from alignn.models.alignn import ALIGNN, ALIGNNConfig
 from jarvis.analysis.defects.vacancy import Vacancy
 import numpy as np
 from alignn.pretrained import get_prediction
