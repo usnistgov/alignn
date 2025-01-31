@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2024.12.02",
+    version="2024.12.12",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
@@ -45,7 +45,12 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/usnistgov/alignn",
     packages=setuptools.find_packages(),
-    package_data={"alignn.ff": ["all_models_ff.json"]},
+    package_data={
+        "alignn.ff": [
+            "all_models_alignn.json",
+            "all_models_alignn_atomwise.json",
+        ]
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

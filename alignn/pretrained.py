@@ -17,6 +17,7 @@ from alignn.graphs import Graph
 from jarvis.db.jsonutils import dumpjson
 import pandas as pd
 from alignn.dataset import get_torch_dataset
+import numpy as np
 
 # from jarvis.core.graphs import Graph
 
@@ -26,7 +27,12 @@ tqdm.pandas()
 Name of the model, figshare link, number of outputs,
 extra config params (optional)
 """
-# For ALIGNN-FF pretrained models see, alignn/ff/ff.py
+# See also, alignn/ff/ff.py
+# Both alignn and alignn_atomwise
+# models are shared
+
+# See: alignn/ff/all_models_alignn.json
+# to load as a calculator
 all_models = {
     "jv_formation_energy_peratom_alignn": [
         "https://figshare.com/ndownloader/files/31458679",
@@ -325,6 +331,7 @@ def get_prediction(
 
 def get_multiple_predictions(
     atoms_array=[],
+    jids=[],
     cutoff=8,
     neighbor_strategy="k-nearest",
     max_neighbors=12,
@@ -357,13 +364,16 @@ def get_multiple_predictions(
     #      atoms=Atoms.from_poscar(i)
     #      atoms_array.append(atoms)
     # get_multiple_predictions(atoms_array=atoms_array)
-
+    if not jids:
+        jids = ["id-" + str(i) for i in np.arange(len(atoms_array))]
     mem = []
-    for i, ii in enumerate(atoms_array):
+    for i, ii in tqdm(enumerate(atoms_array), total=len(atoms_array)):
         info = {}
-        info["atoms"] = ii.to_dict()
+        if isinstance(ii, Atoms):
+            ii = ii.to_dict()
+        info["atoms"] = ii  # .to_dict()
         info["prop"] = -9999  # place-holder only
-        info["jid"] = str(i)
+        info["jid"] = jids[i]  # str(i)
         mem.append(info)
 
     if model is None:

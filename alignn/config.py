@@ -7,6 +7,7 @@ from typing import Literal
 from alignn.utils import BaseSettings
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
+from alignn.models.ealignn_atomwise import eALIGNNAtomWiseConfig
 
 # import torch
 
@@ -188,6 +189,7 @@ class TrainingConfig(BaseSettings):
     log_tensorboard: bool = False
     standard_scalar_and_pca: bool = False
     use_canonize: bool = True
+    compute_line_graph: bool = True
     num_workers: int = 4
     cutoff: float = 8.0
     cutoff_extra: float = 3.0
@@ -210,4 +212,5 @@ class TrainingConfig(BaseSettings):
     model: Union[
         ALIGNNConfig,
         ALIGNNAtomWiseConfig,
+        eALIGNNAtomWiseConfig,
     ] = ALIGNNAtomWiseConfig(name="alignn_atomwise")

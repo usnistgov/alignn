@@ -247,6 +247,9 @@ from alignn.ff.ff import AlignnAtomwiseCalculator,default_path
 from jarvis.io.vasp.inputs import Poscar
 import numpy as np
 import matplotlib.pyplot as plt
+from ase.constraints import ExpCellFilter
+from ase.optimize.fire import FIRE
+from jarvis.core.atoms import ase_to_atoms
 model_path = default_path()
 calc = AlignnAtomwiseCalculator(path=model_path)
 # Source: https://www.ctcms.nist.gov/~knc6/static/JARVIS-DFT/JVASP-1002.xml
@@ -261,9 +264,22 @@ Cartesian
 3.92483875 2.77528125 6.7980237500000005
 0.56069125 0.39646875 0.9711462500000001
 """
+def general_relaxer(atoms="", calculator="", fmax=0.05, steps=150,relax=True):
+    ase_atoms = atoms.ase_converter()
+    ase_atoms.calc = calculator
+    if not relax:
+         return ase_atoms.get_potential_energy()
+    ase_atoms = ExpCellFilter(ase_atoms)
+    dyn = FIRE(ase_atoms)
+    dyn.run(fmax=fmax, steps=steps)
+    return ase_to_atoms(ase_atoms.atoms)
+
 dx=np.arange(-0.1, 0.1, 0.01)
 atoms=Poscar.from_string(poscar).atoms
-print(atoms)
+print('Intital\n',atoms)
+atoms = general_relaxer(atoms=atoms,calculator=calc)
+print('Final\n',atoms)
+
 y = []
 vol = []
 for i in dx:
@@ -278,8 +294,8 @@ for i in dx:
 plt.plot(vol,y,'-o')
 plt.xlabel('Volume ($\AA^3$)')
 plt.ylabel('Total energy (eV)')
-plt.savefig('Si_JVASP-1002.png')
-plt.close()
+# plt.savefig('Si_JVASP-1002.png')
+# plt.close()
 ```
 
 

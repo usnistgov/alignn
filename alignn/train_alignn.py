@@ -317,7 +317,8 @@ def train_for_folder(
     #    "alignn_atomwise",
     # }
 
-    if config.model.alignn_layers > 0:
+    if config.compute_line_graph > 0:
+        # if config.model.alignn_layers > 0:
         line_graph = True
 
     if multioutput:

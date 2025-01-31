@@ -375,7 +375,7 @@ class ALIGNNAtomWise(nn.Module):
             lg = lg.local_var()
             # print('lg',lg)
             # angle features (fixed)
-            # z = self.angle_embedding(lg.edata.pop("h"))
+            z = self.angle_embedding(lg.edata.pop("h"))
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)

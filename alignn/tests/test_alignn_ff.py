@@ -18,7 +18,9 @@ from alignn.ff.ff import (
     ForceField,
 )
 from jarvis.io.vasp.inputs import Poscar
+from alignn.ff.ff import get_figshare_model_prop, get_figshare_model_ff
 import os
+
 # JVASP-25139
 pos = """Rb8
 1.0
@@ -123,6 +125,33 @@ def test_phonons():
 def test_qclean():
     cmd = "rm *.pt *.traj *.csv *.json *range"
     os.system(cmd)
+
+
+def test_ialignn_ff():
+    from alignn.ff.calculators import iAlignnAtomwiseCalculator
+
+    calc = iAlignnAtomwiseCalculator()
+    atoms = Poscar.from_string(pos).atoms.ase_converter()
+    atoms.calc = calc
+    en = atoms.get_potential_energy()
+    results = atoms.calc.results
+
+
+def test_alexandria_gap():
+    p = get_figshare_model_ff("alex_band_gap")
+    calc = AlignnAtomwiseCalculator(path=p)
+    atoms = Poscar.from_string(pos).atoms.ase_converter()
+    atoms.calc = calc
+    val = atoms.get_potential_energy()  # gap
+
+
+def test_jdft_mbj_gap():
+    # p=get_figshare_model_ff('alex_band_gap')
+    p = get_figshare_model_prop()
+    calc = AlignnAtomwiseCalculator(path=p)
+    atoms = Poscar.from_string(pos).atoms.ase_converter()
+    atoms.calc = calc
+    val = atoms.get_potential_energy()  # gap
 
 
 # print('test_graph_builder')

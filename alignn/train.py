@@ -12,6 +12,7 @@ from torch import nn
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
+from alignn.models.ealignn_atomwise import eALIGNNAtomWise
 from alignn.models.alignn import ALIGNN
 from jarvis.db.jsonutils import dumpjson
 import json
@@ -93,7 +94,8 @@ def train_dgl(
     }
     torch.set_default_dtype(TORCH_DTYPES[config.dtype])
     line_graph = False
-    if config.model.alignn_layers > 0:
+    if config.compute_line_graph > 0:
+        # if config.model.alignn_layers > 0:
         line_graph = True
     if world_size > 1:
         use_ddp = True
@@ -156,6 +158,7 @@ def train_dgl(
         config.model.classification = True
     _model = {
         "alignn_atomwise": ALIGNNAtomWise,
+        "ealignn_atomwise": eALIGNNAtomWise,
         "alignn": ALIGNN,
     }
     if config.random_seed is not None:
@@ -256,7 +259,8 @@ def train_dgl(
                 info = {}
                 # info["id"] = jid
                 optimizer.zero_grad()
-                if (config.model.alignn_layers) > 0:
+                if (config.compute_line_graph) > 0:
+                    # if (config.model.alignn_layers) > 0:
                     result = net(
                         [
                             dats[0].to(device),
@@ -266,7 +270,7 @@ def train_dgl(
                     )
 
                 else:
-                    result = net(dats[0].to(device))
+                    result = net([dats[0].to(device), dats[1].to(device)])
                 # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
@@ -420,7 +424,9 @@ def train_dgl(
                 info["id"] = jid
                 optimizer.zero_grad()
                 # result = net([dats[0].to(device), dats[1].to(device)])
-                if (config.model.alignn_layers) > 0:
+                # if (config.model.alignn_layers) > 0:
+                # if (config.create_line_graph) > 0:
+                if (config.compute_line_graph) > 0:
                     result = net(
                         [
                             dats[0].to(device),
@@ -429,7 +435,8 @@ def train_dgl(
                         ]
                     )
                 else:
-                    result = net(dats[0].to(device))
+                    result = net([dats[0].to(device), dats[1].to(device)])
+                    # result = net(dats[0].to(device))
                 # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
@@ -612,7 +619,9 @@ def train_dgl(
                 info = {}
                 info["id"] = jid
                 optimizer.zero_grad()
-                if (config.model.alignn_layers) > 0:
+                # if (config.model.alignn_layers) > 0:
+                # if (config.create_line_graph) > 0:
+                if (config.compute_line_graph) > 0:
                     # result = net([dats[0].to(device), dats[1].to(device)])
                     result = net(
                         [
@@ -622,7 +631,8 @@ def train_dgl(
                         ]
                     )
                 else:
-                    result = net(dats[0].to(device))
+                    result = net([dats[0].to(device), dats[1].to(device)])
+                    # result = net(dats[0].to(device))
                 loss1 = 0  # Such as energy
                 loss2 = 0  # Such as bader charges
                 loss3 = 0  # Such as forces
