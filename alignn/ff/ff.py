@@ -136,6 +136,71 @@ def get_figshare_model_ff(
     return dir_path
 
 
+def get_figshare_model_prop(
+    model_name="jv_mbj_bandgap_alignn", dir_path=None, filename="best_model.pt"
+):
+    """Get ALIGNN-FF torch models from figshare."""
+    all_models_prop = get_all_models_prop()
+    # https://doi.org/10.6084/m9.figshare.23695695
+    if dir_path is None:
+        dir_path = str(os.path.join(os.path.dirname(__file__), model_name))
+    # cwd=os.getcwd()
+    dir_path = os.path.abspath(dir_path)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    # os.chdir(dir_path)
+    url = all_models_prop[model_name]
+    zfile = model_name + ".zip"
+    path = str(os.path.join(dir_path, zfile))
+    # path = str(os.path.join(os.path.dirname(__file__), zfile))
+    print("dir_path", dir_path)
+    best_path = os.path.join(dir_path, filename)
+    if not os.path.exists(best_path):
+        response = requests.get(url, stream=True)
+        total_size_in_bytes = int(response.headers.get("content-length", 0))
+        block_size = 1024  # 1 Kibibyte
+        progress_bar = tqdm(
+            total=total_size_in_bytes, unit="iB", unit_scale=True
+        )
+        with open(path, "wb") as file:
+            for data in response.iter_content(block_size):
+                progress_bar.update(len(data))
+                file.write(data)
+        progress_bar.close()
+        zp = zipfile.ZipFile(path)
+        names = zp.namelist()
+        chks = []
+        cfg = []
+        for i in names:
+            if "checkpoint_" in i and "pt" in i:
+                tmp = i
+                # fname = i
+                chks.append(i)
+            if filename in i:
+                tmp = i
+                chks.append(i)
+
+            if "config.json" in i:
+                cfg = i
+
+        config = zipfile.ZipFile(path).read(cfg)
+        # print("Loading the zipfile...", zipfile.ZipFile(path).namelist())
+        data = zipfile.ZipFile(path).read(tmp)
+        # print('dir_path',dir_path,filename)
+        # new_file, filename = tempfile.mkstemp()
+        filename = os.path.join(dir_path, filename)
+        with open(filename, "wb") as f:
+            f.write(data)
+        filename = os.path.join(dir_path, "config.json")
+        with open(filename, "wb") as f:
+            f.write(config)
+        os.remove(path)
+    # print("Using model file", url, "from ", chks)
+    # print("Path", os.path.abspath(path))
+    # print("Config", os.path.abspath(cfg))
+    return dir_path
+
+
 def default_path():
     """Get default model path."""
     dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")

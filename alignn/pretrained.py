@@ -30,6 +30,9 @@ extra config params (optional)
 # See also, alignn/ff/ff.py
 # Both alignn and alignn_atomwise
 # models are shared
+
+# See: alignn/ff/all_models_alignn.json
+# to load as a calculator
 all_models = {
     "jv_formation_energy_peratom_alignn": [
         "https://figshare.com/ndownloader/files/31458679",
