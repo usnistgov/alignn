@@ -317,7 +317,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         #    # and self.trained_stress:
         #    stress = (
         #        full_3x3_to_voigt_6_stress(
-        #            result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+        #            result["stresses"][:3].r
+        # eshape(3, 3).detach().cpu().numpy()
         #        )
         #        * self.stress_wt
         #        / 160.21766208
