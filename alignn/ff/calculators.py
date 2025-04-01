@@ -213,6 +213,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             self.config = config
         if self.force_mult_natoms:
             self.config["model"]["force_mult_natoms"] = True
+
         if self.include_stress:
             self.implemented_properties = ["energy", "forces", "stress"]
             if (
@@ -226,6 +227,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
         else:
             self.implemented_properties = ["energy", "forces"]
+        if self.config["model"]["calculate_gradient"]:
+            self.trained_stress = True
 
         if (
             batch_stress is not None
@@ -305,7 +308,9 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         else:
             forces = np.zeros((3, 3))
-        if "atomwise" in self.config["model"]["name"] and self.trained_stress:
+        # print("self.trained_stress",self.trained_stress)
+        if self.trained_stress:
+            # if "atomwise" in self.config["model"]["name"] and self.trained_stress:
             stress = (
                 full_3x3_to_voigt_6_stress(
                     result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
@@ -315,13 +320,13 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         else:
             stress = np.zeros((3, 3))
-        stress = (
-            full_3x3_to_voigt_6_stress(
-                result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
-            )
-            * self.stress_wt
-            / 160.21766208
-        )
+        # stress = (
+        #    full_3x3_to_voigt_6_stress(
+        #        result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+        #    )
+        #    * self.stress_wt
+        #    / 160.21766208
+        # )
         if "atomwise" in self.config["model"]["name"]:
             energy = result["out"].detach().cpu().numpy()
         else:
