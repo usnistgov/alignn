@@ -227,7 +227,10 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
         else:
             self.implemented_properties = ["energy", "forces"]
-        if self.config["model"]["calculate_gradient"]:
+        if (
+            "calculate_gradient" in self.config["model"]
+            and self.config["model"]["calculate_gradient"]
+        ):
             self.trained_stress = True
 
         if (
