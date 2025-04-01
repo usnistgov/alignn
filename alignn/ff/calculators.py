@@ -312,16 +312,37 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         else:
             forces = np.zeros((3, 3))
         # print("self.trained_stress",self.trained_stress)
-        if self.trained_stress:
-            # if "atomwise" in self.config["model"]["name"]
-            # and self.trained_stress:
-            stress = (
-                full_3x3_to_voigt_6_stress(
-                    result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+        # if self.trained_stress:
+        #    # if "atomwise" in self.config["model"]["name"]
+        #    # and self.trained_stress:
+        #    stress = (
+        #        full_3x3_to_voigt_6_stress(
+        #            result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+        #        )
+        #        * self.stress_wt
+        #        / 160.21766208
+        #    )
+        # else:
+        #    stress = np.zeros((3, 3))
+        if (
+            "calculate_gradient" in self.config["model"]
+            and self.config["model"]["calculate_gradient"]
+        ):
+            try:
+                stress = (
+                    full_3x3_to_voigt_6_stress(
+                        result["stresses"][:3]
+                        .reshape(3, 3)
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+                    * self.stress_wt
+                    / 160.21766208
                 )
-                * self.stress_wt
-                / 160.21766208
-            )
+            except Exception:
+                stress = np.zeros((3, 3))
+                pass
         else:
             stress = np.zeros((3, 3))
         # stress = (
