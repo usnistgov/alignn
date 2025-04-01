@@ -298,6 +298,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             result = self.model(
                 (g.to(self.device), torch.tensor(atoms.cell).to(self.device))
             )
+        # print("result",result)
         if "atomwise" in self.config["model"]["name"]:
             forces = forces = (
                 result["grad"].detach().cpu().numpy() * self.force_multiplier
@@ -314,6 +315,13 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         else:
             stress = np.zeros((3, 3))
+        stress = (
+            full_3x3_to_voigt_6_stress(
+                result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+            )
+            * self.stress_wt
+            / 160.21766208
+        )
         if "atomwise" in self.config["model"]["name"]:
             energy = result["out"].detach().cpu().numpy()
         else:
@@ -325,6 +333,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         if self.force_mult_batchsize:
             forces *= self.config["batch_size"]
 
+        # print("stress cal",stress)
         self.results = {
             "energy": energy,
             "forces": forces,
@@ -449,6 +458,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             atom_features=self.ff_config["atom_features"],
             use_canonize=self.ff_config["use_canonize"],
         )
+        # print("config",self.ff_config)
         result_ff = self.ff_model(
             (
                 g.to(self.device),
@@ -459,6 +469,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         )
         forces = forces = result_ff["grad"].detach().cpu().numpy()
+
         stress = (
             full_3x3_to_voigt_6_stress(
                 result_ff["stresses"][:3].reshape(3, 3).detach().cpu().numpy()

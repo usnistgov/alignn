@@ -634,6 +634,7 @@ class ALIGNNAtomWise(nn.Module):
                         stress = self.config.stress_multiplier * torch.stack(
                             stresses
                         )
+                        # print("stress",stress)
                     # print("stress2", stress, stress.shape)
                     # virial = (
                     #    160.21766208
