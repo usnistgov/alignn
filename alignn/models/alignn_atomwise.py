@@ -371,16 +371,27 @@ class ALIGNNAtomWise(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
-            g, lg, lat = g
-            lg = lg.local_var()
-            # print('lg',lg)
-            # angle features (fixed)
-            z = self.angle_embedding(lg.edata.pop("h"))
+            if len(g) == 3:
+                g, lg, lat = g
+                lg = lg.local_var()
+                z = self.angle_embedding(lg.edata.pop("h"))
+            else:
+                g, lat = g
+                g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
+                g.ndata["cart_coords"].requires_grad_(True)
+                r, bondlength = compute_pair_vector_and_distance(g)
+                lg = g.line_graph(shared=True)
+                lg.ndata["r"] = r
+                lg.apply_edges(compute_bond_cosines)
+                # print('lg',lg)
+                # angle features (fixed)
+        else:
+            g, lat = g
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)
             features = self.extra_feature_embedding(features)
-        g = g.local_var()
+        # g = g.local_var()
         result = {}
 
         # initial node features: atom feature network...

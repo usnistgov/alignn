@@ -296,7 +296,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         else:
             result = self.model(
-                (g.to(self.device, torch.tensor(atoms.cell).to(self.device)))
+                (g.to(self.device), torch.tensor(atoms.cell).to(self.device))
             )
         if "atomwise" in self.config["model"]["name"]:
             forces = forces = (
