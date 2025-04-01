@@ -310,7 +310,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             forces = np.zeros((3, 3))
         # print("self.trained_stress",self.trained_stress)
         if self.trained_stress:
-            # if "atomwise" in self.config["model"]["name"] and self.trained_stress:
+            # if "atomwise" in self.config["model"]["name"]
+            # and self.trained_stress:
             stress = (
                 full_3x3_to_voigt_6_stress(
                     result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
