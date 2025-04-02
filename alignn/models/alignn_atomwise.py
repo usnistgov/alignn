@@ -371,20 +371,32 @@ class ALIGNNAtomWise(nn.Module):
         z: angle features (lg.edata)
         """
         if len(self.alignn_layers) > 0:
-            g, lg, lat = g
-            lg = lg.local_var()
-            # print('lg',lg)
-            # angle features (fixed)
-            z = self.angle_embedding(lg.edata.pop("h"))
+            if len(g) == 3:
+                g, lg, lat = g
+                lg = lg.local_var()
+                # z = self.angle_embedding(lg.edata.pop("h"))
+                z = self.angle_embedding(lg.edata["h"])
+            else:
+                g, lat = g
+                g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
+                g.ndata["cart_coords"].requires_grad_(True)
+                r, bondlength = compute_pair_vector_and_distance(g)
+                lg = g.line_graph(shared=True)
+                lg.ndata["r"] = r
+                lg.apply_edges(compute_bond_cosines)
+                # print('lg',lg)
+                # angle features (fixed)
+        else:
+            g, lat = g
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)
             features = self.extra_feature_embedding(features)
-        g = g.local_var()
+        # g = g.local_var()
         result = {}
-
         # initial node features: atom feature network...
-        x = g.ndata.pop("atom_features")
+        x = g.ndata["atom_features"]
+        # x = g.ndata.pop("atom_features")
         # print('x1',x,x.shape)
 
         x = self.atom_embedding(x)
@@ -416,7 +428,8 @@ class ALIGNNAtomWise(nn.Module):
 
             lg.ndata["r"] = r  # overwrites precomputed r values
             lg.apply_edges(compute_bond_cosines)  # overwrites precomputed h
-            z = self.angle_embedding(lg.edata.pop("h"))
+            z = self.angle_embedding(lg.edata["h"])
+            # z = self.angle_embedding(lg.edata.pop("h"))
 
         # r = g.edata["r"].clone().detach().requires_grad_(True)
         if self.config.use_cutoff_function:
@@ -623,6 +636,7 @@ class ALIGNNAtomWise(nn.Module):
                         stress = self.config.stress_multiplier * torch.stack(
                             stresses
                         )
+                        # print("stress",stress)
                     # print("stress2", stress, stress.shape)
                     # virial = (
                     #    160.21766208

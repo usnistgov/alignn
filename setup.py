@@ -10,18 +10,18 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2024.12.12",
+    version="2025.4.1",
     author="Kamal Choudhary, Brian DeCost",
     author_email="kamal.choudhary@nist.gov",
     description="alignn",
     install_requires=[
-        "numpy>=1.19.5",
+        "numpy<2.0",
         # "numpy>=1.19.5,<2.0.0",
         "scipy>=1.6.1",
         "jarvis-tools>=2021.07.19",
-        "torch>=2.0.0",
+        "torch<=2.2.1",
         "mpmath<=1.3.0",
-        "dgl>=0.6.0",
+        "dgl<=1.1.1",
         "spglib>=2.0.2",
         "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",

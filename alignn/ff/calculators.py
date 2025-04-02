@@ -213,6 +213,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             self.config = config
         if self.force_mult_natoms:
             self.config["model"]["force_mult_natoms"] = True
+
         if self.include_stress:
             self.implemented_properties = ["energy", "forces", "stress"]
             if (
@@ -226,6 +227,11 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
         else:
             self.implemented_properties = ["energy", "forces"]
+        if (
+            "calculate_gradient" in self.config["model"]
+            and self.config["model"]["calculate_gradient"]
+        ):
+            self.trained_stress = True
 
         if (
             batch_stress is not None
@@ -296,24 +302,57 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         else:
             result = self.model(
-                (g.to(self.device, torch.tensor(atoms.cell).to(self.device)))
+                (g.to(self.device), torch.tensor(atoms.cell).to(self.device))
             )
+        # print("result",result)
         if "atomwise" in self.config["model"]["name"]:
             forces = forces = (
                 result["grad"].detach().cpu().numpy() * self.force_multiplier
             )
         else:
             forces = np.zeros((3, 3))
-        if "atomwise" in self.config["model"]["name"] and self.trained_stress:
-            stress = (
-                full_3x3_to_voigt_6_stress(
-                    result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+        # print("self.trained_stress",self.trained_stress)
+        # if self.trained_stress:
+        #    # if "atomwise" in self.config["model"]["name"]
+        #    # and self.trained_stress:
+        #    stress = (
+        #        full_3x3_to_voigt_6_stress(
+        #            result["stresses"][:3].r
+        # eshape(3, 3).detach().cpu().numpy()
+        #        )
+        #        * self.stress_wt
+        #        / 160.21766208
+        #    )
+        # else:
+        #    stress = np.zeros((3, 3))
+        if (
+            "calculate_gradient" in self.config["model"]
+            and self.config["model"]["calculate_gradient"]
+        ):
+            try:
+                stress = (
+                    full_3x3_to_voigt_6_stress(
+                        result["stresses"][:3]
+                        .reshape(3, 3)
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+                    * self.stress_wt
+                    / 160.21766208
                 )
-                * self.stress_wt
-                / 160.21766208
-            )
+            except Exception:
+                stress = np.zeros((3, 3))
+                pass
         else:
             stress = np.zeros((3, 3))
+        # stress = (
+        #    full_3x3_to_voigt_6_stress(
+        #        result["stresses"][:3].reshape(3, 3).detach().cpu().numpy()
+        #    )
+        #    * self.stress_wt
+        #    / 160.21766208
+        # )
         if "atomwise" in self.config["model"]["name"]:
             energy = result["out"].detach().cpu().numpy()
         else:
@@ -325,6 +364,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         if self.force_mult_batchsize:
             forces *= self.config["batch_size"]
 
+        # print("stress cal",stress)
         self.results = {
             "energy": energy,
             "forces": forces,
@@ -449,6 +489,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             atom_features=self.ff_config["atom_features"],
             use_canonize=self.ff_config["use_canonize"],
         )
+        # print("config",self.ff_config)
         result_ff = self.ff_model(
             (
                 g.to(self.device),
@@ -459,6 +500,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         )
         forces = forces = result_ff["grad"].detach().cpu().numpy()
+
         stress = (
             full_3x3_to_voigt_6_stress(
                 result_ff["stresses"][:3].reshape(3, 3).detach().cpu().numpy()

@@ -154,6 +154,9 @@ def test_jdft_mbj_gap():
     val = atoms.get_potential_energy()  # gap
 
 
+# test_jdft_mbj_gap()
+# test_alexandria_gap()
+# test_alexandria_gap()
 # print('test_graph_builder')
 # test_graph_builder()
 # print('test_ev')
