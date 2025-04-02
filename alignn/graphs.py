@@ -483,6 +483,7 @@ class Graph(object):
         use_lattice_prop: bool = False,
         cutoff_extra=3.5,
         dtype="float32",
+        backtracking=True,
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
@@ -585,7 +586,7 @@ class Graph(object):
             # construct atomistic line graph
             # (nodes are bonds, edges are bond pairs)
             # and add bond angle cosines as edge features
-            lg = g.line_graph(shared=True)
+            lg = g.line_graph(shared=True, backtracking=backtracking)
             lg.apply_edges(compute_bond_cosines)
             return g, lg
         else:
@@ -1062,7 +1063,7 @@ class StructureDataset(DGLDataset):
 
     @staticmethod
     def collate_line_graph(
-        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]],
     ):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, line_graphs, lattices, labels = map(list, zip(*samples))

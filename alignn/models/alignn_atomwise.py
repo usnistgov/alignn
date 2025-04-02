@@ -26,20 +26,16 @@ from alignn.utils import BaseSettings
 
 
 class ALIGNNAtomWiseConfig(BaseSettings):
-    """Hyperparameter schema for jarvisdgl.models.alignn."""
+    """Hyperparameter schema for alignn.models.alignn_atomwise."""
 
     name: Literal["alignn_atomwise"]
     alignn_layers: int = 2
     gcn_layers: int = 2
     atom_input_features: int = 1
-    # atom_input_features: int = 92
     edge_input_features: int = 80
     triplet_input_features: int = 40
     embedding_features: int = 64
     hidden_features: int = 64
-    # hidden_features: int = 256
-    # fc_layers: int = 1
-    # fc_features: int = 64
     output_features: int = 1
     grad_multiplier: int = -1
     calculate_gradient: bool = True
@@ -48,9 +44,6 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     gradwise_weight: float = 1.0
     stresswise_weight: float = 0.0
     atomwise_weight: float = 0.0
-    # if link == log, apply `exp` to final outputs
-    # to constrain predictions to be positive
-    link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
     classification: bool = False
     force_mult_natoms: bool = False
@@ -64,12 +57,21 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     batch_stress: bool = True
     multiply_cutoff: bool = False
     use_penalty: bool = True
+    lighten_edges: bool = True
+    backtracking: bool = True
     extra_features: int = 0
     exponent: int = 5
     penalty_factor: float = 0.1
     penalty_threshold: float = 1
     additional_output_features: int = 0
     additional_output_weight: float = 0
+    link: Literal["identity", "log", "logit"] = "identity"
+    # if link == log, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    # atom_input_features: int = 92
+    # hidden_features: int = 256
+    # fc_layers: int = 1
+    # fc_features: int = 64
 
     class Config:
         """Configure model settings behavior."""
@@ -246,6 +248,55 @@ class ALIGNNConv(nn.Module):
         return x, y, z
 
 
+def get_line_graph(
+    g, lat=[], inner_cutoff=3.0, lighten_edges=False, backtracking=True
+):
+    if not lighten_edges:
+        lg = g.line_graph(shared=True, backtracking=backtracking)
+        # lg.ndata["r"] = r
+        lg.apply_edges(compute_bond_cosines)
+        return lg
+    else:
+        g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
+        g.ndata["cart_coords"].requires_grad_(True)
+        r, bondlength = compute_pair_vector_and_distance(g)
+        dst_pos = g.ndata["cart_coords"][g.edges()[1]] + g.edata["images"]
+        src_pos = g.ndata["cart_coords"][g.edges()[0]]
+        bond_vec = dst_pos - src_pos
+        bond_dist = torch.norm(bond_vec, dim=1)
+        pos = g.ndata["cart_coords"]
+        g.edata["bond_dist"] = bond_dist
+        g.edata["r"] = bond_vec
+        src, dst = g.edges()  # shape: [E], [E]
+        pos = g.ndata["cart_coords"]
+        src1 = src.unsqueeze(1)  # [E,1]
+        dst1 = dst.unsqueeze(1)  # [E,1]
+        src2 = src.unsqueeze(0)  # [1,E]
+        dst2 = dst.unsqueeze(0)  # [1,E]
+        # Broadcasted match on center node
+        center_match = dst1 == src2  # [E, E] -> bool matrix
+        # Get u, v, w for matching triples
+        u = src1.expand(-1, len(src))  # [E, E]
+        v = dst1.expand(-1, len(src))  # [E, E]
+        v2 = src2.expand(len(src), -1)  # [E, E]
+        w = dst2.expand(len(src), -1)  # [E, E]
+        # Mask out u == w (no backtracking)
+        non_backtrack = u != w
+        # Compute distance from u to w for all pairs (eid1, eid2)
+        pos_u = pos[u]
+        pos_w = pos[w]
+        uw_dist = torch.norm(pos_u - pos_w, dim=-1)  # [E, E]
+        # Apply angular cutoff
+        angle_mask = center_match & non_backtrack & (uw_dist < inner_cutoff)
+        # Get edge pairs (eid1, eid2) for the line graph
+        eid1, eid2 = angle_mask.nonzero(as_tuple=True)
+        # Create the line graph
+        lg = dgl.graph((eid1, eid2), num_nodes=len(src))
+        lg.ndata["r"] = bond_vec
+        lg.apply_edges(compute_bond_cosines)
+        return lg
+
+
 class ALIGNNAtomWise(nn.Module):
     """Atomistic Line graph network.
 
@@ -370,24 +421,24 @@ class ALIGNNAtomWise(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
-        if len(self.alignn_layers) > 0:
-            if len(g) == 3:
-                g, lg, lat = g
-                lg = lg.local_var()
-                # z = self.angle_embedding(lg.edata.pop("h"))
-                z = self.angle_embedding(lg.edata["h"])
-            else:
-                g, lat = g
-                g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
-                g.ndata["cart_coords"].requires_grad_(True)
-                r, bondlength = compute_pair_vector_and_distance(g)
-                lg = g.line_graph(shared=True)
-                lg.ndata["r"] = r
-                lg.apply_edges(compute_bond_cosines)
-                # print('lg',lg)
-                # angle features (fixed)
+        if len(g) == 3:
+            g, lg, lat = g
+            lg = lg.local_var()
+            # z = self.angle_embedding(lg.edata.pop("h"))
+            z = self.angle_embedding(lg.edata["h"])
         else:
             g, lat = g
+            if len(self.alignn_layers) > 0:
+                lg = get_line_graph(
+                    g,
+                    lat=lat,
+                    inner_cutoff=self.config.inner_cutoff,
+                    lighten_edges=self.config.lighten_edges,
+                    backtracking=self.config.backtracking,
+                )
+                z = self.angle_embedding(lg.edata["h"])
+            print("lg", lg)
+            # angle features (fixed)
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)
@@ -409,6 +460,7 @@ class ALIGNNAtomWise(nn.Module):
             r, bondlength = compute_pair_vector_and_distance(g)
             lg = g.line_graph(shared=True)
             lg.ndata["r"] = r
+            print("lg", lg)
             lg.apply_edges(compute_bond_cosines)
 
             # bondlength = torch.norm(r, dim=1)
