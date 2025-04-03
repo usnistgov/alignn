@@ -294,8 +294,6 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         )
         if self.config["compute_line_graph"]:
             g, lg = g
-
-        if self.config["model"]["alignn_layers"] > 0:
             result = self.model(
                 (
                     g.to(self.device),
@@ -305,9 +303,15 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     .to(self.device),
                 )
             )
+
         else:
             result = self.model(
-                (g.to(self.device), torch.tensor(atoms.cell).to(self.device))
+                (
+                    g.to(self.device),
+                    torch.tensor(atoms.cell)
+                    .type(torch.get_default_dtype())
+                    .to(self.device),
+                )
             )
         # print("result",result)
         if "atomwise" in self.config["model"]["name"]:

@@ -442,6 +442,7 @@ def radius_graph_old(
 def get_line_graph(
     g, lat=[], inner_cutoff=3.0, lighten_edges=False, backtracking=True
 ):
+    """Generate a line graph object."""
     if not lighten_edges:
         lg = g.line_graph(shared=True, backtracking=backtracking)
         # lg.ndata["r"] = r
