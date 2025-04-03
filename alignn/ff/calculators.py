@@ -281,14 +281,19 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         """Calculate properties."""
         j_atoms = ase_to_atoms(atoms)
         num_atoms = j_atoms.num_atoms
-        g, lg = Graph.atom_dgl_multigraph(
+        g = Graph.atom_dgl_multigraph(
             j_atoms,
             neighbor_strategy=self.config["neighbor_strategy"],
             cutoff=self.config["cutoff"],
             max_neighbors=self.config["max_neighbors"],
             atom_features=self.config["atom_features"],
             use_canonize=self.config["use_canonize"],
+            inner_cutoff=self.config["model"]["inner_cutoff"],
+            lighten_edges=self.config["model"]["lighten_edges"],
+            compute_line_graph=self.config["compute_line_graph"],
         )
+        if self.config["compute_line_graph"]:
+            g, lg = g
 
         if self.config["model"]["alignn_layers"] > 0:
             result = self.model(

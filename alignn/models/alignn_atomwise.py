@@ -21,7 +21,7 @@ from alignn.models.utils import (
     compute_pair_vector_and_distance,
     MLPLayer,
 )
-from alignn.graphs import compute_bond_cosines
+from alignn.graphs import compute_bond_cosines, get_line_graph
 from alignn.utils import BaseSettings
 
 
@@ -248,55 +248,6 @@ class ALIGNNConv(nn.Module):
         return x, y, z
 
 
-def get_line_graph(
-    g, lat=[], inner_cutoff=3.0, lighten_edges=False, backtracking=True
-):
-    if not lighten_edges:
-        lg = g.line_graph(shared=True, backtracking=backtracking)
-        # lg.ndata["r"] = r
-        lg.apply_edges(compute_bond_cosines)
-        return lg
-    else:
-        g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
-        g.ndata["cart_coords"].requires_grad_(True)
-        r, bondlength = compute_pair_vector_and_distance(g)
-        dst_pos = g.ndata["cart_coords"][g.edges()[1]] + g.edata["images"]
-        src_pos = g.ndata["cart_coords"][g.edges()[0]]
-        bond_vec = dst_pos - src_pos
-        bond_dist = torch.norm(bond_vec, dim=1)
-        pos = g.ndata["cart_coords"]
-        g.edata["bond_dist"] = bond_dist
-        g.edata["r"] = bond_vec
-        src, dst = g.edges()  # shape: [E], [E]
-        pos = g.ndata["cart_coords"]
-        src1 = src.unsqueeze(1)  # [E,1]
-        dst1 = dst.unsqueeze(1)  # [E,1]
-        src2 = src.unsqueeze(0)  # [1,E]
-        dst2 = dst.unsqueeze(0)  # [1,E]
-        # Broadcasted match on center node
-        center_match = dst1 == src2  # [E, E] -> bool matrix
-        # Get u, v, w for matching triples
-        u = src1.expand(-1, len(src))  # [E, E]
-        v = dst1.expand(-1, len(src))  # [E, E]
-        v2 = src2.expand(len(src), -1)  # [E, E]
-        w = dst2.expand(len(src), -1)  # [E, E]
-        # Mask out u == w (no backtracking)
-        non_backtrack = u != w
-        # Compute distance from u to w for all pairs (eid1, eid2)
-        pos_u = pos[u]
-        pos_w = pos[w]
-        uw_dist = torch.norm(pos_u - pos_w, dim=-1)  # [E, E]
-        # Apply angular cutoff
-        angle_mask = center_match & non_backtrack & (uw_dist < inner_cutoff)
-        # Get edge pairs (eid1, eid2) for the line graph
-        eid1, eid2 = angle_mask.nonzero(as_tuple=True)
-        # Create the line graph
-        lg = dgl.graph((eid1, eid2), num_nodes=len(src))
-        lg.ndata["r"] = bond_vec
-        lg.apply_edges(compute_bond_cosines)
-        return lg
-
-
 class ALIGNNAtomWise(nn.Module):
     """Atomistic Line graph network.
 
@@ -437,7 +388,7 @@ class ALIGNNAtomWise(nn.Module):
                     backtracking=self.config.backtracking,
                 )
                 z = self.angle_embedding(lg.edata["h"])
-            print("lg", lg)
+            # print("lg", lg)
             # angle features (fixed)
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
