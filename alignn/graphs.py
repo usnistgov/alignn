@@ -449,6 +449,7 @@ def get_line_graph(
         lg.apply_edges(compute_bond_cosines)
         return lg
     else:
+        # print(g)
         g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
         g.ndata["cart_coords"].requires_grad_(True)
         r, bondlength = compute_pair_vector_and_distance(g)
@@ -642,15 +643,20 @@ class Graph(object):
             # construct atomistic line graph
             # (nodes are bonds, edges are bond pairs)
             # and add bond angle cosines as edge features
-            lg = get_line_graph(
-                g,
-                lat=atoms.lattice_mat,
-                inner_cutoff=inner_cutoff,
-                lighten_edges=lighten_edges,
-                backtracking=backtracking,
-            )
-            # lg = g.line_graph(shared=True, backtracking=backtracking)
-            # lg.apply_edges(compute_bond_cosines)
+            # print("lighten_edges",lighten_edges)
+            if lighten_edges:
+                lg = get_line_graph(
+                    g,
+                    lat=torch.tensor(atoms.lattice_mat).type(
+                        torch.get_default_dtype()
+                    ),
+                    inner_cutoff=inner_cutoff,
+                    lighten_edges=lighten_edges,
+                    backtracking=backtracking,
+                )
+            else:
+                lg = g.line_graph(shared=True, backtracking=backtracking)
+                lg.apply_edges(compute_bond_cosines)
             return g, lg
         else:
             return g
