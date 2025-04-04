@@ -161,6 +161,7 @@ class TrainingConfig(BaseSettings):
 
     # training configuration
     dtype: str = "float32"
+    device: str = "cpu"
     random_seed: Optional[int] = 123
     classification_threshold: Optional[float] = None
     # target_range: Optional[List] = None

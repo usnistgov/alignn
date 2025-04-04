@@ -38,6 +38,8 @@ class ALIGNNConfig(BaseSettings):
     classification: bool = False
     num_classes: int = 2
     extra_features: int = 0
+    inner_cutoff: int = 3
+    lighten_edges: int = False
 
     class Config:
         """Configure model settings behavior."""

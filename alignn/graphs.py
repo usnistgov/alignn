@@ -452,14 +452,15 @@ def get_line_graph(
         # print(g)
         g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
         g.ndata["cart_coords"].requires_grad_(True)
-        r, bondlength = compute_pair_vector_and_distance(g)
-        dst_pos = g.ndata["cart_coords"][g.edges()[1]] + g.edata["images"]
-        src_pos = g.ndata["cart_coords"][g.edges()[0]]
-        bond_vec = dst_pos - src_pos
-        bond_dist = torch.norm(bond_vec, dim=1)
-        pos = g.ndata["cart_coords"]
-        g.edata["bond_dist"] = bond_dist
-        g.edata["r"] = bond_vec
+        # r, bondlength = compute_pair_vector_and_distance(g)
+        # dst_pos = g.ndata["cart_coords"][g.edges()[1]] + g.edata["images"]
+        # src_pos = g.ndata["cart_coords"][g.edges()[0]]
+        # bond_vec = dst_pos - src_pos
+        # bond_dist = torch.norm(bond_vec, dim=1)
+        # pos = g.ndata["cart_coords"]
+        # g.edata["bond_dist"] = bond_dist
+        # g.edata["r"] = bond_vec
+
         src, dst = g.edges()  # shape: [E], [E]
         pos = g.ndata["cart_coords"]
         src1 = src.unsqueeze(1)  # [E,1]
@@ -485,7 +486,7 @@ def get_line_graph(
         eid1, eid2 = angle_mask.nonzero(as_tuple=True)
         # Create the line graph
         lg = dgl.graph((eid1, eid2), num_nodes=len(src))
-        lg.ndata["r"] = bond_vec
+        lg.ndata["r"] = g.edata["r"]  # bond_vec
         lg.apply_edges(compute_bond_cosines)
         return lg
 

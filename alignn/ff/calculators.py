@@ -19,6 +19,7 @@ import zipfile
 import numpy as np
 from tqdm import tqdm
 import torch
+from alignn.config import TrainingConfig
 
 # Reference: https://doi.org/10.1039/D2DD00096B
 
@@ -209,8 +210,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         if path is None and model is None:
             path = default_path()
         if self.config is None:
-            config = loadjson(os.path.join(path, config_filename))
-            self.config = config
+            self.config = loadjson(os.path.join(path, config_filename))
+            self.config = TrainingConfig(**self.config).model_dump()
         if self.force_mult_natoms:
             self.config["model"]["force_mult_natoms"] = True
 
@@ -262,6 +263,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     torch.load(
                         os.path.join(path, model_filename),
                         map_location=self.device,
+                        weights_only=False,
                     )
                 )
             else:
@@ -269,13 +271,15 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     torch.load(
                         os.path.join(path, model_filename),
                         map_location=self.device,
+                        weights_only=False,
                     )["model"]
                 )
-            model.to(device)
             model.eval()
+            model.to(device)
             self.model = model
         else:
             model = self.model
+        self.model = self.model.to(self.device)
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
@@ -294,11 +298,13 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         )
         if self.config["compute_line_graph"]:
             g, lg = g
+            # print('self.model',self.model.device)
+            # print("delf.device",self.device)
             result = self.model(
                 (
                     g.to(self.device),
                     lg.to(self.device),
-                    torch.tensor(atoms.cell)
+                    torch.tensor(np.array(atoms.cell))
                     .type(torch.get_default_dtype())
                     .to(self.device),
                 )
@@ -454,6 +460,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             torch.load(
                 os.path.join(ff_path, ff_model_filename),
                 map_location=self.device,
+                weights_only=False,
             )
         )
         ff_model.eval()
@@ -475,10 +482,13 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             torch.load(
                 os.path.join(prop_path, prop_model_filename),
                 map_location=self.device,
+                weights_only=False,
             )
         )
         prop_model.eval()
         self.prop_model = prop_model
+        self.ff_model = self.ff_model.to(self.device)
+        self.prop_model = self.prop_model.to(self.device)
 
     def calculate(
         self,

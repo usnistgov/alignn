@@ -374,10 +374,11 @@ class ALIGNNAtomWise(nn.Module):
         """
         if len(g) == 3:
             g, lg, lat = g
-            lg = lg.local_var()
+            # lg = lg.local_var()
             # print('lg',lg)
             # z = self.angle_embedding(lg.edata.pop("h"))
             z = self.angle_embedding(lg.edata["h"])
+            # lg = lg.local_var()
         else:
             g, lat = g
             if len(self.alignn_layers) > 0:
