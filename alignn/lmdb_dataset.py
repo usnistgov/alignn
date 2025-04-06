@@ -44,7 +44,9 @@ class TorchLMDBDataset(Dataset):
         self.lmdb_path = lmdb_path
         self.ids = ids
         self.line_graph = line_graph
-        self.env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
+        self.env = lmdb.open(
+            self.lmdb_path, readonly=True, lock=False, readahead=False
+        )
         with self.env.begin() as txn:
             self.length = txn.stat()["entries"]
         self.prepare_batch = prepare_line_graph_batch
@@ -55,8 +57,39 @@ class TorchLMDBDataset(Dataset):
 
     def __getitem__(self, idx):
         """Get sample."""
+        if self.env is None:
+            self.env = lmdb.open(
+                self.lmdb_path, readonly=True, lock=False, readahead=False
+            )
+
         with self.env.begin() as txn:
             serialized_data = txn.get(f"{idx}".encode())
+        if self.line_graph:
+            graph, line_graph, lattice, label = pk.loads(serialized_data)
+            return graph, line_graph, lattice, label
+        else:
+            graph, lattice, label = pk.loads(serialized_data)
+            return graph, lattice, label
+
+    def __getitem__(self, idx):
+        """Get sample."""
+        try:
+            if self.env is None:
+                self.env = lmdb.open(
+                    self.lmdb_path, readonly=True, lock=False, readahead=False
+                )
+
+            with self.env.begin() as txn:
+                serialized_data = txn.get(f"{idx}".encode())
+        except lmdb.MapResizedError:
+            # Close and reopen the environment
+            self.close()
+            self.env = lmdb.open(
+                self.lmdb_path, readonly=True, lock=False, readahead=False
+            )
+            with self.env.begin() as txn:
+                serialized_data = txn.get(f"{idx}".encode())
+
         if self.line_graph:
             graph, line_graph, lattice, label = pk.loads(serialized_data)
             return graph, line_graph, lattice, label
@@ -86,7 +119,7 @@ class TorchLMDBDataset(Dataset):
 
     @staticmethod
     def collate_line_graph(
-        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]],
     ):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, line_graphs, lattices, labels = map(list, zip(*samples))
@@ -131,8 +164,11 @@ def get_torch_dataset(
     map_size=1e12,
     read_existing=True,
     dtype="float32",
+    rank=0,
+    world_size=0,
 ):
     """Get Torch Dataset with LMDB."""
+    # read_existing=False
     vals = np.array([ii[target] for ii in dataset])  # df[target].values
     print("data range", np.max(vals), np.min(vals))
     print("line_graph", line_graph)
@@ -143,91 +179,105 @@ def get_torch_dataset(
     f.write(line)
     f.close()
     ids = []
-    if os.path.exists(tmp_name) and read_existing:
-        for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
-            ids.append(d[id_tag])
-        dat = TorchLMDBDataset(
-            lmdb_path=tmp_name, line_graph=line_graph, ids=ids
-        )
-        print("Reading dataset", tmp_name)
-        return dat
-    ids = []
-    env = lmdb.open(tmp_name, map_size=int(map_size))
-    with env.begin(write=True) as txn:
-        for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
-            ids.append(d[id_tag])
-            # g, lg = Graph.atom_dgl_multigraph(
-            atoms = Atoms.from_dict(d["atoms"])
-            g = Graph.atom_dgl_multigraph(
-                atoms,
-                cutoff=float(cutoff),
-                max_neighbors=max_neighbors,
-                atom_features=atom_features,
-                compute_line_graph=line_graph,
-                use_canonize=use_canonize,
-                cutoff_extra=cutoff_extra,
-                neighbor_strategy=neighbor_strategy,
-                dtype=dtype,
-            )
-            if line_graph:
-                g, lg = g
-            lattice = torch.tensor(atoms.lattice_mat).type(
-                torch.get_default_dtype()
-            )
-            label = torch.tensor(d[target]).type(torch.get_default_dtype())
-            natoms = len(d["atoms"]["elements"])
-            # print('label',label,label.view(-1).long())
-            if classification:
-                label = label.long()
-                # label = label.view(-1).long()
-            if "extra_features" in d:
-                g.ndata["extra_features"] = torch.tensor(
-                    [d["extra_features"] for n in range(natoms)]
-                ).type(torch.get_default_dtype())
-            if target_atomwise is not None and target_atomwise != "":
-                g.ndata[target_atomwise] = torch.tensor(
-                    np.array(d[target_atomwise])
-                ).type(torch.get_default_dtype())
-            if target_grad is not None and target_grad != "":
-                # print('grad', np.array(d[target_grad]))
-                # print('grad shape',np.array(d[target_grad]).shape)
-                arr = np.array(d[target_grad])
-                try:
-                    g.ndata[target_grad] = torch.tensor(arr).type(
-                        torch.get_default_dtype()
-                    )
-                except Exception:
-                    arr = arr.reshape(1, -1)
-                    g.ndata[target_grad] = torch.tensor(arr).type(
-                        torch.get_default_dtype()
-                    )
-                    # print('arr',arr.shape)
-            if target_stress is not None and target_stress != "":
-                stress = np.array(d[target_stress])
-                g.ndata[target_stress] = torch.tensor(
-                    np.array([stress for ii in range(g.number_of_nodes())])
-                ).type(torch.get_default_dtype())
-            if (
-                target_additional_output is not None
-                and target_additional_output != ""
-            ):
-                additional_output = np.array(d[target_additional_output])
-                g.ndata[target_additional_output] = torch.tensor(
-                    ([additional_output for ii in range(natoms)])
-                ).type(torch.get_default_dtype())
+    lock_path = os.path.join(tmp_name + "_done.lock")
 
-            # labels.append(label)
-            if line_graph:
-                serialized_data = pk.dumps((g, lg, lattice, label))
-            else:
-                serialized_data = pk.dumps((g, lattice, label))
-            txn.put(f"{idx}".encode(), serialized_data)
+    ids_path = os.path.join(tmp_name, "ids.txt")
+    if rank == 0 and (
+        not os.path.exists(tmp_name) or not os.path.exists(lock_path)
+    ):
+        print(f"[RANK {rank}] Creating LMDB...")
+        os.makedirs(tmp_name, exist_ok=True)
+        env = lmdb.open(tmp_name, map_size=int(map_size))
 
-    env.close()
-    lmdb_dataset = TorchLMDBDataset(
-        lmdb_path=tmp_name, line_graph=line_graph, ids=ids
-    )
-    return lmdb_dataset
+        ids = []
+        with env.begin(write=True) as txn:
+            for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
+                ids.append(d[id_tag])
+                # g, lg = Graph.atom_dgl_multigraph(
+                atoms = Atoms.from_dict(d["atoms"])
+                g = Graph.atom_dgl_multigraph(
+                    atoms,
+                    cutoff=float(cutoff),
+                    max_neighbors=max_neighbors,
+                    atom_features=atom_features,
+                    compute_line_graph=line_graph,
+                    use_canonize=use_canonize,
+                    cutoff_extra=cutoff_extra,
+                    neighbor_strategy=neighbor_strategy,
+                    dtype=dtype,
+                )
+                if line_graph:
+                    g, lg = g
+                lattice = torch.tensor(atoms.lattice_mat).type(
+                    torch.get_default_dtype()
+                )
+                label = torch.tensor(d[target]).type(torch.get_default_dtype())
+                natoms = len(d["atoms"]["elements"])
+                # print('label',label,label.view(-1).long())
+                if classification:
+                    label = label.long()
+                    # label = label.view(-1).long()
+                if "extra_features" in d:
+                    g.ndata["extra_features"] = torch.tensor(
+                        [d["extra_features"] for n in range(natoms)]
+                    ).type(torch.get_default_dtype())
+                if target_atomwise is not None and target_atomwise != "":
+                    g.ndata[target_atomwise] = torch.tensor(
+                        np.array(d[target_atomwise])
+                    ).type(torch.get_default_dtype())
+                if target_grad is not None and target_grad != "":
+                    # print('grad', np.array(d[target_grad]))
+                    # print('grad shape',np.array(d[target_grad]).shape)
+                    arr = np.array(d[target_grad])
+                    try:
+                        g.ndata[target_grad] = torch.tensor(arr).type(
+                            torch.get_default_dtype()
+                        )
+                    except Exception:
+                        arr = arr.reshape(1, -1)
+                        g.ndata[target_grad] = torch.tensor(arr).type(
+                            torch.get_default_dtype()
+                        )
+                        # print('arr',arr.shape)
+                if target_stress is not None and target_stress != "":
+                    stress = np.array(d[target_stress])
+                    g.ndata[target_stress] = torch.tensor(
+                        np.array([stress for ii in range(g.number_of_nodes())])
+                    ).type(torch.get_default_dtype())
+                if (
+                    target_additional_output is not None
+                    and target_additional_output != ""
+                ):
+                    additional_output = np.array(d[target_additional_output])
+                    g.ndata[target_additional_output] = torch.tensor(
+                        ([additional_output for ii in range(natoms)])
+                    ).type(torch.get_default_dtype())
+
+                # labels.append(label)
+                if line_graph:
+                    serialized_data = pk.dumps((g, lg, lattice, label))
+                else:
+                    serialized_data = pk.dumps((g, lattice, label))
+                txn.put(f"{idx}".encode(), serialized_data)
+
+        env.close()
+        with open(ids_path, "w") as f:
+            for i in ids:
+                f.write(i + "\n")
+        # with open(lock_path, "w") as f:
+        #    f.write("done")
+
+    if world_size > 1:
+        if rank != 0:
+            while not os.path.exists(lock_path):
+                print(f"[RANK {rank}] Waiting for dataset...")
+                time.sleep(1)  # wait for rank 0 to finish
+        torch.distributed.barrier()  # synchronizes all ranks
+
+    with open(os.path.join(tmp_name, "ids.txt"), "r") as f:
+        ids = [line.strip() for line in f]
+
+    return TorchLMDBDataset(lmdb_path=tmp_name, line_graph=line_graph, ids=ids)
 
 
 if __name__ == "__main__":

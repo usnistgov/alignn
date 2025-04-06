@@ -19,7 +19,6 @@ import zipfile
 import numpy as np
 from tqdm import tqdm
 import torch
-from alignn.config import TrainingConfig
 
 # Reference: https://doi.org/10.1039/D2DD00096B
 
@@ -210,8 +209,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         if path is None and model is None:
             path = default_path()
         if self.config is None:
-            self.config = loadjson(os.path.join(path, config_filename))
-            self.config = TrainingConfig(**self.config).model_dump()
+            config = loadjson(os.path.join(path, config_filename))
+            self.config = config
         if self.force_mult_natoms:
             self.config["model"]["force_mult_natoms"] = True
 
@@ -263,7 +262,6 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     torch.load(
                         os.path.join(path, model_filename),
                         map_location=self.device,
-                        weights_only=False,
                     )
                 )
             else:
@@ -271,11 +269,10 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     torch.load(
                         os.path.join(path, model_filename),
                         map_location=self.device,
-                        weights_only=False,
                     )["model"]
                 )
-            model.eval()
             model.to(device)
+            model.eval()
             self.model = model
         else:
             model = self.model
@@ -285,39 +282,29 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         """Calculate properties."""
         j_atoms = ase_to_atoms(atoms)
         num_atoms = j_atoms.num_atoms
-        g = Graph.atom_dgl_multigraph(
+        g, lg = Graph.atom_dgl_multigraph(
             j_atoms,
             neighbor_strategy=self.config["neighbor_strategy"],
             cutoff=self.config["cutoff"],
             max_neighbors=self.config["max_neighbors"],
             atom_features=self.config["atom_features"],
             use_canonize=self.config["use_canonize"],
-            inner_cutoff=self.config["model"]["inner_cutoff"],
-            lighten_edges=self.config["model"]["lighten_edges"],
-            compute_line_graph=self.config["compute_line_graph"],
+            # lighten_edges=self.config["model"]["lighten_edges"],
         )
-        if self.config["compute_line_graph"]:
-            g, lg = g
-            # print('self.model',self.model.device)
-            # print("delf.device",self.device)
+
+        if self.config["model"]["alignn_layers"] > 0:
             result = self.model(
                 (
                     g.to(self.device),
                     lg.to(self.device),
-                    torch.tensor(np.array(atoms.cell))
-                    .type(torch.get_default_dtype())
-                    .to(self.device),
-                )
-            )
-
-        else:
-            result = self.model(
-                (
-                    g.to(self.device),
                     torch.tensor(atoms.cell)
                     .type(torch.get_default_dtype())
                     .to(self.device),
                 )
+            )
+        else:
+            result = self.model(
+                (g.to(self.device), torch.tensor(atoms.cell).to(self.device))
             )
         # print("result",result)
         if "atomwise" in self.config["model"]["name"]:
@@ -460,7 +447,6 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             torch.load(
                 os.path.join(ff_path, ff_model_filename),
                 map_location=self.device,
-                weights_only=False,
             )
         )
         ff_model.eval()
@@ -482,13 +468,12 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             torch.load(
                 os.path.join(prop_path, prop_model_filename),
                 map_location=self.device,
-                weights_only=False,
             )
         )
         prop_model.eval()
         self.prop_model = prop_model
-        self.ff_model = self.ff_model.to(self.device)
         self.prop_model = self.prop_model.to(self.device)
+        self.ff_model = self.ff_model.to(self.device)
 
     def calculate(
         self,

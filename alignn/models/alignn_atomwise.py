@@ -402,7 +402,7 @@ class ALIGNNAtomWise(nn.Module):
         x = g.ndata["atom_features"]
         # x = g.ndata.pop("atom_features")
         # print('x1',x,x.shape)
-
+        # print('lg',lg)
         x = self.atom_embedding(x)
         # print('x2',x,x.shape)
         r = g.edata["r"]

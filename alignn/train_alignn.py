@@ -24,15 +24,15 @@ if torch.cuda.is_available():
     device = torch.device("cuda")
 
 
-def setup(rank=0, world_size=0, port="12356"):
-    """Set up multi GPU rank."""
-    # "12356"
+def setup(rank, world_size, master_addr="localhost", master_port="12356"):
+    """Set up multi GPU rank for multi-node training."""
     if port == "":
         port = str(random.randint(10000, 99999))
     if world_size > 1:
-        os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = port
-        # os.environ["MASTER_PORT"] = "12355"
+        os.environ["MASTER_ADDR"] = (
+            master_addr  # Changed from hardcoded "localhost"
+        )
+        os.environ["MASTER_PORT"] = master_port
         # Initialize the distributed environment.
         dist.init_process_group("nccl", rank=rank, world_size=world_size)
         torch.cuda.set_device(rank)
@@ -142,9 +142,42 @@ parser.add_argument(
     help="set device for training the model [e.g. cpu, cuda, cuda:2]",
 )
 
+parser.add_argument(
+    "--master_addr",
+    default="localhost",
+    help="IP address of the master node for distributed training",
+)
+
+parser.add_argument(
+    "--master_port",
+    default="12356",
+    help="Port of the master node for distributed training",
+)
+
+parser.add_argument(
+    "--node_rank",
+    type=int,
+    default=0,
+    help="Rank of this node in multi-node training",
+)
+
+parser.add_argument(
+    "--num_nodes",
+    type=int,
+    default=1,
+    help="Total number of nodes for distributed training",
+)
+
+parser.add_argument(
+    "--gpus_per_node",
+    type=int,
+    default=None,
+    help="Number of GPUs per node (if not all available GPUs)",
+)
+
 
 def train_for_folder(
-    rank=0,
+    local_rank=0,  # Renamed to clarify this is local to the node
     world_size=0,
     root_dir="examples/sample_data",
     config_name="config.json",
@@ -160,9 +193,22 @@ def train_for_folder(
     file_format="poscar",
     restart_model_path=None,
     output_dir=None,
+    master_addr="localhost",
+    master_port="12356",
+    node_rank_offset=0,
 ):
-    """Train for a folder."""
-    setup(rank=rank, world_size=world_size)
+    """Train for a folder with multi-node support."""
+    # Calculate global rank based on local rank and node offset
+    global_rank = local_rank + node_rank_offset
+
+    # Setup distributed environment
+    setup(
+        rank=global_rank,
+        world_size=world_size,
+        master_addr=master_addr,
+        master_port=master_port,
+    )
+
     print("root_dir", root_dir)
     id_prop_json = os.path.join(root_dir, "id_prop.json")
     id_prop_json_zip = os.path.join(root_dir, "id_prop.json.zip")
@@ -409,6 +455,8 @@ def train_for_folder(
     # print("dataset", dataset[0])
     t1 = time.time()
     # world_size = torch.cuda.device_count()
+    print()
+    print()
     print("rank", rank)
     print("world_size", world_size)
     train_dgl(
@@ -420,7 +468,7 @@ def train_for_folder(
             test_loader,
             prepare_batch,
         ],
-        rank=rank,
+        rank=global_rank,
         world_size=world_size,
     )
     t2 = time.time()
@@ -431,9 +479,21 @@ def train_for_folder(
 
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
-    world_size = int(torch.cuda.device_count())
-    print("world_size", world_size)
+
+    # Determine GPUs per node
+    gpus_per_node = (
+        args.gpus_per_node
+        if args.gpus_per_node is not None
+        else torch.cuda.device_count()
+    )
+
+    # Calculate global world size and rank
+    world_size = gpus_per_node * args.num_nodes
+
     if world_size > 1:
+        # Calculate starting rank for this node
+        node_rank_offset = args.node_rank * gpus_per_node
+
         torch.multiprocessing.spawn(
             train_for_folder,
             args=(
@@ -452,10 +512,14 @@ if __name__ == "__main__":
                 args.file_format,
                 args.restart_model_path,
                 args.output_dir,
+                args.master_addr,  # Pass master address
+                args.master_port,  # Pass master port
+                node_rank_offset,  # Pass node rank offset to calculate global rank
             ),
-            nprocs=world_size,
+            nprocs=gpus_per_node,
         )
     else:
+        # Single GPU case, unchanged
         train_for_folder(
             0,
             world_size,
@@ -474,7 +538,3 @@ if __name__ == "__main__":
             args.restart_model_path,
             args.output_dir,
         )
-    try:
-        cleanup(world_size)
-    except Exception:
-        pass

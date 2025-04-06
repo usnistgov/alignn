@@ -482,6 +482,8 @@ def get_line_graph(
         uw_dist = torch.norm(pos_u - pos_w, dim=-1)  # [E, E]
         # Apply angular cutoff
         angle_mask = center_match & non_backtrack & (uw_dist < inner_cutoff)
+        angle_mask = center_match & (uw_dist < inner_cutoff)
+        # angle_mask =  (uw_dist < inner_cutoff)
         # Get edge pairs (eid1, eid2) for the line graph
         eid1, eid2 = angle_mask.nonzero(as_tuple=True)
         # Create the line graph
