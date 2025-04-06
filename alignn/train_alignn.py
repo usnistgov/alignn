@@ -19,6 +19,9 @@ from jarvis.core.atoms import Atoms
 import random
 from ase.stress import voigt_6_to_full_3x3_stress
 
+# from torch.utils.data import DataLoader
+# from torch.utils.data.distributed import DistributedSampler
+
 device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -26,12 +29,10 @@ if torch.cuda.is_available():
 
 def setup(rank, world_size, master_addr="localhost", master_port="12356"):
     """Set up multi GPU rank for multi-node training."""
-    if port == "":
-        port = str(random.randint(10000, 99999))
+    if master_port == "":  # Fixed variable name
+        master_port = str(random.randint(10000, 99999))
     if world_size > 1:
-        os.environ["MASTER_ADDR"] = (
-            master_addr  # Changed from hardcoded "localhost"
-        )
+        os.environ["MASTER_ADDR"] = master_addr
         os.environ["MASTER_PORT"] = master_port
         # Initialize the distributed environment.
         dist.init_process_group("nccl", rank=rank, world_size=world_size)
@@ -451,14 +452,15 @@ def train_for_folder(
         output_dir=config.output_dir,
         use_lmdb=config.use_lmdb,
         dtype=config.dtype,
+        # rank=global_rank,
+        # ~world_size=world_size,
+        # world_size=world_size,
     )
-    # print("dataset", dataset[0])
     t1 = time.time()
-    # world_size = torch.cuda.device_count()
     print()
-    print()
-    print("rank", rank)
+    print("rank", global_rank)
     print("world_size", world_size)
+    # """
     train_dgl(
         config,
         model=model,
@@ -471,6 +473,7 @@ def train_for_folder(
         rank=global_rank,
         world_size=world_size,
     )
+    # """
     t2 = time.time()
     print("Time taken (s)", t2 - t1)
 
@@ -514,7 +517,7 @@ if __name__ == "__main__":
                 args.output_dir,
                 args.master_addr,  # Pass master address
                 args.master_port,  # Pass master port
-                node_rank_offset,  # Pass node rank offset to calculate global rank
+                node_rank_offset,  # node rank offset to calculate global rank
             ),
             nprocs=gpus_per_node,
         )

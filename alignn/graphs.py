@@ -18,7 +18,7 @@ from tqdm import tqdm
 from jarvis.core.atoms import Atoms
 from alignn.models.utils import (
     compute_cartesian_coordinates,
-    compute_pair_vector_and_distance,
+    #    compute_pair_vector_and_distance,
 )
 
 # import matgl

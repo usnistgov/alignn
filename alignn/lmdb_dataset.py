@@ -12,6 +12,7 @@ import torch
 from tqdm import tqdm
 from typing import List, Tuple
 import dgl
+import time
 
 
 def prepare_line_graph_batch(
@@ -54,22 +55,6 @@ class TorchLMDBDataset(Dataset):
     def __len__(self):
         """Get length."""
         return self.length
-
-    def __getitem__(self, idx):
-        """Get sample."""
-        if self.env is None:
-            self.env = lmdb.open(
-                self.lmdb_path, readonly=True, lock=False, readahead=False
-            )
-
-        with self.env.begin() as txn:
-            serialized_data = txn.get(f"{idx}".encode())
-        if self.line_graph:
-            graph, line_graph, lattice, label = pk.loads(serialized_data)
-            return graph, line_graph, lattice, label
-        else:
-            graph, lattice, label = pk.loads(serialized_data)
-            return graph, lattice, label
 
     def __getitem__(self, idx):
         """Get sample."""
