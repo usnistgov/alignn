@@ -236,6 +236,7 @@ dependencies:
       - cryptography==42.0.5
       - dgl==2.1.0
       - dill==0.3.8
+      - elastic==5.2.5.3
       - filelock==3.13.1
       - flake8==7.0.0
       - fsspec==2024.3.1

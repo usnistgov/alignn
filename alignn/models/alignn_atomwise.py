@@ -21,25 +21,21 @@ from alignn.models.utils import (
     compute_pair_vector_and_distance,
     MLPLayer,
 )
-from alignn.graphs import compute_bond_cosines
+from alignn.graphs import compute_bond_cosines, get_line_graph
 from alignn.utils import BaseSettings
 
 
 class ALIGNNAtomWiseConfig(BaseSettings):
-    """Hyperparameter schema for jarvisdgl.models.alignn."""
+    """Hyperparameter schema for alignn.models.alignn_atomwise."""
 
     name: Literal["alignn_atomwise"]
     alignn_layers: int = 2
     gcn_layers: int = 2
     atom_input_features: int = 1
-    # atom_input_features: int = 92
     edge_input_features: int = 80
     triplet_input_features: int = 40
     embedding_features: int = 64
     hidden_features: int = 64
-    # hidden_features: int = 256
-    # fc_layers: int = 1
-    # fc_features: int = 64
     output_features: int = 1
     grad_multiplier: int = -1
     calculate_gradient: bool = True
@@ -48,9 +44,6 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     gradwise_weight: float = 1.0
     stresswise_weight: float = 0.0
     atomwise_weight: float = 0.0
-    # if link == log, apply `exp` to final outputs
-    # to constrain predictions to be positive
-    link: Literal["identity", "log", "logit"] = "identity"
     zero_inflated: bool = False
     classification: bool = False
     force_mult_natoms: bool = False
@@ -64,12 +57,21 @@ class ALIGNNAtomWiseConfig(BaseSettings):
     batch_stress: bool = True
     multiply_cutoff: bool = False
     use_penalty: bool = True
+    lighten_edges: bool = True
+    backtracking: bool = True
     extra_features: int = 0
     exponent: int = 5
     penalty_factor: float = 0.1
     penalty_threshold: float = 1
     additional_output_features: int = 0
     additional_output_weight: float = 0
+    link: Literal["identity", "log", "logit"] = "identity"
+    # if link == log, apply `exp` to final outputs
+    # to constrain predictions to be positive
+    # atom_input_features: int = 92
+    # hidden_features: int = 256
+    # fc_layers: int = 1
+    # fc_features: int = 64
 
     class Config:
         """Configure model settings behavior."""
@@ -370,24 +372,26 @@ class ALIGNNAtomWise(nn.Module):
         y: bond features (g.edata and lg.ndata)
         z: angle features (lg.edata)
         """
-        if len(self.alignn_layers) > 0:
-            if len(g) == 3:
-                g, lg, lat = g
-                lg = lg.local_var()
-                # z = self.angle_embedding(lg.edata.pop("h"))
-                z = self.angle_embedding(lg.edata["h"])
-            else:
-                g, lat = g
-                g.ndata["cart_coords"] = compute_cartesian_coordinates(g, lat)
-                g.ndata["cart_coords"].requires_grad_(True)
-                r, bondlength = compute_pair_vector_and_distance(g)
-                lg = g.line_graph(shared=True)
-                lg.ndata["r"] = r
-                lg.apply_edges(compute_bond_cosines)
-                # print('lg',lg)
-                # angle features (fixed)
+        if len(g) == 3:
+            g, lg, lat = g
+            # lg = lg.local_var()
+            # print('lg',lg)
+            # z = self.angle_embedding(lg.edata.pop("h"))
+            z = self.angle_embedding(lg.edata["h"])
+            # lg = lg.local_var()
         else:
             g, lat = g
+            if len(self.alignn_layers) > 0:
+                lg = get_line_graph(
+                    g,
+                    lat=lat,
+                    inner_cutoff=self.config.inner_cutoff,
+                    lighten_edges=self.config.lighten_edges,
+                    backtracking=self.config.backtracking,
+                )
+                z = self.angle_embedding(lg.edata["h"])
+            # print("lg", lg)
+            # angle features (fixed)
         if self.config.extra_features != 0:
             features = g.ndata["extra_features"]
             # print('features',features,features.shape)
@@ -398,7 +402,7 @@ class ALIGNNAtomWise(nn.Module):
         x = g.ndata["atom_features"]
         # x = g.ndata.pop("atom_features")
         # print('x1',x,x.shape)
-
+        # print('lg',lg)
         x = self.atom_embedding(x)
         # print('x2',x,x.shape)
         r = g.edata["r"]
@@ -409,6 +413,7 @@ class ALIGNNAtomWise(nn.Module):
             r, bondlength = compute_pair_vector_and_distance(g)
             lg = g.line_graph(shared=True)
             lg.ndata["r"] = r
+            print("lg", lg)
             lg.apply_edges(compute_bond_cosines)
 
             # bondlength = torch.norm(r, dim=1)
