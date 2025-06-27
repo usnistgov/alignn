@@ -13,6 +13,10 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/atomistic-line-graph-neural-network-for/band-gap-on-jarvis-dft)](https://paperswithcode.com/sota/band-gap-on-jarvis-dft?p=atomistic-line-graph-neural-network-for)
 -->
 
+
+⚠️ This repository is no longer maintained.
+For the latest updates and continued development, please visit: https://github.com/atomgptlab/alignn
+
 # Table of Contents
 * [Introduction](#intro)
 * [Installation](#install)
