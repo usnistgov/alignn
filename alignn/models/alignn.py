@@ -25,7 +25,7 @@ class ALIGNNConfig(BaseSettings):
     name: Literal["alignn"]
     alignn_layers: int = 4
     gcn_layers: int = 4
-    atom_input_features: int = 92
+    atom_input_features: int = 100
     edge_input_features: int = 80
     triplet_input_features: int = 40
     embedding_features: int = 64
@@ -232,10 +232,12 @@ class ALIGNN(nn.Module):
         self.readout = AvgPooling()
 
         if self.classification:
-            self.fc = nn.Linear(config.hidden_features, config.num_classes)
+            self.fc = nn.Linear(config.hidden_features + 2, config.num_classes)
             self.softmax = nn.LogSoftmax(dim=1)
         else:
-            self.fc = nn.Linear(config.hidden_features, config.output_features)
+            self.fc = nn.Linear(
+                config.hidden_features + 2, config.output_features
+            )
         self.link = None
         self.link_name = config.link
         if config.link == "identity":
@@ -250,7 +252,10 @@ class ALIGNN(nn.Module):
             self.link = torch.sigmoid
 
     def forward(
-        self, g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph]
+        self,
+        g: Union[Tuple[dgl.DGLGraph, dgl.DGLGraph], dgl.DGLGraph],
+        charge: torch.Tensor = None,
+        data_source: torch.Tensor = None,
     ):
         """ALIGNN : start with `atom_features`.
 
@@ -285,6 +290,10 @@ class ALIGNN(nn.Module):
 
         # norm-activation-pool-classify
         h = self.readout(g, x)
+        if charge is not None:
+            h = torch.cat([h, charge], dim=1)
+        if data_source is not None:
+            h = torch.cat([h, data_source], dim=1)
         out = self.fc(h)
 
         if self.link:

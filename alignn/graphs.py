@@ -7,6 +7,7 @@ import pandas as pd
 from collections import OrderedDict
 from jarvis.analysis.structure.neighbors import NeighborsAnalysis
 from jarvis.core.specie import chem_data, get_node_attributes
+from pymatgen.core.periodic_table import Element
 
 # from jarvis.core.atoms import Atoms
 from collections import defaultdict
@@ -467,12 +468,18 @@ class Standardize(torch.nn.Module):
 
 
 def prepare_dgl_batch(
-    batch: Tuple[dgl.DGLGraph, torch.Tensor], device=None, non_blocking=False
+    batch: Tuple[dgl.DGLGraph, torch.Tensor, torch.Tensor, torch.Tensor],
+    device=None,
+    non_blocking=False,
 ):
     """Send batched dgl crystal graph to device."""
-    g, t = batch
+    g, c, s, t = batch
     batch = (
-        g.to(device, non_blocking=non_blocking),
+        (
+            g.to(device, non_blocking=non_blocking),
+            c.to(device, non_blocking=non_blocking),
+            s.to(device, non_blocking=non_blocking),
+        ),
         t.to(device, non_blocking=non_blocking),
     )
 
@@ -480,7 +487,9 @@ def prepare_dgl_batch(
 
 
 def prepare_line_graph_batch(
-    batch: Tuple[Tuple[dgl.DGLGraph, dgl.DGLGraph], torch.Tensor],
+    batch: Tuple[
+        Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor, torch.Tensor], torch.Tensor
+    ],
     device=None,
     non_blocking=False,
 ):
@@ -488,11 +497,13 @@ def prepare_line_graph_batch(
 
     Note: the batch is a nested tuple, with the graph and line graph together
     """
-    g, lg, t = batch
+    g, lg, c, s, t = batch
     batch = (
         (
             g.to(device, non_blocking=non_blocking),
             lg.to(device, non_blocking=non_blocking),
+            c.to(device, non_blocking=non_blocking),
+            s.to(device, non_blocking=non_blocking),
         ),
         t.to(device, non_blocking=non_blocking),
     )
@@ -559,6 +570,20 @@ class StructureDataset(torch.utils.data.Dataset):
         self.line_graph = line_graph
         print("df", df)
         self.labels = self.df[target]
+
+        if "charge" in df.columns:
+            self.charges = torch.tensor(df["charge"]).type(torch.get_default_dtype())
+        else:
+            self.charges = torch.zeros(len(df), dtype=torch.get_default_dtype())
+
+        if "data_source" in df.columns:
+            uniq = sorted(df["data_source"].unique())
+            self.source_to_idx = {s: i for i, s in enumerate(uniq)}
+            self.sources = torch.tensor([
+                self.source_to_idx[s] for s in df["data_source"]
+            ], dtype=torch.get_default_dtype())
+        else:
+            self.sources = torch.zeros(len(df), dtype=torch.get_default_dtype())
 
         if (
             self.target_atomwise is not None and self.target_atomwise != ""
@@ -657,14 +682,27 @@ class StructureDataset(torch.utils.data.Dataset):
         # get feature shape (referencing Carbon)
         template = get_node_attributes("C", atom_features)
 
-        features = np.zeros((1 + max_z, len(template)))
+        features = np.zeros((1 + max_z, len(template) + 8))
 
         for element, v in chem_data.items():
             z = v["Z"]
             x = get_node_attributes(element, atom_features)
 
             if x is not None:
-                features[z, :] = x
+                features[z, : len(template)] = x
+
+            el = Element.from_Z(z)
+            extras = [
+                el.X or 0.0,
+                el.atomic_radius or 0.0,
+                el.ionization_energy or 0.0,
+                el.electron_affinity or 0.0,
+                1.0 if el.block == "s" else 0.0,
+                1.0 if el.block == "p" else 0.0,
+                1.0 if el.block == "d" else 0.0,
+                1.0 if el.block == "f" else 0.0,
+            ]
+            features[z, len(template) :] = extras
 
         return features
 
@@ -676,14 +714,16 @@ class StructureDataset(torch.utils.data.Dataset):
         """Get StructureDataset sample."""
         g = self.graphs[idx]
         label = self.labels[idx]
+        charge = self.charges[idx].unsqueeze(0)
+        source = self.sources[idx].unsqueeze(0)
 
         if self.transform:
             g = self.transform(g)
 
         if self.line_graph:
-            return g, self.line_graphs[idx], label
+            return g, self.line_graphs[idx], charge, source, label
 
-        return g, label
+        return g, charge, source, label
 
     def setup_standardizer(self, ids):
         """Atom-wise feature standardization transform."""
@@ -702,24 +742,47 @@ class StructureDataset(torch.utils.data.Dataset):
         )
 
     @staticmethod
-    def collate(samples: List[Tuple[dgl.DGLGraph, torch.Tensor]]):
+    def collate(
+        samples: List[Tuple[dgl.DGLGraph, torch.Tensor, torch.Tensor, torch.Tensor]]
+    ):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, labels = map(list, zip(*samples))
+        graphs, charges, sources, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
-        return batched_graph, torch.tensor(labels)
+        return (
+            batched_graph,
+            torch.stack(charges),
+            torch.stack(sources),
+            torch.tensor(labels),
+        )
 
     @staticmethod
     def collate_line_graph(
-        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+        samples: List[
+            Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor, torch.Tensor, torch.Tensor]
+        ]
     ):
         """Dataloader helper to batch graphs cross `samples`."""
-        graphs, line_graphs, labels = map(list, zip(*samples))
+        graphs, line_graphs, charges, sources, labels = map(list, zip(*samples))
         batched_graph = dgl.batch(graphs)
         batched_line_graph = dgl.batch(line_graphs)
+        stacked_charges = torch.stack(charges)
+        stacked_sources = torch.stack(sources)
         if len(labels[0].size()) > 0:
-            return batched_graph, batched_line_graph, torch.stack(labels)
+            return (
+                batched_graph,
+                batched_line_graph,
+                stacked_charges,
+                stacked_sources,
+                torch.stack(labels),
+            )
         else:
-            return batched_graph, batched_line_graph, torch.tensor(labels)
+            return (
+                batched_graph,
+                batched_line_graph,
+                stacked_charges,
+                stacked_sources,
+                torch.tensor(labels),
+            )
 
 
 """
