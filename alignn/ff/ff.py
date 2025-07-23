@@ -1,5 +1,6 @@
 """Module for running ALIGNN-FF."""
 from ase.md import MDLogger
+from ase.parallel import world
 from jarvis.core.atoms import Atoms as JarvisAtoms
 import os
 from ase.md.nvtberendsen import NVTBerendsen
@@ -194,7 +195,14 @@ class ForceField(object):
         dyn=None,
         communicator=None,
     ):
-        """Intialize class."""
+        """Initialize class.
+
+        Parameters
+        ----------
+        communicator : optional
+            MPI communicator for ASE dynamics. Defaults to
+            ``ase.parallel.world`` when ``None``.
+        """
         self.jarvis_atoms = jarvis_atoms
         self.model_path = model_path
         self.model_filename = model_filename
@@ -203,7 +211,7 @@ class ForceField(object):
         self.atoms = self.jarvis_atoms.ase_converter()
         self.print_format = print_format
         self.dyn = dyn
-        self.communicator = communicator
+        self.communicator = communicator or world
         self.logger = logger
         if self.timestep is None:
             self.timestep = 0.01

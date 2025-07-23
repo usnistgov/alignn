@@ -88,11 +88,11 @@ Examples
 ---------
 
 #### Dataset
-The main script to train model is `train_folder.py`. A user needs at least the following info to train a model: 1) `id_prop.csv` with name of the file and corresponding value, 2) `config_example.json` a config file with training and hyperparameters.
+The main script to train model is `train_folder.py`. A user needs at least the following info to train a model: 1) `id_prop_source_charge.csv` with file name, data source, residual charge and target value, 2) `config_example.json` a config file with training and hyperparameters.
 
-Users can keep their structure files in `POSCAR`, `.cif`, `.xyz` or `.pdb` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop.csv` file. 
+Users can keep their structure files in `POSCAR`, `.cif`, `.xyz` or `.pdb` files in a directory. In the examples below we will use POSCAR format files. In the same directory, there should be an `id_prop_source_charge.csv` file.
 
-In this directory, `id_prop.csv`, the filenames, and correponding target values are kept in `comma separated values (csv) format`.
+In this directory, `id_prop_source_charge.csv`, the filenames, data source, residual charge and correponding target values are kept in `comma separated values (csv) format`.
 
 Here is an example of training OptB88vdw bandgaps of 50 materials from JARVIS-DFT database. The example is created using the [generate_sample_data_reg.py](https://github.com/usnistgov/alignn/blob/main/alignn/examples/sample_data/scripts/generate_sample_data_reg.py) script. Users can modify the script for more than 50 data, or make their own dataset in this format. For list of available datasets see [Databases](https://jarvis-tools.readthedocs.io/en/master/databases.html).
 
