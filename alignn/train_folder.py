@@ -68,7 +68,7 @@ def train_for_folder(
 ):
     """Train for a folder."""
     # config_dat=os.path.join(root_dir,config_name)
-    id_prop_dat = os.path.join(root_dir, "id_prop.csv")
+    id_prop_dat = os.path.join(root_dir, "id_prop_source_charge.csv")
     config = loadjson(config_name)
     if type(config) is dict:
         try:
@@ -96,6 +96,8 @@ def train_for_folder(
     for i in data:
         info = {}
         file_name = i[0]
+        data_source = i[1]
+        chg = float(i[2])
         file_path = os.path.join(root_dir, file_name)
         if file_format == "poscar":
             atoms = Atoms.from_poscar(file_path)
@@ -116,8 +118,10 @@ def train_for_folder(
 
         info["atoms"] = atoms.to_dict()
         info["jid"] = file_name
+        info["data_source"] = data_source
+        info["charge"] = chg
 
-        tmp = [float(j) for j in i[1:]]  # float(i[1])
+        tmp = [float(j) for j in i[3:]]  # target value(s)
         if len(tmp) == 1:
             tmp = tmp[0]
         else:

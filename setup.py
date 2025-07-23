@@ -18,7 +18,7 @@ setuptools.setup(
         "numpy>=1.19.5",
         "scipy>=1.6.1",
         "jarvis-tools>=2021.07.19",
-        "torch==1.12.0",
+        "torch>=1.12",
         "dgl>=0.6.0",
         "scikit-learn>=0.22.2",
         "matplotlib>=3.4.1",
