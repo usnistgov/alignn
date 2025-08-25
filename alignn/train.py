@@ -309,7 +309,7 @@ def train_dgl(
                     and config.model.atomwise_weight != 0
                 ):
                     loss2 = config.model.atomwise_weight * criterion(
-                        result["atomwise_pred"].to(device),
+                        result["atomwise_pred"].to(device).squeeze(),
                         dats[0].ndata["atomwise_target"].to(device),
                     )
                     info["target_atomwise_pred"] = (
