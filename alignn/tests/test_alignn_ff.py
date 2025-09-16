@@ -20,6 +20,8 @@ from alignn.ff.ff import (
 from jarvis.io.vasp.inputs import Poscar
 from alignn.ff.ff import get_figshare_model_prop, get_figshare_model_ff
 import os
+from elastic import get_elementary_deformations, get_elastic_tensor
+import elastic, ase
 
 # JVASP-25139
 pos = """Rb8
@@ -154,6 +156,24 @@ def test_jdft_mbj_gap():
     val = atoms.get_potential_energy()  # gap
 
 
+#def test_elastic():
+#    model_path = get_figshare_model_ff(
+#        model_name="v12.2.2024_dft_3d_307k"
+#    )  # default_path()
+#    calc = AlignnAtomwiseCalculator(path=model_path)
+#    atoms = Poscar.from_string(pos).atoms
+#    ase_atoms = atoms.ase_converter()
+#    ase_atoms.calc = calc
+#    systems = get_elementary_deformations(ase_atoms)
+#    cij_order = elastic.elastic.get_cij_order(ase_atoms)
+#    Cij, Bij = get_elastic_tensor(ase_atoms, systems)
+#    for i, j in zip(cij_order, Cij):
+#        # print(i, j / ase.units.GPa)
+#        assert j / ase.units.GPa > 0
+
+
+# test_elastic()
+# test_ev()
 # test_jdft_mbj_gap()
 # test_alexandria_gap()
 # test_alexandria_gap()

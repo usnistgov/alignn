@@ -86,7 +86,7 @@ def test_alignn_train_regression():
     tmp["filename"] = "AA"
     dumpjson(data=tmp, filename=config)
     train_for_folder(
-        rank=0, world_size=world_size, root_dir=root_dir, config_name=config
+        local_rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
 
 
@@ -109,7 +109,7 @@ def test_alignn_train_regression_multi_out():
     tmp["filename"] = "BB"
     dumpjson(data=tmp, filename=config)
     train_for_folder(
-        rank=0, world_size=world_size, root_dir=root_dir, config_name=config
+        local_rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
 
 
@@ -130,7 +130,7 @@ def test_alignn_train_classification():
     tmp["filename"] = "A"
     dumpjson(data=tmp, filename=config)
     train_for_folder(
-        rank=0,
+        local_rank=0,
         world_size=world_size,
         root_dir=root_dir,
         config_name=config,
@@ -155,7 +155,7 @@ def test_alignn_train_ff():
     tmp["filename"] = "B"
     dumpjson(data=tmp, filename=config)
     train_for_folder(
-        rank=0, world_size=world_size, root_dir=root_dir, config_name=config
+        local_rank=0, world_size=world_size, root_dir=root_dir, config_name=config
     )
     cmd = "rm *.pt *.csv *.json *range"
     os.system(cmd)

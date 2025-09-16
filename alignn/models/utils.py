@@ -31,6 +31,7 @@ class RBFExpansion(nn.Module):
             # SchNet-style
             # set lengthscales relative to granularity of RBF expansion
             self.lengthscale = np.diff(self.centers).mean()
+
             self.gamma = 1 / self.lengthscale
 
         else:

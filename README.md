@@ -17,6 +17,7 @@
 * [Introduction](#intro)
 * [Installation](#install)
 * [Examples](#example)
+* [Parameter information](#params)
 * [Pre-trained models](#pretrained)
 * [JARVIS-ALIGNN webapp](#webapp)
 * [ALIGNN-FF & ASE Calculator](#alignnff)
@@ -101,9 +102,9 @@ Examples
 
 | Notebooks                                                                                                                                      | Google&nbsp;Colab                                                                                                                                        | Descriptions                                                                                                                                                                                                                                                                                                                                                                                              |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Regression task (grpah wise prediction)](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb)                                                       | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb)                                 | Examples for developing single output regression model for exfoliation energies of 2D materials.                                                                                                                                                                                                                                                                       |
-| [Machine learning force-field training from scratch](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb)                                                  | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb)                            | Examples of training a machine learning force field for Silicon.                                                                                                                                                                                                                                                                                                                                 |
-| [ALIGNN-FF Relaxer+EV_curve+Phonons+Interface gamma_surface+Interface separation](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Structure_Relaxation_Phonons_Interface.ipynb)                                                  | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Structure_Relaxation_Phonons_Interface.ipynb)                            | Examples of using pre-trained ALIGNN-FF force-field model.                                                                                                                                                                                                                                                                                                                                 |
+| [Regression Example](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb)                                                       | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb)                                 | Examples for developing single output regression model for exfoliation energies of 2D materials.                                                                                                                                                                                                                                                                       |
+| [Machine learning force-field training](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb)                                                  | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb)                            | Examples of training a machine learning force field for Silicon.                                                                                                                                                                                                                                                                                                                                 |
+| [Geometry optimization, EOS, Phonons, Interface](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Structure_Relaxation_Phonons_Interface.ipynb)                                                  | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Structure_Relaxation_Phonons_Interface.ipynb)                            | Examples of using pre-trained ALIGNN-FF force-field model.                                                                                                                                                                                                                                                                                                                                 |
 | [Scaling/timing comaprison](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Timing_uMLFF.ipynb)                                                  | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Timing_uMLFF.ipynb)                            | Examples of analyzing scaling                                                                                                                                                                                                                                                                                                                                 |
 | [Running MD for Melt-Quench](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Fast_Melt_Quench.ipynb)                                                  | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Fast_Melt_Quench.ipynb)                            | Examples of making amorphous structure with moelcular dynamics.                                                                                                                                                                                                                                                                                                                                 |
 | [Miscellaneous tasks](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)                   | [![Open in Google Colab]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb)  | Examples for developing single output (such as formation energy, bandgaps) or multi-output (such as phonon DOS, electron DOS) Regression or Classification (such as metal vs non-metal), Using several pretrained models. |
@@ -186,6 +187,154 @@ These scripts automatically download datasets from [Databases in jarvis-tools](h
 Additional example trainings for property prediction task: [2D-exfoliation energy](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb), [superconductor transition temperature](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Sc.ipynb).
 
 An example for training MLFF for Silicon is provided [here](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb). It is highly recommeded to get familiar with this example before developing a new model. 
+
+
+
+<a name="params"></a>
+ALIGNN Training Parameters Documentation
+----------------------------------------
+
+
+This document provides detailed descriptions of parameters used for training ALIGNN (Atomistic Line Graph Neural Network) models.
+
+#### Basic Training Parameters
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `batch_size` | 64 | Any positive integer | Number of samples per batch during training |
+| `criterion` | 'mse' | 'l1', 'poisson', 'zig' | Loss function used for training |
+| `epochs` | 300 | Any positive integer | Total number of training epochs |
+| `learning_rate` | 0.01 | Any positive float | Initial learning rate for optimizer |
+| `optimizer` | 'adamw' | 'sgd' | Optimization algorithm |
+| `scheduler` | 'onecycle' | 'none' | Learning rate scheduler type |
+| `warmup_steps` | 2000 | Any non-negative integer | Number of warmup steps for learning rate |
+| `weight_decay` | 0 | Any non-negative float | L2 regularization factor |
+| `random_seed` | 123 | Any integer or None | Seed for random number generators to ensure reproducibility |
+| `progress` | True | False | Whether to display progress bars during training |
+
+##### Data Configuration
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `dataset` | 'dft_3d' | 'jdft_3d-8-18-2021', 'dft_2d', 'megnet', 'megnet2', 'mp_3d_2020', 'qm9', 'qm9_dgl', 'qm9_std_jctc', 'user_data', 'oqmd_3d_no_cfid', 'edos_up', 'edos_pdos', 'qmof', 'qe_tb', 'hmof', 'hpov', 'pdbbind', 'pdbbind_core', 'tinnet_OH', 'tinnet_O', 'tinnet_N' | Dataset name or type |
+| `filename` | 'sample' | Any string | Base filename for saved models and outputs |
+| `target` | 'exfoliation_energy' | Multiple options including 'formation_energy_peratom', 'band_gap', etc. (see TARGET_ENUM) | Property to predict (column name in dataset) |
+| `id_tag` | 'jid' | 'id', '_oqmd_entry_id' | Identifier column in the dataset |
+| `atom_features` | 'cgcnn' | 'basic', 'atomic_number', 'cfid' | Type of atom features to use |
+| `n_train` | None | Any positive integer | Number of training samples |
+| `n_val` | None | Any positive integer | Number of validation samples |
+| `n_test` | None | Any positive integer | Number of test samples |
+| `train_ratio` | 0.8 | Any float between 0 and 1 | Fraction of data used for training |
+| `val_ratio` | 0.1 | Any float between 0 and 1 | Fraction of data used for validation |
+| `test_ratio` | 0.1 | Any float between 0 and 1 | Fraction of data used for testing |
+| `keep_data_order` | True | False | Whether to maintain the original order of data |
+| `use_canonize` | True | False | Whether to canonize molecular graphs |
+| `standard_scalar_and_pca` | False | True | Apply standardization and PCA to input features |
+| `target_multiplication_factor` | None | Any float | Factor to multiply target values |
+
+#### Graph Construction Parameters
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `cutoff` | 8.0 | Any positive float | Cutoff radius for constructing graphs (Å) |
+| `cutoff_extra` | 3.0 | Any positive float | Secondary cutoff for special interactions (Å) |
+| `max_neighbors` | 12 | Any positive integer | Maximum number of neighbors per atom |
+| `neighbor_strategy` | 'k-nearest' | 'voronoi', 'radius_graph', 'radius_graph_jarvis' | Method to construct the graph |
+| `compute_line_graph` | True | False | Whether to precompute line graphs |
+
+#### Hardware & Performance
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `device` | 'cpu' | 'cuda', etc. | Computing device |
+| `distributed` | False | True | Whether to use distributed training |
+| `data_parallel` | False | True | Whether to use DataParallel for multi-GPU training |
+| `dtype` | 'float32' | 'float64', etc. | Data type for tensors |
+| `num_workers` | 4 | Any non-negative integer | Number of data loading worker processes |
+| `pin_memory` | False | True | Whether to use pinned memory for faster GPU transfer |
+| `use_lmdb` | True | False | Use LMDB database for faster data loading |
+
+#### Output & Checkpointing
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `output_dir` | Current directory | Any valid path | Directory for saving outputs |
+| `write_checkpoint` | True | False | Whether to save model checkpoints |
+| `write_predictions` | True | False | Whether to save model predictions |
+| `store_outputs` | True | False | Whether to store all outputs during training |
+| `save_dataloader` | False | True | Whether to save the dataloader for future use |
+| `log_tensorboard` | False | True | Whether to log metrics to TensorBoard |
+| `n_early_stopping` | None | Any positive integer | Number of epochs without improvement before early stopping |
+
+#### Classification Settings
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `classification_threshold` | None | Any float | Threshold for binary classification |
+| `normalize_graph_level_loss` | False | True | Whether to normalize graph-level loss |
+
+#### Model Architecture Parameters
+
+The `model` dictionary contains parameters specific to the ALIGNN architecture:
+
+#### Core Architecture
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `name` | 'alignn_atomwise' | 'alignn', 'ealignn_atomwise' | Model architecture name |
+| `gcn_layers` | 2 | Any positive integer | Number of graph convolution layers |
+| `alignn_layers` | 2 | Any positive integer | Number of ALIGNN layers |
+| `hidden_features` | 64 | Any positive integer | Size of hidden feature vectors |
+| `embedding_features` | 64 | Any positive integer | Size of embedding feature vectors |
+| `output_features` | 1 | Any positive integer | Size of output feature vectors |
+| `atom_input_features` | 1 | Any positive integer | Number of atom input features |
+| `edge_input_features` | 80 | Any positive integer | Number of edge input features |
+| `triplet_input_features` | 40 | Any positive integer | Number of triplet input features |
+
+#### Atomistic Properties and Forces
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `calculate_gradient` | True | False | Whether to calculate force gradients |
+| `add_reverse_forces` | True | False | Whether to add reverse force contributions |
+| `gradwise_weight` | 1.0 | Any non-negative float | Weight for gradient (force) loss term |
+| `graphwise_weight` | 1.0 | Any non-negative float | Weight for graph-level (energy) loss term |
+| `stresswise_weight` | 0.0 | Any non-negative float | Weight for stress tensor loss term |
+| `atomwise_weight` | 0.0 | Any non-negative float | Weight for atom-level property loss term |
+| `grad_multiplier` | -1 | Any float | Multiplier for gradient values |
+| `stress_multiplier` | 1.0 | Any float | Multiplier for stress values |
+| `batch_stress` | True | False | Whether to calculate stress for batches |
+| `force_mult_natoms` | False | True | Whether to multiply forces by number of atoms |
+| `energy_mult_natoms` | True | False | Whether to multiply energy by number of atoms |
+
+#### Advanced Features
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `backtracking` | True | False | Whether to use backtracking in edge updates |
+| `lighten_edges` | True | False | Whether to reduce edge feature dimensionality |
+| `lg_on_fly` | True | False | Calculate line graphs on the fly (saves memory) |
+| `link` | 'identity' | Various activation functions | Activation function type for linking layers |
+| `classification` | False | True | Whether the task is classification |
+| `zero_inflated` | False | True | Whether to use zero-inflated loss |
+| `use_cutoff_function` | False | True | Whether to use smooth cutoff functions |
+| `use_penalty` | True | False | Whether to apply penalties |
+| `penalty_factor` | 0.1 | Any positive float | Factor for penalty term |
+| `penalty_threshold` | 1.0 | Any positive float | Threshold for applying penalty |
+| `multiply_cutoff` | False | True | Whether to multiply features by cutoff function |
+| `inner_cutoff` | 4.0 | Any positive float | Inner cutoff radius (Å) |
+| `exponent` | 5 | Any positive integer | Exponent for cutoff function |
+| `include_pos_deriv` | False | True | Whether to include positional derivatives |
+| `additional_output_features` | 0 | Any non-negative integer | Number of additional output features |
+| `additional_output_weight` | 0.0 | Any non-negative float | Weight for additional output loss |
+| `atomwise_output_features` | 0 | Any non-negative integer | Number of atom-level output features |
+| `extra_features` | 0 | Any non-negative integer | Number of extra features |
+
+#### Version Control
+
+| Parameter | Default Value | Other Options | Description |
+|-----------|---------------|---------------|-------------|
+| `version` | Git commit hash or 'NA' | Any string | Git commit hash or version identifier |
 
 <a name="pretrained"></a>
 Using pre-trained models

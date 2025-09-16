@@ -276,6 +276,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             self.model = model
         else:
             model = self.model
+        self.model = self.model.to(self.device)
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
@@ -288,6 +289,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             max_neighbors=self.config["max_neighbors"],
             atom_features=self.config["atom_features"],
             use_canonize=self.config["use_canonize"],
+            # lighten_edges=self.config["model"]["lighten_edges"],
         )
 
         if self.config["model"]["alignn_layers"] > 0:
@@ -470,6 +472,8 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         )
         prop_model.eval()
         self.prop_model = prop_model
+        self.prop_model = self.prop_model.to(self.device)
+        self.ff_model = self.ff_model.to(self.device)
 
     def calculate(
         self,

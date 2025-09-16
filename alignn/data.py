@@ -357,15 +357,31 @@ def get_train_val_loaders(
         if world_size > 1:
             use_ddp = True
             train_sampler = DistributedSampler(
-                dataset_train, num_replicas=world_size, rank=rank
+                dataset_train,
+                num_replicas=world_size,
+                rank=rank,
+                shuffle=False,
+                drop_last=False,
             )
             val_sampler = DistributedSampler(
-                dataset_val, num_replicas=world_size, rank=rank
+                dataset_val,
+                num_replicas=world_size,
+                rank=rank,
+                shuffle=False,
+                drop_last=False,
+            )
+            test_sampler = DistributedSampler(
+                dataset_test,
+                num_replicas=world_size,
+                rank=rank,
+                shuffle=False,
+                drop_last=False,
             )
         else:
             use_ddp = False
             train_sampler = None
             val_sampler = None
+            test_sampler = None
         tmp_name = filename + "train_data"
         train_data = get_torch_dataset(
             dataset=dataset_train,
@@ -388,6 +404,8 @@ def get_train_val_loaders(
             sampler=train_sampler,
             tmp_name=tmp_name,
             dtype=dtype,
+            rank=rank,
+            world_size=world_size,
             # tmp_name="train_data",
         )
         tmp_name = filename + "val_data"
@@ -413,6 +431,8 @@ def get_train_val_loaders(
                 output_dir=output_dir,
                 tmp_name=tmp_name,
                 dtype=dtype,
+                rank=rank,
+                world_size=world_size,
                 # tmp_name="val_data",
             )
             if len(dataset_val) > 0
@@ -440,6 +460,9 @@ def get_train_val_loaders(
                 output_dir=output_dir,
                 tmp_name=tmp_name,
                 dtype=dtype,
+                sampler=test_sampler,
+                rank=rank,
+                world_size=world_size,
                 # tmp_name="test_data",
             )
             if len(dataset_test) > 0
@@ -456,12 +479,13 @@ def get_train_val_loaders(
             # train_loader = DataLoader(
             train_data,
             batch_size=batch_size,
-            shuffle=True,
+            shuffle=False,
             collate_fn=collate_fn,
             drop_last=True,
             num_workers=workers,
             pin_memory=pin_memory,
             use_ddp=use_ddp,
+            sampler=train_sampler,
         )
 
         val_loader = GraphDataLoader(
@@ -474,6 +498,7 @@ def get_train_val_loaders(
             num_workers=workers,
             pin_memory=pin_memory,
             use_ddp=use_ddp,
+            sampler=val_sampler,
         )
 
         test_loader = (
@@ -487,6 +512,7 @@ def get_train_val_loaders(
                 num_workers=workers,
                 pin_memory=pin_memory,
                 use_ddp=use_ddp,
+                sampler=test_sampler,
             )
             if len(dataset_test) > 0
             else None

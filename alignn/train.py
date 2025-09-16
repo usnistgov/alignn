@@ -70,7 +70,6 @@ def train_dgl(
                 config = TrainingConfig(**config)
             except Exception as exp:
                 print("Check", exp)
-    print("config:", config.dict())
 
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
@@ -153,6 +152,7 @@ def train_dgl(
     # rank=0
     if use_ddp:
         device = torch.device(f"cuda:{rank}")
+        torch.cuda.set_device(device)
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True
@@ -181,31 +181,34 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
-    print(figlet_alignn)
-    print("Model parameters", sum(p.numel() for p in net.parameters()))
-    print("CUDA available", torch.cuda.is_available())
-    print("CUDA device count", int(torch.cuda.device_count()))
-    try:
-        gpu_stats = torch.cuda.get_device_properties(0)
-        max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
-        from platform import system as platform_system
-
-        platform_system = platform_system()
-        statistics = (
-            f"   GPU: {gpu_stats.name}. Max memory: {max_memory} GB"
-            + f". Platform = {platform_system}.\n"
-            f"   Pytorch: {torch.__version__}. CUDA = "
-            + f"{gpu_stats.major}.{gpu_stats.minor}."
-            + f" CUDA Toolkit = {torch.version.cuda}.\n"
-        )
-        print(statistics)
-    except Exception:
-        pass
     # print("device", device)
     net.to(device)
     if use_ddp:
+        # net = DDP(net, device_ids=[rank])
         net = DDP(net, device_ids=[rank], find_unused_parameters=True)
     # group parameters to skip weight decay for bias and batchnorm
+    if rank == 0:
+        print("config:", config.dict())
+        print(figlet_alignn)
+        print("Model parameters", sum(p.numel() for p in net.parameters()))
+        print("CUDA available", torch.cuda.is_available())
+        print("CUDA device count", int(torch.cuda.device_count()))
+        try:
+            gpu_stats = torch.cuda.get_device_properties(0)
+            max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+            from platform import system as platform_system
+
+            platform_system = platform_system()
+            statistics = (
+                f"   GPU: {gpu_stats.name}. Max memory: {max_memory} GB"
+                + f". Platform = {platform_system}.\n"
+                f"   Pytorch: {torch.__version__}. CUDA = "
+                + f"{gpu_stats.major}.{gpu_stats.minor}."
+                + f" CUDA Toolkit = {torch.version.cuda}.\n"
+            )
+            print(statistics)
+        except Exception:
+            pass
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
     if config.scheduler == "none":
@@ -215,6 +218,7 @@ def train_dgl(
         )
 
     elif config.scheduler == "onecycle":
+        print("onecycle steps_per_epoch", len(train_loader))
         steps_per_epoch = len(train_loader)
         # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
@@ -255,8 +259,11 @@ def train_dgl(
             running_loss4 = 0
             running_loss5 = 0
             train_result = []
-            for dats, jid in zip(train_loader, train_loader.dataset.ids):
+            for dats in train_loader:
+                #    dats = prepare_batch(dats)
+                # for dats, jid in zip(train_loader, train_loader.dataset.ids):
                 info = {}
+                # dats = prepare_batch(dats)
                 # info["id"] = jid
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
@@ -419,9 +426,11 @@ def train_dgl(
             val_result = []
             # for dats in val_loader:
             val_init_time = time.time()
-            for dats, jid in zip(val_loader, val_loader.dataset.ids):
+            # for dats, jid in zip(val_loader, val_loader.dataset.ids):
+            for dats in val_loader:
+                # dats = prepare_batch(dats)
                 info = {}
-                info["id"] = jid
+                info["id"] = "NA"  # jid
                 optimizer.zero_grad()
                 # result = net([dats[0].to(device), dats[1].to(device)])
                 # if (config.model.alignn_layers) > 0:
@@ -592,6 +601,7 @@ def train_dgl(
                 data=history_val,
             )
             if rank == 0:
+                os.system("nvidia-smi >> nvidia_log.txt")
                 print_train_val_loss(
                     e,
                     running_loss,
