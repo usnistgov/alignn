@@ -17,7 +17,7 @@ tqdm.pandas()
 # NOTE: Use lmd_dataset,
 # need to fix adding lattice in dataloader
 def load_graphs(
-    dataset=[],
+    dataset=None,
     name: str = "dft_3d",
     neighbor_strategy: str = "k-nearest",
     cutoff: float = 8,
@@ -42,6 +42,8 @@ def load_graphs(
           edata_schemes={'r': Scheme(shape=(3,)})
     ```
     """
+    if dataset is None:
+        dataset = []
 
     def atoms_to_graph(atoms):
         """Convert structure dict to DGLGraph."""
@@ -111,7 +113,7 @@ def load_graphs(
 
 
 def get_torch_dataset(
-    dataset=[],
+    dataset=None,
     id_tag="jid",
     target="",
     target_atomwise="",
@@ -132,6 +134,8 @@ def get_torch_dataset(
     dtype="float32",
 ):
     """Get Torch Dataset."""
+    if dataset is None:
+        dataset = []
     df = pd.DataFrame(dataset)
     # df['natoms']=df['atoms'].apply(lambda x: len(x['elements']))
     # print(" data df", df)

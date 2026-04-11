@@ -1335,9 +1335,9 @@ def phonons3(
 
 
 def ase_phonon(
-    atoms=[],
+    atoms=None,
     N=2,
-    path=[],
+    path=None,
     jid=None,
     calc=None,
     npoints=100,
@@ -1351,6 +1351,10 @@ def ase_phonon(
     force_multiplier=1,
 ):
     """Get phonon bandstructure and DOS using ASE."""
+    if atoms is None:
+        atoms = []
+    if path is None:
+        path = []
     if calc is None:
         calc = AlignnAtomwiseCalculator(
             path=model_path, force_multiplier=force_multiplier

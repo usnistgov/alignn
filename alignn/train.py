@@ -50,7 +50,7 @@ def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
     # checkpoint_dir: Path = Path("./"),
-    train_val_test_loaders=[],
+    train_val_test_loaders=None,
     rank=0,
     world_size=0,
     # log_tensorboard: bool = False,
@@ -60,6 +60,8 @@ def train_dgl(
     `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
+    if train_val_test_loaders is None:
+        train_val_test_loaders = []
     # print("rank", rank)
     # setup(rank, world_size)
     if rank == 0:

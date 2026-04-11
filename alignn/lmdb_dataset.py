@@ -38,8 +38,10 @@ def prepare_line_graph_batch(
 class TorchLMDBDataset(Dataset):
     """Dataset of crystal DGLGraphs using LMDB."""
 
-    def __init__(self, lmdb_path="", line_graph=True, ids=[]):
+    def __init__(self, lmdb_path="", line_graph=True, ids=None):
         """Intitialize with path and ids array."""
+        if ids is None:
+            ids = []
         super(TorchLMDBDataset, self).__init__()
         self.lmdb_path = lmdb_path
         self.ids = ids
@@ -109,7 +111,7 @@ class TorchLMDBDataset(Dataset):
 
 
 def get_torch_dataset(
-    dataset=[],
+    dataset=None,
     id_tag="jid",
     target="",
     target_atomwise="",
@@ -133,6 +135,8 @@ def get_torch_dataset(
     dtype="float32",
 ):
     """Get Torch Dataset with LMDB."""
+    if dataset is None:
+        dataset = []
     vals = np.array([ii[target] for ii in dataset])  # df[target].values
     print("data range", np.max(vals), np.min(vals))
     print("line_graph", line_graph)

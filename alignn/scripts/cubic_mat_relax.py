@@ -26,7 +26,9 @@ print("model_path", model_path)
 # model_path = "/wrk/knc6/ALINN_FC/ALIGNNFF_DB/temp_new"
 
 
-def relax(model_path=[]):
+def relax(model_path=None):
+    if model_path is None:
+        model_path = []
     exp_a = []
     aff_a = []
     for i in tqdm(d):

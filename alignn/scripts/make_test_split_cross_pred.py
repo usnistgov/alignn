@@ -35,9 +35,11 @@ model.eval()
 
 
 def predict_for_db(
-    name="dft_3d", prop="formation_energy_peratom", id_tag="jid", ids=[]
+    name="dft_3d", prop="formation_energy_peratom", id_tag="jid", ids=None
 ):
     """Predict using ALIGNN for a DB."""
+    if ids is None:
+        ids = []
     db = data(name)
     df = pd.DataFrame(db)
     x = []

@@ -330,8 +330,8 @@ def get_prediction(
 
 
 def get_multiple_predictions(
-    atoms_array=[],
-    jids=[],
+    atoms_array=None,
+    jids=None,
     cutoff=8,
     neighbor_strategy="k-nearest",
     max_neighbors=12,
@@ -351,6 +351,10 @@ def get_multiple_predictions(
     # use_lmdb=True,
 ):
     """Use pretrained model on a number of structures."""
+    if atoms_array is None:
+        atoms_array = []
+    if jids is None:
+        jids = []
     # if use_lmdb:
     #    print("Using LMDB dataset.")
     #    from alignn.lmdb_dataset import get_torch_dataset
